@@ -58,10 +58,10 @@ cp interview-mcp/.env.example interview-mcp/.env   # then edit with your API key
 # AI_ENABLED=false runs entirely from knowledge files — no API key needed
 
 # 3. Start the HTTP API (port 3001)
-cd interview-mcp && npm run dev:http
+npm run dev:http
 
 # 4. Start the React dashboard (port 5173) — in a new terminal
-cd ../ui && npm run dev
+npm run dev:ui
 
 # 5. Connect the MCP servers to Claude Code — add to .mcp.json:
 #    see interview-mcp/README.md and report-mcp/README.md for exact config
@@ -77,6 +77,7 @@ Open **http://localhost:5173/graph** to explore the knowledge graph.
 | Script | Description |
 |---|---|
 | `npm run dev:interview` | Start `interview-mcp` MCP server (stdio) |
+| `npm run dev:http` | Start `interview-mcp` HTTP API server on port 3001 |
 | `npm run dev:report` | Start `report-mcp` MCP server (stdio) |
 | `npm run dev:ui` | Start `ui` Vite dev server on port 5173 |
 | `npm run build` | Build all three compiled packages |

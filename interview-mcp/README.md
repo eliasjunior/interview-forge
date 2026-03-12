@@ -226,7 +226,7 @@ This `data/` directory is the **shared data layer** for the whole monorepo. `rep
 
 ## The HTTP Server (`http.ts`)
 
-A standalone Express server on **port 3001**. Runs separately from the MCP server — start it with `npm run dev:http`.
+A standalone Express server on **port 3001**. Runs separately from the MCP server — start it with `npm run dev:http` from the monorepo root, or `npm run dev:ui` from inside this package directly.
 
 This is the data API consumed by the `ui` React app and `report-mcp`'s dynamic report viewer.
 
@@ -319,7 +319,7 @@ EOF
 npm run dev:interview
 
 # Run the HTTP API server (port 3001)
-cd interview-mcp && npm run dev:http
+npm run dev:http   # from monorepo root  — or —  cd interview-mcp && npm run dev:ui
 ```
 
 ### Connecting to Claude Code

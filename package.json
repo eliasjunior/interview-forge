@@ -15,6 +15,7 @@
     "build:report": "npm run build -w report-mcp",
     "build:ui": "npm run build -w ui",
     "dev:interview": "npm run dev -w interview-mcp",
+    "dev:http": "npm run dev:ui -w interview-mcp",
     "dev:report": "npm run dev -w report-mcp",
     "dev:ui": "npm run dev -w ui",
     "start:interview": "npm run start -w interview-mcp",

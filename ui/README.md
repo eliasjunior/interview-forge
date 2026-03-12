@@ -98,10 +98,10 @@ Thin wrappers around `fetch` — all proxied through Vite's `/api` prefix to `ht
 npm install
 
 # Start interview-mcp's HTTP API first (required — ui has no data of its own)
-cd interview-mcp && npm run dev:http
+npm run dev:http   # from monorepo root — runs interview-mcp's http.ts on port 3001
 
 # In a second terminal, start the ui dev server
-npm run dev:ui   # from monorepo root  — or —  cd ui && npm run dev
+npm run dev:ui   # from monorepo root — runs this Vite app on port 5173
 ```
 
 The app is available at **http://localhost:5173**.
