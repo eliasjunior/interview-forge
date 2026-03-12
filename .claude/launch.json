@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "interview-mcp (dev)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "interview-mcp"],
+      "port": 3000
+    },
+    {
+      "name": "interview-mcp (start)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--prefix", "interview-mcp"],
+      "port": 3000
+    },
+    {
+      "name": "neural-map (dev)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:ui", "--prefix", "interview-mcp"],
+      "port": 3001
+    }
+  ]
+}
