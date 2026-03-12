@@ -1,6 +1,6 @@
 import type { AIProvider } from "../ai/index.js";
 import type { KnowledgeStore } from "../knowledge/index.js";
-import type { Concept, Evaluation, KnowledgeGraph, Session } from "../types.js";
+import type { Concept, Evaluation, KnowledgeGraph, Session } from "@mock-interview/shared";
 
 export type StateError = ReturnType<ToolDeps["stateError"]>;
 

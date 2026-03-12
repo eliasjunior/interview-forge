@@ -4,6 +4,7 @@
   "private": true,
   "description": "Monorepo for the Mock Interview MCP study project",
   "workspaces": [
+    "shared",
     "interview-mcp",
     "report-mcp",
     "ui"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getSession } from '../api'
-import type { Session, Evaluation, Concept } from '../types'
+import type { Session, Evaluation, Concept } from '@mock-interview/shared'
 import ScoreBadge, { ScoreBar } from '../components/ScoreBadge'
 
 function calcAvg(evals: Evaluation[]): string {

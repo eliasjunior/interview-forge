@@ -10,7 +10,7 @@ import { fileURLToPath } from "url";
 
 import { createAIProvider, type AIProvider } from "./ai/index.js";
 import { createKnowledgeStore, type KnowledgeStore } from "./knowledge/index.js";
-import type { Session, Concept, KnowledgeGraph } from "./types.js";
+import type { Session, Concept, KnowledgeGraph } from "@mock-interview/shared";
 import {
   assertState,
   generateId,

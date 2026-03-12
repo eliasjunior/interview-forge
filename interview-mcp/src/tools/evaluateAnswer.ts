@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Evaluation } from "../types.js";
+import type { Evaluation } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 
 export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {

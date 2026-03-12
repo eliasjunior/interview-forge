@@ -7,7 +7,7 @@ import {
   calcAvgScore,
   mergeConceptsIntoGraph,
 } from "../interviewUtils.js";
-import type { Session, Evaluation, KnowledgeGraph, Concept } from "../types.js";
+import type { Session, Evaluation, KnowledgeGraph, Concept } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────
 // Helpers

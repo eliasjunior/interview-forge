@@ -7,8 +7,8 @@ export type {
   GraphNode,
   GraphEdge,
   KnowledgeGraph,
-} from "./types.js";
-import type { InterviewState, Session, Evaluation, Concept, KnowledgeGraph } from "./types.js";
+} from "@mock-interview/shared";
+import type { InterviewState, Session, Evaluation, Concept, KnowledgeGraph } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────
 // State machine

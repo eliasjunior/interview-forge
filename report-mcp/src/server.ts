@@ -9,7 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { createAIProvider, type AIProvider } from "./ai/index.js";
-import type { KnowledgeGraph, Session } from "./types.js";
+import type { KnowledgeGraph, Session } from "@mock-interview/shared";
 import {
   calcAvgScore,
   buildSummary,

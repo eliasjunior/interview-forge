@@ -1,0 +1,12 @@
+{
+  "name": "@mock-interview/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import type { Concept } from "../types.js";
+import type { Concept } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KnowledgeStore — port

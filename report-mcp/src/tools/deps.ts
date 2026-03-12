@@ -1,5 +1,5 @@
 import type { AIProvider } from "../ai/index.js";
-import type { Evaluation, KnowledgeGraph, Session } from "../types.js";
+import type { Evaluation, KnowledgeGraph, Session } from "@mock-interview/shared";
 
 export type WeakSubject = {
   questionIndex: number;

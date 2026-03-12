@@ -1,4 +1,4 @@
-import type { Session, KnowledgeGraph, ReportMeta } from './types'
+import type { Session, KnowledgeGraph, ReportMeta } from '@mock-interview/shared'
 
 const BASE = '/api'
 

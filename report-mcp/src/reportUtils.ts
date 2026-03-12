@@ -1,4 +1,4 @@
-import type { Evaluation, Session, KnowledgeGraph } from "./types.js";
+import type { Evaluation, Session, KnowledgeGraph } from "@mock-interview/shared";
 import type { WeakSubject, FullReportQuestionContext } from "./tools/deps.js";
 
 // ─────────────────────────────────────────────────────────────────────────────

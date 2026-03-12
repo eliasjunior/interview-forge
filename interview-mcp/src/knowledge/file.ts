@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { KnowledgeStore, KnowledgeTopic } from "./port.js";
-import type { Concept } from "../types.js";
+import type { Concept } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FileKnowledgeStore — adapter

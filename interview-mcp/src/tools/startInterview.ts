@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Session } from "../types.js";
+import type { Session } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 
 export function registerStartInterviewTool(server: McpServer, deps: ToolDeps) {

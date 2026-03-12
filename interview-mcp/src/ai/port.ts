@@ -1,4 +1,4 @@
-import type { Concept, Evaluation, EvaluationResult } from "../types.js";
+import type { Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AIProvider — the port

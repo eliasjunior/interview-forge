@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AIProvider } from "./port.js";
-import type { Concept, Evaluation, EvaluationResult } from "../types.js";
+import type { Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AnthropicAIProvider — adapter

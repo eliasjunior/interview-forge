@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import type { AIProvider } from "./port.js";
-import type { Concept, Evaluation, EvaluationResult } from "../types.js";
+import type { Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CachingAIProvider — decorator

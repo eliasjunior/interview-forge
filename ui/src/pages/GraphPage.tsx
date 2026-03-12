@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import { getGraph } from '../api'
-import type { KnowledgeGraph, GraphNode, GraphEdge } from '../types'
+import type { KnowledgeGraph, GraphNode, GraphEdge } from '@mock-interview/shared'
 
 // ── Cluster colours ────────────────────────────────────────────────────────
 const CLUSTER_COLOR: Record<string, string> = {
