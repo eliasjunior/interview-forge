@@ -1,6 +1,9 @@
 # interview-mcp
 
-A **Model Context Protocol (MCP) server** that conducts mock technical interviews, evaluates answers with AI, and builds an evolving knowledge graph from every session.
+A **Model Context Protocol (MCP) server** that conducts mock technical interviews, evaluates answers with AI, enforces a session state machine, and exposes a REST API consumed by the rest of the monorepo.
+
+> **Monorepo:** this package is one of four. See the [root README](../README.md) for the full picture.
+> Related: [report-mcp](../report-mcp/README.md) · [ui](../ui/README.md) · [shared](../shared/README.md)
 
 ---
 
@@ -37,8 +40,7 @@ Before diving into the code, it helps to understand what MCP is and how the diff
 │  • A plain Node.js process, no web server           │
 │  • Exposes named tools with typed schemas           │
 │  • Returns structured data in every response        │
-│    (questions, criteria, sessions, graph, scores)   │
-│  • Owns all state (sessions.json, graph.json)       │
+│  • Owns all shared state (sessions.json, graph.json)│
 │  • Enforces the interview state machine             │
 │  • Optionally calls the AI API for the LLM work     │
 └────────────────────────┬────────────────────────────┘
@@ -115,7 +117,7 @@ The Worker LLM is the only part that costs money and requires an internet connec
 1. **Runs a structured mock interview** — generates topic-specific questions, evaluates each answer with a score (1–5), and optionally asks follow-up questions.
 2. **Produces a Markdown report** at the end of every session, including per-question scores, AI feedback, and "where to go deeper" bullet points.
 3. **Builds a knowledge graph** across all sessions — concepts from every interview are merged into a growing graph of nodes and edges.
-4. **Visualizes the graph** in a browser via a D3.js neural map served on `localhost:3001`.
+4. **Exposes a REST API** on port 3001 consumed by `report-mcp` and the `ui` dashboard.
 
 ---
 
@@ -125,12 +127,11 @@ The Worker LLM is the only part that costs money and requires an internet connec
 interview-mcp/
 ├── src/
 │   ├── server.ts           # MCP bootstrap/composition root
-│   ├── http.ts             # Express HTTP server — neural map frontend + REST API
+│   ├── http.ts             # Express HTTP server — REST API on port 3001
 │   ├── tools/              # One file per MCP tool + registerAllTools
-│   ├── ai/                 # Anthropic API integration (questions, evaluation, concepts, dives)
+│   ├── ai/                 # AIProvider port + Anthropic adapter + caching decorator
 │   ├── knowledge/          # FileKnowledgeStore — reads data/knowledge/*.md
-│   ├── interviewUtils.ts   # Pure utilities: state guards, report builder, graph merge, summary
-│   └── types.ts            # Shared TypeScript types
+│   └── interviewUtils.ts   # Pure utilities: state guards, report builder, graph merge, summary
 ├── data/
 │   ├── sessions.json       # All session records (persisted after every state change)
 │   ├── graph.json          # Cumulative knowledge graph
@@ -142,19 +143,18 @@ interview-mcp/
 │       ├── rest-spring-jpa.md
 │       ├── payment-api-design.md
 │       └── …               # Add more to expand coverage
-├── public/
-│   ├── index.html          # D3.js neural map (single-file frontend)
-│   └── generated/          # Dynamic report viewer + per-session JSON datasets
 └── .env                    # ANTHROPIC_API_KEY + AI_ENABLED (not committed)
 ```
+
+> **Shared types** live in `../shared/src/types.ts` (`@mock-interview/shared`). Do not add a local `types.ts`.
 
 ---
 
 ## The MCP Server (`server.ts`)
 
-The entry point now acts as a **composition/bootstrap root**: it wires shared dependencies, then registers tools from `src/tools/`.
+The entry point acts as a **composition/bootstrap root**: it wires shared dependencies, then registers tools from `src/tools/`.
 
-The server exposes **16 MCP tools** to any connected LLM client and enforces a **state machine** so interview flow stays valid.
+The server exposes **12 MCP tools** and enforces a **state machine** so interview flow stays valid.
 
 ### State Machine
 
@@ -186,6 +186,7 @@ The LLM cannot skip or re-order steps — the server enforces the flow regardles
 
 | Tool | Valid state(s) | Description |
 |---|---|---|
+| `server_status` | — | Returns version and current AI mode. |
 | `help_tools` | — | Lists all tools with short descriptions and example payloads. |
 | `start_interview` | — | Creates a session. Loads questions from a knowledge file if the topic is known; falls back to AI generation if `AI_ENABLED=true`. Returns a session ID. |
 | `ask_question` | `ASK_QUESTION` | Presents the current question. Also returns `evaluationCriteria` from the knowledge file so the orchestrator can evaluate without AI. |
@@ -194,14 +195,11 @@ The LLM cannot skip or re-order steps — the server enforces the flow regardles
 | `ask_followup` | `FOLLOW_UP` | Asks the follow-up question. |
 | `next_question` | `FOLLOW_UP` | Advances to the next question, or ends the interview if done. |
 | `end_interview` | any active state | Force-ends the session and runs finalization. |
-| `regenerate_report` | `ENDED` | Re-runs deeper dives and rewrites the `.md` report for a past session. |
 | `get_session` | any | Returns the full session object (transcript, evaluations, state). |
 | `list_sessions` | any | Lists all sessions with topic, state, progress, and average score. |
 | `list_topics` | any | Lists curated knowledge-file topics available for zero-cost interviews. |
-| `get_graph` | any | Returns the full cumulative knowledge graph. |
-| `get_report_weak_subjects` | any | Returns weak-question report context plus `nextCall` scaffold for `generate_report_ui`. |
-| `get_report_full_context` | any | Returns full report context (all evaluated Q/A) plus `nextCall` scaffold for `generate_report_ui`. |
-| `generate_report_ui` | any | Writes a per-session JSON report dataset and returns a reusable viewer URL (`report-ui.html?sessionId=...`). |
+
+> Report and graph tools (`regenerate_report`, `get_graph`, `get_report_*`, `generate_report_ui`) live in **[report-mcp](../report-mcp/README.md)**.
 
 ### Session Finalization
 
@@ -222,106 +220,55 @@ All data is stored as local JSON files in `data/`. No database required.
 - **`graph.json`** — cumulative graph, merged after every completed session
 - **`reports/{id}.md`** — one Markdown report per completed session
 
----
-
-## The Anthropic API (`ai.ts`)
-
-All calls to the Anthropic API are isolated in `ai.ts`. The client is lazily initialized — it only instantiates when the first API call is made, so a missing key doesn't crash the server at startup.
-
-**Model:** `claude-haiku-4-5-20251001` — chosen for low latency and cost since it's called multiple times per interview turn.
-
-### API calls
-
-#### `generateQuestions(topic)`
-- Sends a single request asking for 5 progressive interview questions as a JSON array.
-- Questions escalate from broad/conceptual to specific/advanced.
-- **Fallback:** if the API call fails, returns 5 hardcoded template questions with the topic filled in.
-
-#### `evaluateAnswer(question, answer)`
-- Scores the candidate's answer on a 1–5 scale.
-- Returns: `score`, `feedback` (one specific sentence), `needsFollowUp` (true if score ≤ 3), and an optional `followUpQuestion`.
-- **Fallback:** scores based on answer word count if the API call fails.
-
-#### `extractConcepts(topic, transcript)`
-- Reads the full interview transcript and extracts 10–20 key technical concepts.
-- Each concept is assigned to one of four clusters: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
-- A concept can appear in multiple clusters.
-- **Fallback:** scans the transcript for keyword matches to produce a minimal concept list.
-
-#### `generateDeeperDives(topic, evaluations)`
-- **Single batch call** — sends all questions, answers, scores, and feedback together.
-- Returns one markdown string per evaluation: 3–5 bullet points in `- **concept** → explanation` format.
-- Focuses on low-scoring questions but includes advanced topics for high scores too.
-- `max_tokens: 4000` to handle up to ~10 questions with full bullet points.
-- **On error:** returns the error message in slot 0 so it's visible in the tool response.
+This `data/` directory is the **shared data layer** for the whole monorepo. `report-mcp` points its data paths here (configurable via `DATA_DIR` env var).
 
 ---
 
 ## The HTTP Server (`http.ts`)
 
-A standalone Express server on **port 3001**. Runs separately from the MCP server and can hot-reload during development.
+A standalone Express server on **port 3001**. Runs separately from the MCP server — start it with `npm run dev:http`.
+
+This is the data API consumed by the `ui` React app and `report-mcp`'s dynamic report viewer.
 
 ### Endpoints
 
 | Endpoint | Description |
 |---|---|
-| `GET /` | Serves the neural map frontend (`public/index.html`) |
 | `GET /api/graph` | Returns `graph.json` — the full knowledge graph |
 | `GET /api/sessions` | Returns all sessions as an array |
 | `GET /api/reports` | Lists all report files with topic, average score, and date |
 | `GET /api/reports/:id` | Returns the raw Markdown for a single report |
 | `GET /api/debug/deeper-dives/:id` | Dev tool: calls `generateDeeperDives` for a session and returns the result |
-| `GET /generated/report-ui.html?sessionId=...` | Reusable dynamic report viewer (client-side rendering from JSON) |
-| `GET /generated/:sessionId-report-ui.json` | JSON dataset generated by `generate_report_ui` |
-
-### Dynamic Report Viewer Flow
-
-1. Call `get_report_full_context` (or `get_report_weak_subjects`).
-2. Fill each `strongAnswer` (max 3 lines).
-3. Call `generate_report_ui` with `sessionId + questions`.
-4. Open `http://localhost:3001/generated/report-ui.html?sessionId=<sessionId>`.
-
-This keeps report rendering dynamic: the page is reusable, and session content lives in JSON.
-
-### Quick Commands (JWT Example)
-
-Use these in sequence for session `1772743307856-xe3eld`:
-
-```json
-{ "tool": "get_report_full_context", "arguments": { "sessionId": "1772743307856-xe3eld" } }
-```
-
-Take the returned `nextCall.arguments`, replace each `strongAnswer: "TODO: max 3 lines"`, then call:
-
-```json
-{ "tool": "generate_report_ui", "arguments": { "sessionId": "1772743307856-xe3eld", "title": "Full Report — JWT authentication", "questions": [/* filled strongAnswer values */] } }
-```
-
-Open:
-
-```text
-http://localhost:3001/generated/report-ui.html?sessionId=1772743307856-xe3eld
-```
+| `GET /generated/report-ui.html?sessionId=...` | Reusable dynamic report viewer (served for `report-mcp`) |
+| `GET /generated/:sessionId-report-ui.json` | JSON dataset written by `report-mcp`'s `generate_report_ui` tool |
 
 ---
 
-## The Neural Map (`public/index.html`)
+## The Anthropic API (`src/ai/`)
 
-A self-contained D3.js force-directed graph visualization.
+All calls to the Anthropic API are isolated here. The client is lazily initialized — it only instantiates when the first API call is made, so a missing key doesn't crash the server at startup.
 
-- **Nodes** = concepts extracted from completed interviews
-- **Edges** = co-occurrence within the same cluster (thicker = more sessions reinforced it)
-- **Clusters** = color-coded groups (`core concepts`, `practical usage`, `tradeoffs`, `best practices`)
-- Convex hull outlines visually group nodes by cluster
-- Nodes that appear in multiple clusters are shared across groups
-- Cluster centroids are pre-positioned to reduce overlap
-- **Interactions:** zoom/pan, click a node to highlight its neighbors, click a cluster in the legend to collapse/expand it
+**Model:** `claude-haiku-4-5-20251001` — chosen for low latency and cost since it is called multiple times per interview turn.
+
+### API calls
+
+#### `generateQuestions(topic)`
+Sends a single request asking for 5 progressive interview questions as a JSON array. Questions escalate from broad/conceptual to specific/advanced. **Fallback:** returns 5 hardcoded template questions with the topic filled in.
+
+#### `evaluateAnswer(question, answer)`
+Scores the candidate's answer on a 1–5 scale. Returns: `score`, `feedback` (one specific sentence), `needsFollowUp` (true if score ≤ 3), and an optional `followUpQuestion`. **Fallback:** scores based on answer word count.
+
+#### `extractConcepts(topic, transcript)`
+Reads the full interview transcript and extracts 10–20 key technical concepts, each assigned to one of four clusters: `core concepts`, `practical usage`, `tradeoffs`, `best practices`. A concept can appear in multiple clusters. **Fallback:** keyword scan of the transcript.
+
+#### `generateDeeperDives(topic, evaluations)`
+**Single batch call** — sends all questions, answers, scores, and feedback together. Returns one markdown string per evaluation: 3–5 bullet points in `- **concept** → explanation` format. `max_tokens: 4000` to handle up to ~10 questions. **On error:** returns the error message in slot 0.
 
 ---
 
 ## Pure Utilities (`interviewUtils.ts`)
 
-Side-effect-free functions shared across `server.ts` and `http.ts`.
+Side-effect-free functions used across `server.ts` and `http.ts`.
 
 | Function | Description |
 |---|---|
@@ -341,9 +288,10 @@ Side-effect-free functions shared across `server.ts` and `http.ts`.
 | Package | Role |
 |---|---|
 | `@modelcontextprotocol/sdk` | MCP server primitives (`McpServer`, `StdioServerTransport`, tool registration) |
-| `@anthropic-ai/sdk` | Official Anthropic client — used in `ai.ts` to call `messages.create` |
+| `@anthropic-ai/sdk` | Official Anthropic client — used in `src/ai/` to call `messages.create` |
+| `@mock-interview/shared` | Shared TypeScript types (workspace package — no runtime cost) |
 | `zod` | Runtime schema validation for MCP tool input parameters |
-| `express` | HTTP server for the neural map and REST API |
+| `express` | HTTP server for the REST API |
 | `cors` | CORS middleware for the Express server |
 | `dotenv` | Loads `ANTHROPIC_API_KEY` from `.env` |
 | `tsx` | Runs TypeScript directly without a compile step (dev only) |
@@ -354,11 +302,11 @@ Side-effect-free functions shared across `server.ts` and `http.ts`.
 ## Setup
 
 ```bash
-# Install dependencies
+# From monorepo root — installs all workspaces
 npm install
 
-# Create .env — see comments for each variable
-cat > .env << 'EOF'
+# Create .env inside interview-mcp/
+cat > interview-mcp/.env << 'EOF'
 # Get your key at https://console.anthropic.com
 ANTHROPIC_API_KEY=sk-ant-...
 
@@ -367,22 +315,22 @@ ANTHROPIC_API_KEY=sk-ant-...
 AI_ENABLED=false
 EOF
 
-# Run the MCP server (stdio, for Claude Desktop / Claude Code)
-npm run dev
+# Run the MCP server (stdio — for Claude Desktop / Claude Code)
+npm run dev:interview
 
-# Run the neural map server (http://localhost:3001)
-npm run dev:ui
+# Run the HTTP API server (port 3001)
+cd interview-mcp && npm run dev:http
 ```
 
 ### Connecting to Claude Code
 
-Add to `.mcp.json` in the project root:
+Add to `.mcp.json` in the monorepo root:
 
 ```json
 {
   "mcpServers": {
     "interview-mcp": {
-      "command": "/path/to/interview-mcp/node_modules/.bin/tsx",
+      "command": "/path/to/node_modules/.bin/tsx",
       "args": ["/path/to/interview-mcp/src/server.ts"]
     }
   }
@@ -399,10 +347,6 @@ The server has two operating modes, controlled by a single line in `.env`. **No 
 
 ### `AI_ENABLED=false` — Knowledge-files-only mode (default)
 
-```
-AI_ENABLED=false
-```
-
 | What changes | Detail |
 |---|---|
 | **Zero API cost** | No calls to Anthropic. The `ANTHROPIC_API_KEY` is still read from `.env` but never used. |
@@ -412,14 +356,7 @@ AI_ENABLED=false
 | **Deeper dives** | Not generated — the report section will be empty. |
 | **Unknown topics** | `start_interview` returns an error listing the available topics. |
 
-Use `list_sessions` or just ask Claude which topics are available — the server reads them from `data/knowledge/` on startup.
-
 ### `AI_ENABLED=true` — Full AI mode
-
-```
-AI_ENABLED=true
-# (or simply remove the line — true is the default)
-```
 
 | What changes | Detail |
 |---|---|
@@ -442,7 +379,7 @@ Knowledge files live in `data/knowledge/*.md` and are committed to git. Each fil
 
 - **Questions** — 5 progressive interview questions
 - **Evaluation criteria** — per-question rubric used in file-only mode
-- **Concepts** — pre-defined clusters used for the knowledge graph (AI mode still extracts dynamically, but file-only mode skips this)
+- **Concepts** — pre-defined clusters used for the knowledge graph
 
 To add a new topic in file-only mode, create a new `.md` file following the format of an existing one (e.g. `java-concurrency.md`) and restart the server.
 
@@ -467,10 +404,8 @@ server.ts  ──── state machine ────► sessions.json
     │
     ├──────────────────────────────► graph.json
     └──────────────────────────────► reports/{id}.md
-                                          │  HTTP GET
-                                     http.ts (port 3001)
-                                          │
-                                     index.html (D3.js)
+
+http.ts (port 3001) ◄──── data/ ──── ui / report-mcp
 ```
 
 **File-only mode (`AI_ENABLED=false`):**
@@ -486,8 +421,6 @@ server.ts  ──── state machine ────► │   from ask_question re
     │  on finalize (no AI calls)
     ├──────────────────────────────► sessions.json
     └──────────────────────────────► reports/{id}.md  (no deeper dives)
-                                          │  HTTP GET
-                                     http.ts (port 3001)
-                                          │
-                                     index.html (D3.js)
+
+http.ts (port 3001) ◄──── data/ ──── ui / report-mcp
 ```
