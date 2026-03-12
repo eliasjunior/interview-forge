@@ -63,6 +63,9 @@ export function buildReport(session: Session): string {
         ``,
         `**Answer:** ${e.answer}`,
         ``,
+        ...(e.strongAnswer?.trim()
+          ? [`**Strong answer:** ${e.strongAnswer}`, ``]
+          : []),
         `**Feedback:** ${e.feedback}`,
         ``,
       );
@@ -221,6 +224,7 @@ export function buildFullQuestionContext(
       subject,
       question: evaluation.question,
       candidateAnswer: evaluation.answer,
+      strongAnswer: evaluation.strongAnswer,
       interviewerFeedback: evaluation.feedback,
       score: evaluation.score,
       isWeak: evaluation.score <= weakScoreThreshold,

@@ -26,6 +26,7 @@ export interface Evaluation {
   questionIndex: number
   question: string
   answer: string
+  strongAnswer?: string
   score: number           // 1–5
   feedback: string
   needsFollowUp: boolean

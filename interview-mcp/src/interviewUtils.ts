@@ -118,6 +118,9 @@ export function buildReport(session: Session): string {
         ``,
         `**Answer:** ${e.answer}`,
         ``,
+        ...(e.strongAnswer?.trim()
+          ? [`**Strong answer:** ${e.strongAnswer}`, ``]
+          : []),
         `**Feedback:** ${e.feedback}`,
         ``,
       );

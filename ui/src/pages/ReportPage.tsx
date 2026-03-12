@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getSession } from '../api'
+import { getGeneratedReportUi, getSession, type ReportUiDataset } from '../api'
 import type { Session, Evaluation, Concept } from '@mock-interview/shared'
 import ScoreBadge, { ScoreBar } from '../components/ScoreBadge'
 
@@ -32,6 +32,7 @@ export default function ReportPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [session, setSession] = useState<Session | null>(null)
+  const [reportUi, setReportUi] = useState<ReportUiDataset | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
@@ -39,9 +40,10 @@ export default function ReportPage() {
 
   useEffect(() => {
     if (!id) return
-    getSession(id)
-      .then(s => {
+    Promise.all([getSession(id), getGeneratedReportUi(id)])
+      .then(([s, dataset]) => {
         setSession(s)
+        setReportUi(dataset)
         if (!s) setError('Session not found')
       })
       .catch(e => setError(String(e)))
@@ -153,6 +155,7 @@ export default function ReportPage() {
                 key={idx}
                 idx={idx}
                 ev={ev}
+                strongAnswer={ev.strongAnswer ?? reportUi?.questions[idx]?.strongAnswer}
                 open={openQ === idx}
                 onToggle={() => setOpenQ(openQ === idx ? null : idx)}
               />
@@ -185,9 +188,10 @@ export default function ReportPage() {
   )
 }
 
-function QuestionCard({ ev, idx, open, onToggle }: {
+function QuestionCard({ ev, idx, strongAnswer, open, onToggle }: {
   ev: Evaluation
   idx: number
+  strongAnswer?: string
   open: boolean
   onToggle: () => void
 }) {
@@ -211,6 +215,12 @@ function QuestionCard({ ev, idx, open, onToggle }: {
             <div className="qa-section-label">Feedback</div>
             <div className="qa-section-text">{ev.feedback}</div>
           </div>
+          {strongAnswer && (
+            <div className="strong-answer-box">
+              <div className="qa-section-label">Strong answer</div>
+              <div className="qa-section-text strong-answer-text">{strongAnswer}</div>
+            </div>
+          )}
           {ev.deeperDive && !ev.deeperDive.startsWith('ERROR') && (
             <div>
               <div className="qa-section-label">🔍 Where to go deeper</div>

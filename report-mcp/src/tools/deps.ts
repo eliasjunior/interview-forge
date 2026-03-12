@@ -16,6 +16,7 @@ export type FullReportQuestionContext = {
   subject: string;
   question: string;
   candidateAnswer: string;
+  strongAnswer?: string;
   interviewerFeedback: string;
   score: number;
   isWeak: boolean;

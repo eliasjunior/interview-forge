@@ -5,10 +5,10 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "dev:ui": "tsx watch src/http.ts",
+    "dev:http": "tsx watch src/http.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "start:ui": "node dist/http.js",
+    "start:http": "node dist/http.js",
     "test": "npx tsx --test src/__tests__/**/*.test.ts"
   },
   "keywords": [],

@@ -281,6 +281,19 @@ export function registerGenerateReportUiTool(server: McpServer, deps: ToolDeps) 
         questions,
       };
 
+      for (const item of questions) {
+        const evaluation = session.evaluations.find((e) =>
+          e.questionIndex === item.questionNumber - 1 &&
+          e.question === item.question &&
+          e.answer === item.candidateAnswer
+        );
+        if (evaluation) evaluation.strongAnswer = item.strongAnswer;
+      }
+
+      sessions[sessionId] = session;
+      deps.saveSessions(sessions);
+      deps.saveReport(session);
+
       deps.writeTextFile(datasetPath, JSON.stringify(payload, null, 2));
       if (!fs.existsSync(viewerPath)) {
         deps.writeTextFile(viewerPath, buildViewerHtml());

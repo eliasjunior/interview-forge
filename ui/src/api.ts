@@ -18,3 +18,28 @@ export const getSession = async (id: string): Promise<Session | null> => {
 export const getReports = (): Promise<ReportMeta[]> => req(`${BASE}/reports`)
 
 export const getGraph = (): Promise<KnowledgeGraph> => req(`${BASE}/graph`)
+
+export interface ReportUiQuestion {
+  questionNumber: number
+  subject?: string
+  question: string
+  candidateAnswer: string
+  interviewerFeedback: string
+  score?: number
+  strongAnswer: string
+}
+
+export interface ReportUiDataset {
+  sessionId: string
+  topic: string
+  title: string
+  generatedAt: string
+  questions: ReportUiQuestion[]
+}
+
+export async function getGeneratedReportUi(id: string): Promise<ReportUiDataset | null> {
+  const res = await fetch(`/generated/${encodeURIComponent(id)}-report-ui.json`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`Request failed: ${res.status} /generated/${id}-report-ui.json`)
+  return res.json() as Promise<ReportUiDataset>
+}

@@ -132,7 +132,7 @@ export default function GraphPage() {
     const tooltip = d3.select(tooltipRef.current)
 
     nodeSel
-      .on('mouseenter', (event, d) => {
+      .on('mouseenter', (_, d) => {
         tooltip
           .style('display', 'block')
           .html(`<strong>${d.label}</strong><br/>${d.clusters.join(', ')}`)
