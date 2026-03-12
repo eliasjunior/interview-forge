@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "interview-mcp": {
+      "command": "/absolute/path/to/first-mcp/interview-mcp/node_modules/.bin/tsx",
+      "args": [
+        "/absolute/path/to/first-mcp/interview-mcp/src/server.ts"
+      ]
+    }
+  }
+}

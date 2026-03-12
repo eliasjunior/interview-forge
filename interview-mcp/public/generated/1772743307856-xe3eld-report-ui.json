@@ -1,0 +1,71 @@
+{
+  "sessionId": "1772743307856-xe3eld",
+  "topic": "JWT authentication",
+  "title": "Full Report — JWT authentication",
+  "generatedAt": "2026-03-10T21:19:51.222Z",
+  "questions": [
+    {
+      "questionNumber": 1,
+      "subject": "JWT authentication overview and fundamentals",
+      "question": "Give me a high-level overview of JWT authentication and explain why it matters.",
+      "candidateAnswer": "JWT JSON web token, scenario without JWT and using session, user types user/password, app goes to the db to retrieve the pwd and matches the password, save the a cookie in the session and usually it has a expire date, this works fine but not really scalable. now with JWT, what if we could login once, do one trip to DB, and create a token, this token can identify the user, with no session, and no more trips to the DB, the is the main idea of JWT.",
+      "interviewerFeedback": "Strong answer — clear and well-structured.",
+      "score": 4,
+      "strongAnswer": "JWT is a signed token (header.payload.signature) that enables stateless auth: server verifies signature and claims (iss/aud/exp) without session lookup.\nIt improves horizontal scaling and service-to-service propagation because identity travels with each request.\nSecurity depends on short-lived access tokens, strict claim validation, and safe key management."
+    },
+    {
+      "questionNumber": 2,
+      "subject": "JWT authentication practical use cases",
+      "question": "Walk me through a practical example or real-world use case for JWT authentication.",
+      "candidateAnswer": "practical example - access my home-video web app, assume home-video is access only via https, types user/pwd, application checks the pwd, usually stored in DB or a vault. app now generates an access token (AT), and we add this token in a special cookies, there are some special cookies that JS does not has access to it (HttpOnly cookies), so we store the AT there. now user leave the app but comes back a few hours later, and try to access GET /videos, that request has a special cookie that the app retrieves and read, there has some info about the user, what he can do, and also the token itself, app has a private key and verify if that token has being tempered or not, if it all good, the request carry out and server the resource, the user does not need to type the password again, this was seemless, stateless and no trip to the DB or over the wire.",
+      "interviewerFeedback": "Excellent — thorough, structured, and insightful.",
+      "score": 5,
+      "strongAnswer": "Example: user logs in, backend issues short-lived access JWT + rotating refresh token; API gateway verifies JWT on each request.\nProtected endpoints trust verified claims (subject, roles, scopes) and avoid per-request DB session checks.\nOn refresh reuse or logout, invalidate refresh token server-side and force re-authentication."
+    },
+    {
+      "questionNumber": 3,
+      "subject": "JWT authentication common pitfalls",
+      "question": "What are the most common pitfalls or mistakes developers make with JWT authentication?",
+      "candidateAnswer": "Long expiration date — the JWT token should be short lived. One way to make sure the user does not type the password again is the use of refresh tokens. Another mistake is adding the token in common cookies (not HttpOnly), making it vulnerable for attackers.",
+      "interviewerFeedback": "Adequate, but could go deeper on key points.",
+      "score": 3,
+      "strongAnswer": "Top pitfalls: long-lived access tokens, skipping claim checks (iss/aud/exp/nbf), weak key rotation, and storing tokens in unsafe browser storage.\nNever put secrets/PII in payload; JWT is signed, not encrypted by default.\nUse HttpOnly/Secure/SameSite cookies (or strict auth headers), short TTL, and refresh-token rotation with reuse detection."
+    },
+    {
+      "questionNumber": 3,
+      "subject": "JWT authentication common pitfalls",
+      "question": "Can you elaborate further and give a concrete example?",
+      "candidateAnswer": "Common time for short-lived tokens is minutes — 15 minutes for instance. Refresh tokens: when the token is about to expire, we can write some filters that identify the expiration, generate a new token and invalidate the old one. Also, secrets should not be added to the payload, as the AT is not encrypted — it's hashed (signed).",
+      "interviewerFeedback": "Adequate, but could go deeper on key points.",
+      "score": 3,
+      "strongAnswer": "Top pitfalls: long-lived access tokens, skipping claim checks (iss/aud/exp/nbf), weak key rotation, and storing tokens in unsafe browser storage.\nNever put secrets/PII in payload; JWT is signed, not encrypted by default.\nUse HttpOnly/Secure/SameSite cookies (or strict auth headers), short TTL, and refresh-token rotation with reuse detection."
+    },
+    {
+      "questionNumber": 4,
+      "subject": "JWT authentication explanation for juniors",
+      "question": "How would you explain JWT authentication to a junior developer who has never seen it?",
+      "candidateAnswer": "Assuming the junior dev understands the basics of a web app where the user needs to authenticate, and to avoid typing the credentials we can use some mechanisms. The old traditional way is to create a session of the user, that when he comes back and tries to login with a browser for example, the server knows how to identify that user, however it has some limitations regarding scalability. Imagine if the user can login once and come back to the app without re-typing the password, also the app does not need to retrieve the info in the DB every time, and also not keep any session — JWT is stateless. The token though should live short because of security, about 15 minutes, but we can refresh the token and the user still doesn't need to type the password.",
+      "interviewerFeedback": "Excellent — thorough, structured, and insightful.",
+      "score": 5,
+      "strongAnswer": "For juniors: session auth stores state on server; JWT stores verifiable identity claims in a signed token sent by client each request.\nServer validates signature and claims, then authorizes access without server-side session lookup (stateless).\nKeep access tokens short-lived and use refresh tokens plus revocation controls for security."
+    },
+    {
+      "questionNumber": 5,
+      "subject": "JWT authentication in high-scale production",
+      "question": "If you had to use JWT authentication in a high-scale production system, what tradeoffs would you consider?",
+      "candidateAnswer": "It adds some complexity. If a token gets stolen we cannot invalidate it, not easily.",
+      "interviewerFeedback": "Partial — missing important concepts.",
+      "score": 2,
+      "strongAnswer": "At scale, JWT reduces session-store bottlenecks but makes immediate revocation harder, so pair short-lived access tokens with rotating refresh tokens.\nAdopt key lifecycle controls (kid/JWKS), strict claim validation, clock-skew handling, and incident-response revocation flows.\nTradeoff: better throughput and multi-instance simplicity vs higher security/operational complexity."
+    },
+    {
+      "questionNumber": 5,
+      "subject": "JWT authentication in high-scale production",
+      "question": "Can you elaborate further and give a concrete example?",
+      "candidateAnswer": "In a high scale the token will be shared across instances, making it very hard to track it down. You can only invalidate a refresh token where you can store it in the DB. There is a limitation in the signature size, I don't know the max size.",
+      "interviewerFeedback": "Adequate, but could go deeper on key points.",
+      "score": 3,
+      "strongAnswer": "At scale, JWT reduces session-store bottlenecks but makes immediate revocation harder, so pair short-lived access tokens with rotating refresh tokens.\nAdopt key lifecycle controls (kid/JWKS), strict claim validation, clock-skew handling, and incident-response revocation flows.\nTradeoff: better throughput and multi-instance simplicity vs higher security/operational complexity."
+    }
+  ]
+}

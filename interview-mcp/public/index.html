@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knowledge Neural Map</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    #header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #21262d;
+      z-index: 100;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      height: 44px;
+      gap: 12px;
+    }
+
+    #header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e6edf3;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    #legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 0 20px 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      font-size: 12px;
+      color: #8b949e;
+    }
+
+    .legend-item:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: #30363d;
+      color: #e6edf3;
+    }
+
+    .legend-item.collapsed {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #stats {
+      margin-left: auto;
+      font-size: 11px;
+      color: #6e7681;
+      white-space: nowrap;
+    }
+
+    #graph-container {
+      position: fixed;
+      top: 80px; left: 0; right: 0; bottom: 0;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Info panel */
+    #info-panel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 240px;
+      background: rgba(22, 27, 34, 0.95);
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.2s;
+      pointer-events: none;
+    }
+
+    #info-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #info-panel h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 8px;
+    }
+
+    .info-row {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 4px;
+    }
+
+    .info-row span {
+      color: #e6edf3;
+    }
+
+    .cluster-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .cluster-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid;
+    }
+
+    /* Hint */
+    #hint {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      font-size: 11px;
+      color: #484f58;
+      line-height: 1.6;
+    }
+
+    /* Empty state */
+    #empty-state {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #484f58;
+    }
+
+    #empty-state h2 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: #6e7681;
+    }
+
+    #empty-state p {
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div class="header-top">
+      <h1>Knowledge Neural Map</h1>
+      <div id="stats"></div>
+    </div>
+    <div id="legend"></div>
+  </div>
+  <div id="graph-container"></div>
+  <div id="info-panel">
+    <h3 id="info-label"></h3>
+    <div class="info-row">Clusters: <span id="info-clusters"></span></div>
+    <div class="info-row">Connections: <span id="info-connections"></span></div>
+  </div>
+  <div id="hint">
+    Scroll to zoom · Drag to pan · Click node for details · Click legend to toggle cluster
+  </div>
+
+  <script>
+  (async () => {
+    // ─── Color palette ────────────────────────────────────────────────────────
+    const COLORS = [
+      "#58a6ff", "#3fb950", "#e3b341", "#f78166",
+      "#bc8cff", "#39d353", "#ff9f43", "#70b8ff",
+    ];
+
+    // ─── Fetch data ───────────────────────────────────────────────────────────
+    let graph;
+    try {
+      const res = await fetch("/api/graph");
+      graph = await res.json();
+    } catch (e) {
+      document.getElementById("graph-container").innerHTML =
+        `<div id="empty-state"><h2>Could not load graph</h2><p>${e.message}</p></div>`;
+      return;
+    }
+
+    if (!graph.nodes || graph.nodes.length === 0) {
+      document.getElementById("graph-container").innerHTML =
+        `<div id="empty-state">
+           <h2>No data yet</h2>
+           <p>Complete a mock interview to see concepts appear here.</p>
+         </div>`;
+      return;
+    }
+
+    // ─── Cluster setup ────────────────────────────────────────────────────────
+    const allClusters = [...new Set(graph.nodes.flatMap(n => n.clusters))];
+    const clusterColor = {};
+    allClusters.forEach((c, i) => { clusterColor[c] = COLORS[i % COLORS.length]; });
+
+    const collapsedClusters = new Set();
+
+    // ─── Stats ────────────────────────────────────────────────────────────────
+    document.getElementById("stats").textContent =
+      `${graph.nodes.length} concepts · ${graph.edges.length} links · ${graph.sessions?.length ?? 0} sessions`;
+
+    // ─── Legend ───────────────────────────────────────────────────────────────
+    const legend = document.getElementById("legend");
+    allClusters.forEach(cluster => {
+      const item = document.createElement("div");
+      item.className = "legend-item";
+      item.dataset.cluster = cluster;
+      item.innerHTML = `<div class="legend-dot" style="background:${clusterColor[cluster]}"></div>${cluster}`;
+      item.addEventListener("click", () => toggleCluster(cluster, item));
+      legend.appendChild(item);
+    });
+
+    // ─── SVG setup ────────────────────────────────────────────────────────────
+    const container = document.getElementById("graph-container");
+    const W = container.clientWidth;
+    const H = container.clientHeight;
+
+    const svg = d3.select("#graph-container")
+      .append("svg")
+      .attr("viewBox", [0, 0, W, H]);
+
+    const g = svg.append("g"); // main group (zoomed)
+
+    // Zoom/pan
+    const zoom = d3.zoom()
+      .scaleExtent([0.2, 4])
+      .on("zoom", (event) => g.attr("transform", event.transform));
+    svg.call(zoom);
+
+    // ─── Prepare simulation data ──────────────────────────────────────────────
+    const nodes = graph.nodes.map(n => ({ ...n }));
+    const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+    const edges = graph.edges
+      .filter(e => nodeById[e.source] && nodeById[e.target])
+      .map(e => ({ ...e, source: e.source, target: e.target }));
+
+    // ─── Hull layer ───────────────────────────────────────────────────────────
+    const hullGroup = g.append("g").attr("class", "hulls");
+
+    // ─── Edge layer ───────────────────────────────────────────────────────────
+    const linkGroup = g.append("g").attr("class", "links");
+    const link = linkGroup.selectAll("line")
+      .data(edges)
+      .join("line")
+      .attr("stroke", "#30363d")
+      .attr("stroke-width", d => Math.max(1, d.weight * 1.5))
+      .attr("stroke-opacity", 0.8);
+
+    // ─── Node layer ───────────────────────────────────────────────────────────
+    const nodeGroup = g.append("g").attr("class", "nodes");
+
+    const nodeEl = nodeGroup.selectAll("g")
+      .data(nodes)
+      .join("g")
+      .attr("class", "node")
+      .style("cursor", "pointer")
+      .call(d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended))
+      .on("click", (event, d) => {
+        event.stopPropagation();
+        showInfo(d);
+        highlightNode(d);
+      });
+
+    // Outer glow ring
+    nodeEl.append("circle")
+      .attr("r", 22)
+      .attr("fill", "none")
+      .attr("stroke", d => clusterColor[d.clusters[0]])
+      .attr("stroke-width", 1.5)
+      .attr("stroke-opacity", 0.3)
+      .attr("class", "glow-ring");
+
+    // Main circle
+    nodeEl.append("circle")
+      .attr("r", 16)
+      .attr("fill", d => {
+        const col = d3.color(clusterColor[d.clusters[0]]);
+        col.opacity = 0.15;
+        return col;
+      })
+      .attr("stroke", d => clusterColor[d.clusters[0]])
+      .attr("stroke-width", 2)
+      .attr("class", "main-circle");
+
+    // Label
+    nodeEl.append("text")
+      .text(d => d.label)
+      .attr("text-anchor", "middle")
+      .attr("dy", 30)
+      .attr("font-size", 11)
+      .attr("fill", "#8b949e")
+      .attr("class", "node-label");
+
+    // Multi-cluster badge (small dot for each extra cluster)
+    nodeEl.each(function(d) {
+      if (d.clusters.length > 1) {
+        const el = d3.select(this);
+        d.clusters.slice(1).forEach((c, i) => {
+          el.append("circle")
+            .attr("r", 4)
+            .attr("cx", 10 + i * 10)
+            .attr("cy", -10)
+            .attr("fill", clusterColor[c])
+            .attr("stroke", "#0d1117")
+            .attr("stroke-width", 1.5);
+        });
+      }
+    });
+
+    // ─── Pre-position nodes by cluster quadrant ───────────────────────────────
+    const clusterCount = allClusters.length;
+    const clusterCentroids = {};
+    allClusters.forEach((cluster, i) => {
+      const angle = (i / clusterCount) * 2 * Math.PI - Math.PI / 2;
+      const radius = Math.min(W, H) * 0.28;
+      clusterCentroids[cluster] = {
+        x: W / 2 + radius * Math.cos(angle),
+        y: H / 2 + radius * Math.sin(angle),
+      };
+    });
+    nodes.forEach(n => {
+      const c = clusterCentroids[n.clusters[0]];
+      n.x = c.x + (Math.random() - 0.5) * 40;
+      n.y = c.y + (Math.random() - 0.5) * 40;
+    });
+
+    // ─── Force simulation ─────────────────────────────────────────────────────
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(edges).id(d => d.id).distance(70).strength(0.4))
+      .force("charge", d3.forceManyBody().strength(-180))
+      .force("center", d3.forceCenter(W / 2, H / 2).strength(0.03))
+      .force("collision", d3.forceCollide(28))
+      .force("cluster", clusterForce(0.15));
+
+    simulation.on("tick", ticked);
+
+    // ─── Click background = deselect ──────────────────────────────────────────
+    svg.on("click", () => {
+      clearHighlight();
+      hideInfo();
+    });
+
+    // ─── Tick ─────────────────────────────────────────────────────────────────
+    function ticked() {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      nodeEl.attr("transform", d => `translate(${d.x},${d.y})`);
+
+      drawHulls();
+    }
+
+    // ─── Convex hulls per cluster ─────────────────────────────────────────────
+    function drawHulls() {
+      const hullData = allClusters.map(cluster => {
+        if (collapsedClusters.has(cluster)) return null;
+        const pts = nodes
+          .filter(n => n.clusters.includes(cluster) && !isHidden(n))
+          .flatMap(n => {
+            const r = 28;
+            return [
+              [n.x - r, n.y - r], [n.x + r, n.y - r],
+              [n.x - r, n.y + r], [n.x + r, n.y + r],
+            ];
+          });
+        if (pts.length < 3) return null;
+        const hull = d3.polygonHull(pts);
+        return hull ? { cluster, hull } : null;
+      }).filter(Boolean);
+
+      hullGroup.selectAll("path")
+        .data(hullData, d => d.cluster)
+        .join("path")
+        .attr("d", d => `M${d.hull.join("L")}Z`)
+        .attr("fill", d => clusterColor[d.cluster])
+        .attr("fill-opacity", 0.05)
+        .attr("stroke", d => clusterColor[d.cluster])
+        .attr("stroke-opacity", 0.2)
+        .attr("stroke-width", 1.5)
+        .attr("stroke-dasharray", "4,3")
+        .style("pointer-events", "none");
+    }
+
+    // ─── Cluster force: pull nodes toward their cluster centroid target ───────
+    function clusterForce(strength) {
+      return function() {
+        nodes.forEach(node => {
+          if (!node.clusters?.length) return;
+          const c = clusterCentroids[node.clusters[0]];
+          if (!c) return;
+          node.vx += (c.x - node.x) * strength;
+          node.vy += (c.y - node.y) * strength;
+        });
+      };
+    }
+
+    // ─── Drag ─────────────────────────────────────────────────────────────────
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    // ─── Highlight ────────────────────────────────────────────────────────────
+    let selectedNode = null;
+
+    function highlightNode(d) {
+      selectedNode = d;
+      const connectedIds = new Set([d.id]);
+      edges.forEach(e => {
+        const sid = typeof e.source === "object" ? e.source.id : e.source;
+        const tid = typeof e.target === "object" ? e.target.id : e.target;
+        if (sid === d.id) connectedIds.add(tid);
+        if (tid === d.id) connectedIds.add(sid);
+      });
+
+      nodeEl.select(".main-circle")
+        .attr("stroke-opacity", n => connectedIds.has(n.id) ? 1 : 0.2)
+        .attr("fill-opacity", n => connectedIds.has(n.id) ? 0.25 : 0.05);
+
+      nodeEl.select(".glow-ring")
+        .attr("stroke-opacity", n => n.id === d.id ? 0.8 : 0.1);
+
+      nodeEl.select(".node-label")
+        .attr("fill", n => connectedIds.has(n.id) ? "#e6edf3" : "#484f58");
+
+      link
+        .attr("stroke-opacity", e => {
+          const sid = typeof e.source === "object" ? e.source.id : e.source;
+          const tid = typeof e.target === "object" ? e.target.id : e.target;
+          return sid === d.id || tid === d.id ? 1 : 0.1;
+        })
+        .attr("stroke", e => {
+          const sid = typeof e.source === "object" ? e.source.id : e.source;
+          const tid = typeof e.target === "object" ? e.target.id : e.target;
+          return sid === d.id || tid === d.id ? clusterColor[d.clusters[0]] : "#30363d";
+        });
+    }
+
+    function clearHighlight() {
+      selectedNode = null;
+      nodeEl.select(".main-circle")
+        .attr("stroke-opacity", 1)
+        .attr("fill-opacity", 0.15);
+      nodeEl.select(".glow-ring").attr("stroke-opacity", 0.3);
+      nodeEl.select(".node-label").attr("fill", "#8b949e");
+      link.attr("stroke-opacity", 0.8).attr("stroke", "#30363d");
+    }
+
+    // ─── Info panel ───────────────────────────────────────────────────────────
+    const infoPanel = document.getElementById("info-panel");
+
+    function showInfo(d) {
+      const connCount = edges.filter(e => {
+        const sid = typeof e.source === "object" ? e.source.id : e.source;
+        const tid = typeof e.target === "object" ? e.target.id : e.target;
+        return sid === d.id || tid === d.id;
+      }).length;
+
+      document.getElementById("info-label").textContent = d.label;
+
+      const clusterEl = document.getElementById("info-clusters");
+      clusterEl.innerHTML = "";
+      const tagsDiv = document.createElement("div");
+      tagsDiv.className = "cluster-tags";
+      d.clusters.forEach(c => {
+        const tag = document.createElement("span");
+        tag.className = "cluster-tag";
+        tag.textContent = c;
+        tag.style.color = clusterColor[c];
+        tag.style.borderColor = clusterColor[c] + "55";
+        tag.style.background = clusterColor[c] + "11";
+        tagsDiv.appendChild(tag);
+      });
+      clusterEl.parentElement.appendChild(tagsDiv);
+
+      document.getElementById("info-connections").textContent = connCount;
+      infoPanel.classList.add("visible");
+    }
+
+    function hideInfo() {
+      infoPanel.classList.remove("visible");
+    }
+
+    // ─── Toggle cluster ───────────────────────────────────────────────────────
+    function isHidden(node) {
+      return node.clusters.every(c => collapsedClusters.has(c));
+    }
+
+    function toggleCluster(cluster, legendEl) {
+      if (collapsedClusters.has(cluster)) {
+        collapsedClusters.delete(cluster);
+        legendEl.classList.remove("collapsed");
+      } else {
+        collapsedClusters.add(cluster);
+        legendEl.classList.add("collapsed");
+      }
+
+      nodeEl.style("display", d => isHidden(d) ? "none" : "");
+      link.style("display", e => {
+        const sid = typeof e.source === "object" ? e.source : nodeById[e.source];
+        const tid = typeof e.target === "object" ? e.target : nodeById[e.target];
+        return (sid && isHidden(sid)) || (tid && isHidden(tid)) ? "none" : "";
+      });
+
+      simulation.alpha(0.3).restart();
+    }
+
+  })();
+  </script>
+</body>
+</html>

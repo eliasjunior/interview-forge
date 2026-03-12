@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Interview Report Viewer</title>
+  <style>
+    :root { --bg:#0b1220; --bg-soft:#111a2e; --card:#121c31; --card-elev:#18243d; --ink:#e5ecf7; --muted:#9db0d0; --accent:#4fd1c5; --accent-soft:#183a44; --line:#2a3957; --danger:#fca5a5; }
+    *{box-sizing:border-box} body{margin:0;padding:28px 18px;background:radial-gradient(circle at top right,#1d2a44 0%,var(--bg) 45%),linear-gradient(180deg,var(--bg),#090f1a);color:var(--ink);font-family:"Avenir Next","Segoe UI",sans-serif}
+    .wrap{max-width:920px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 14px 32px rgba(0,0,0,.35)}
+    h1{margin:0;font-size:1.35rem}.meta{margin-top:6px;color:var(--muted);font-size:.95rem}.error{margin-top:12px;color:var(--danger);font-size:.95rem}
+    .chips{margin-top:16px;display:flex;flex-wrap:wrap;gap:10px}.chip{border:1px solid var(--line);background:var(--bg-soft);color:var(--ink);padding:8px 12px;border-radius:999px;cursor:pointer;transition:all .2s ease;font-weight:600}
+    .chip:hover{border-color:var(--accent);transform:translateY(-1px)}.chip.active{background:var(--accent-soft);border-color:var(--accent);color:#d9fffb}
+    .panels{margin-top:18px}.panel{display:none;border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--card-elev)}.panel.active{display:block}
+    .panel h2{margin:0 0 8px;font-size:1.05rem}.panel p,.panel pre{margin:0;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;font-family:inherit}
+    .row{margin-top:12px}.row h3{margin:0 0 6px;font-size:.92rem;text-transform:uppercase;letter-spacing:.04em;color:#c2d3ee}
+    .badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:#1d3d47;border:1px solid #3fbeb2;color:#a9fff6;font-size:.78rem;font-weight:600}
+  </style>
+</head>
+<body>
+  <main class="wrap"><h1 id="title">Interview Report</h1><div class="meta" id="meta">Loading report...</div><div class="error" id="error"></div><div class="chips" id="chips"></div><div class="panels" id="panels"></div></main>
+  <script>
+    const titleEl=document.getElementById('title'),metaEl=document.getElementById('meta'),errorEl=document.getElementById('error'),chipsRoot=document.getElementById('chips'),panelsRoot=document.getElementById('panels');
+    const activate=(i)=>{chipsRoot.querySelectorAll('.chip').forEach((c,idx)=>c.classList.toggle('active',idx===i));panelsRoot.querySelectorAll('.panel').forEach((p,idx)=>p.classList.toggle('active',idx===i));};
+    const append=(t,v)=>String(v||'').split(/\n/).forEach((line,i)=>{if(i>0)t.appendChild(document.createElement('br'));t.appendChild(document.createTextNode(line));});
+    const render=(questions)=>{chipsRoot.innerHTML='';panelsRoot.innerHTML='';questions.forEach((item,idx)=>{const chip=document.createElement('button');chip.className='chip';chip.textContent=item.subject||('Q'+item.questionNumber);chip.addEventListener('click',()=>activate(idx));chipsRoot.appendChild(chip);const panel=document.createElement('section');panel.className='panel';const h=document.createElement('h2');h.textContent='Q'+item.questionNumber+': '+item.question;if(typeof item.score==='number'){const s=document.createElement('span');s.className='badge';s.textContent=item.score+'/5';h.appendChild(s);}panel.appendChild(h);const mk=(title,text,tag='p')=>{const row=document.createElement('div');row.className='row';const h3=document.createElement('h3');h3.textContent=title;const el=document.createElement(tag);append(el,text);row.appendChild(h3);row.appendChild(el);return row;};panel.appendChild(mk('Candidate answer',item.candidateAnswer,'pre'));panel.appendChild(mk('Interviewer feedback',item.interviewerFeedback));panel.appendChild(mk('Strong answer',item.strongAnswer));panelsRoot.appendChild(panel);});if(questions.length>0)activate(0);};
+    (async()=>{const sid=new URLSearchParams(location.search).get('sessionId');if(!sid){errorEl.textContent='Missing sessionId query param';return;}try{const r=await fetch('./'+encodeURIComponent(sid)+'-report-ui.json',{cache:'no-store'});if(!r.ok)throw new Error('Dataset not found for session '+sid);const p=await r.json();titleEl.textContent=p.title||'Interview Report';metaEl.textContent='Topic: '+(p.topic||'Unknown')+' | Session: '+sid;render(Array.isArray(p.questions)?p.questions:[]);}catch(e){errorEl.textContent=e.message||String(e);}})();
+  </script>
+</body>
+</html>

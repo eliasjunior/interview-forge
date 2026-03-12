@@ -1,0 +1,19 @@
+{
+  "name": "mock-interview-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo for the Mock Interview MCP study project",
+  "workspaces": [
+    "interview-mcp",
+    "report-mcp"
+  ],
+  "scripts": {
+    "build": "npm run build -w interview-mcp -w report-mcp",
+    "build:interview": "npm run build -w interview-mcp",
+    "build:report": "npm run build -w report-mcp",
+    "dev:interview": "npm run dev -w interview-mcp",
+    "dev:report": "npm run dev -w report-mcp",
+    "start:interview": "npm run start -w interview-mcp",
+    "start:report": "npm run start -w report-mcp"
+  }
+}

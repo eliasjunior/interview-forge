@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weak Subjects - JWT authentication</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --bg-soft: #111a2e;
+      --card: #121c31;
+      --card-elev: #18243d;
+      --ink: #e5ecf7;
+      --muted: #9db0d0;
+      --accent: #4fd1c5;
+      --accent-soft: #183a44;
+      --line: #2a3957;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 28px 18px;
+      background:
+        radial-gradient(circle at top right, #1d2a44 0%, var(--bg) 45%),
+        linear-gradient(180deg, var(--bg), #090f1a);
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+    }
+    h1 { margin: 0; font-size: 1.35rem; }
+    .meta { margin-top: 6px; color: var(--muted); font-size: 0.95rem; }
+    .chips { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--bg-soft);
+      color: var(--ink);
+      padding: 8px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all .2s ease;
+      font-weight: 600;
+    }
+    .chip:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .chip.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: #d9fffb;
+    }
+    .panels { margin-top: 18px; }
+    .panel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      background: var(--card-elev);
+    }
+    .panel.active { display: block; }
+    .panel h2 { margin: 0 0 8px; font-size: 1.05rem; }
+    .panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 5;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Weak Subjects - JWT authentication</h1>
+    <div class="meta">Topic: JWT authentication | Session: 1772743307856-xe3eld</div>
+    <div class="chips">
+      <button class="chip active" data-panel="panel-0">JWT authentication in high-scale production</button>
+      <button class="chip" data-panel="panel-1">JWT authentication common pitfalls</button>
+    </div>
+    <div class="panels">
+      <section id="panel-0" class="panel active">
+        <h2>JWT authentication in high-scale production</h2>
+        <p>In high-scale systems, JWT improves stateless horizontal scaling, but revocation becomes harder, so use short-lived access tokens plus rotating refresh tokens backed by server-side storage.<br>Plan key rotation (kid/JWKS), enforce issuer/audience checks, and design for clock skew and multi-region verification latency.<br>Tradeoff: lower DB/session load and better throughput vs higher security and operational complexity for revocation, incident response, and key lifecycle.</p>
+      </section>
+      <section id="panel-1" class="panel">
+        <h2>JWT authentication common pitfalls</h2>
+        <p>Common mistakes are long-lived access tokens, missing claim validation (iss/aud/exp/nbf), weak secret or key handling, and storing tokens in unsafe browser storage.<br>Use HttpOnly, Secure, SameSite cookies (or a strict header strategy), minimize claims, never put secrets/PII in payload, and always verify algorithm and key correctly.<br>Implement refresh-token rotation with reuse detection, plus a logout/revocation strategy and monitoring for anomalous token usage.</p>
+      </section>
+    </div>
+  </main>
+  <script>
+    const chips = document.querySelectorAll(".chip");
+    const panels = document.querySelectorAll(".panel");
+    chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const id = chip.getAttribute("data-panel");
+        chips.forEach((c) => c.classList.remove("active"));
+        panels.forEach((p) => p.classList.remove("active"));
+        chip.classList.add("active");
+        const panel = document.getElementById(id);
+        if (panel) panel.classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>

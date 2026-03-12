@@ -1,0 +1,80 @@
+{
+  "sessionId": "manual-rotate-matrix-20260311",
+  "topic": "Rotate Matrix",
+  "title": "Full Report - Rotate Matrix",
+  "generatedAt": "2026-03-11T00:00:00.000Z",
+  "questions": [
+    {
+      "questionNumber": 1,
+      "subject": "Square matrix constraint",
+      "question": "Why does this problem require an `N x N` matrix, and what breaks if the matrix is not square?",
+      "candidateAnswer": "It requires because the column has to systematically work with the row, same size. when rotating 90 degrees, you see a pattern, and the column has to match with the row size as in a NXN 0,0 -> 0,3, and 3,0 -> 0,0. we the row size does not match column size we cannot do in place, at least not r,c -> r, c - 1 - r",
+      "interviewerFeedback": "You identified the alignment constraint, but the key point is that an M x N matrix becomes N x M after a 90-degree rotation, so the original shape cannot be preserved in place unless it is square.",
+      "strongAnswer": "A 90-degree in-place rotation assumes the matrix stays the same shape after rotation. That only works for N x N, because an M x N matrix would become N x M and need a different layout.",
+      "score": 3
+    },
+    {
+      "questionNumber": 2,
+      "subject": "Coordinate mapping",
+      "question": "What is the coordinate mapping for a cell `(r, c)` after a 90-degree clockwise rotation?",
+      "candidateAnswer": "NXN where n = 4\n\nr,c -> c, N - 1 - r\n0,0 -> 0,3\n1,0 -> 0,2\n2,0 -> 0,1\n3,0 -> 0,0",
+      "interviewerFeedback": "Correct. You gave the right mapping and validated it with consistent examples.",
+      "strongAnswer": "For a clockwise rotation, each cell moves from (r, c) to (c, N - 1 - r). Example in a 4 x 4: (0, 0) moves to (0, 3).",
+      "score": 5
+    },
+    {
+      "questionNumber": 3,
+      "subject": "Extra-matrix approach",
+      "question": "How would you solve this with an extra matrix first, and why is that not in place?",
+      "candidateAnswer": "So a next, an extra matrix would use any square space, and that's the main reason we are doing in place. And to solve this with an extra matrix, that would be..rom the last column to the first column, moving to the extra matrix. For example, within a 4x4, if I have ABCD, I would move D, C, B, and A to the last column of the new matrix.",
+      "interviewerFeedback": "You described the high-level idea, but the mapping logic was still vague. The missing point is that this uses O(N^2) extra space, which is why it is not in place.",
+      "strongAnswer": "Create a second N x N matrix and place each value at its rotated position using (r, c) -> (c, N - 1 - r). It is not in place because the auxiliary matrix costs O(N^2) extra space.",
+      "score": 3
+    },
+    {
+      "questionNumber": 4,
+      "subject": "Layers and rings",
+      "question": "How do layers work in the in-place solution, and why do you only iterate to `n / 2` layers?",
+      "candidateAnswer": "You only need n / 2 layers because each layer consumes one row/column from the top, bottom, left, and right. In a 4 x 4, that gives 2 layers. In a 5 x 5, it also gives 2 full layers, and the center cell is left alone.",
+      "interviewerFeedback": "Correct on the number of layers and the odd-sized case. What was missing is that layers are concentric rings processed from the outside inward.",
+      "strongAnswer": "The matrix is processed ring by ring from the outside inward. There are n / 2 layers because each layer removes one top, bottom, left, and right boundary; in odd N, the center cell is left untouched.",
+      "score": 4
+    },
+    {
+      "questionNumber": 5,
+      "subject": "4-way swap coordinates",
+      "question": "Which four coordinates participate in one rotation step for a given layer and offset?",
+      "candidateAnswer": "Example 1:\n\na is at (0,0)\nnew position = (c, N - 1 - r) = (0, 3 - 0) = (0,3)\nSo a moves to top-right.\n\nExample 2:\n\nb is at (0,1)\nnew position = (1, 3 - 0) = (1,3)\nSo b moves to row 1, last column.\ne is at (1,0)\nnew position = (0, 3 - 1) = (0,2)\n\nm is at 3,0 new pos = (0, 0)",
+      "interviewerFeedback": "You kept applying the global mapping formula, but the expected answer was the exact 4-way cycle for one layer and one offset: top, right, bottom, and left positions in the same ring.",
+      "strongAnswer": "For one step: top = (first, i), right = (i, last), bottom = (last, last - offset), left = (last - offset, first). These four positions are rotated in one 4-way swap.",
+      "score": 2
+    },
+    {
+      "questionNumber": 6,
+      "subject": "Inner loop boundary",
+      "question": "Why do you stop the inner loop at `last - 1` instead of `last`?",
+      "candidateAnswer": "i dont know",
+      "interviewerFeedback": "If the loop goes to last, it reprocesses a corner already covered by an earlier offset and breaks the 4-way swap cycle.",
+      "strongAnswer": "You stop at last - 1 to avoid rotating the same corner twice. The last corner in the top edge is already handled by a previous swap cycle.",
+      "score": 1
+    },
+    {
+      "questionNumber": 7,
+      "subject": "Complexity",
+      "question": "What are the time and space complexities of the in-place approach?",
+      "candidateAnswer": "time is O^2(N) as it touch all the matrix, space is O(1)",
+      "interviewerFeedback": "Correct idea: O(N^2) time because all matrix cells are processed overall, and O(1) extra space. Only the notation needed correction.",
+      "strongAnswer": "The algorithm runs in O(N^2) time because it processes the whole matrix, and it uses O(1) extra space because rotation is done in place.",
+      "score": 4
+    },
+    {
+      "questionNumber": 8,
+      "subject": "Odd-sized center cell",
+      "question": "What happens for odd-sized matrices, especially the center cell?",
+      "candidateAnswer": "only one cell will be left at the center",
+      "interviewerFeedback": "Correct. In an odd-sized matrix, the center cell remains unchanged and needs no special move.",
+      "strongAnswer": "In an odd-sized matrix, the single center cell does not move. It has no distinct partner in the rotation, so it is left as is.",
+      "score": 4
+    }
+  ]
+}

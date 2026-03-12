@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+
+# Runtime data — machine-specific, not committed
+data/sessions.json
+data/graph.json
+data/questions-cache.json
+data/reports/
+
+# Personal notes inside knowledge store (not interview content)
+data/knowledge/misc/
+
+# data/knowledge/*.md files ARE committed — they are the curated knowledge base
+
+# PDFs are large binary files — excluded from git (store externally if needed)
+data/knowledge/*.pdf
+
+# macOS metadata
+.DS_Store
+**/.DS_Store

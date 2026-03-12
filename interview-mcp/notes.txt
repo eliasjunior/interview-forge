@@ -1,0 +1,64 @@
+
+1.start_interview
+{
+  "topic": "React Hooks",
+  "role": "Frontend Engineer",
+  "difficulty": "mid",
+  "mode": "technical"
+}
+
+{
+  "sessionId": "sess_8f32a",
+  "question": {
+    "id": "q1",
+    "text": "Can you explain how useEffect works and when it runs?",
+    "tags": ["react", "hooks", "useEffect"]
+  }
+}
+
+2.answer_question
+input
+{
+  "sessionId": "sess_8f32a",
+  "questionId": "q1",
+  "answer": "useEffect runs after render..."
+}
+output
+{
+  "evaluation": {
+    "score": 0.7,
+    "strengths": ["Correct lifecycle explanation"],
+    "missing": ["Dependency array nuances"]
+  },
+  "nextQuestion": {
+    "id": "q2",
+    "text": "What problems occur if you omit the dependency array?",
+    "tags": ["react", "hooks"]
+  }
+}
+
+end_interview
+input
+{
+  "sessionId": "sess_8f32a"
+}
+output
+
+{
+  "summary": {
+    "score": 0.72,
+    "strengths": [
+      "Good mental model of hooks lifecycle"
+    ],
+    "gaps": [
+      "Dependency array edge cases",
+      "useLayoutEffect"
+    ]
+  },
+  "concepts": [
+    "useEffect",
+    "dependency array",
+    "cleanup function",
+    "render cycle"
+  ]
+}

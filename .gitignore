@@ -1,0 +1,12 @@
+# Claude Code local settings — machine-specific permissions, session IDs, absolute paths
+.claude/settings.local.json
+
+# MCP config has absolute paths — use .mcp.json.example as the template
+.mcp.json
+
+# Monorepo — hoisted node_modules
+node_modules/
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
