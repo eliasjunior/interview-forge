@@ -28,6 +28,14 @@ function conceptStyle(cluster: string) {
 
 type Tab = 'overview' | 'questions' | 'transcript'
 
+function getSessionKind(session: Session): 'interview' | 'study' {
+  return session.sessionKind ?? 'interview'
+}
+
+function getStudyCategory(session: Session): 'topic' | 'algorithm' {
+  return session.studyCategory ?? 'topic'
+}
+
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -54,6 +62,9 @@ export default function ReportPage() {
   if (error || !session) return <div className="error-msg">{error ?? 'Session not found'}</div>
 
   const avg = calcAvg(session.evaluations)
+  const isStudy = getSessionKind(session) === 'study'
+  const isAlgorithmStudy = isStudy && getStudyCategory(session) === 'algorithm'
+  const tabs: Tab[] = isStudy ? ['overview', 'questions'] : ['overview', 'questions', 'transcript']
 
   return (
     <div>
@@ -70,9 +81,14 @@ export default function ReportPage() {
             <span>·</span>
             <span>ID: <code style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>{session.id}</code></span>
             <span>·</span>
-            <span className={`tag ${session.state === 'ENDED' ? 'tag-ended' : 'tag-active'}`}>
-              {session.state === 'ENDED' ? '✓ Completed' : '⏳ In progress'}
+            <span className={`tag ${isStudy ? 'tag-study' : session.state === 'ENDED' ? 'tag-ended' : 'tag-active'}`}>
+              {isStudy ? 'Study Session' : session.state === 'ENDED' ? '✓ Completed' : '⏳ In progress'}
             </span>
+            {isStudy && (
+              <span className={`tag ${isAlgorithmStudy ? 'tag-algorithm' : 'tag-topic'}`}>
+                {isAlgorithmStudy ? 'Algorithm' : 'Topic'}
+              </span>
+            )}
           </div>
         </div>
         <ScoreBadge score={avg} size="lg" />
@@ -81,35 +97,35 @@ export default function ReportPage() {
       {/* Stats */}
       <div className="stats-row">
         <div className="stat-card">
-          <div className="stat-value">{session.evaluations.length}</div>
-          <div className="stat-label">Questions answered</div>
+          <div className="stat-value">{isStudy ? session.questions.length : session.evaluations.length}</div>
+          <div className="stat-label">{isStudy ? 'Study prompts' : 'Questions answered'}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{avg}</div>
-          <div className="stat-label">Avg score</div>
+          <div className="stat-value">{isStudy ? (isAlgorithmStudy ? 'Code' : 'Topic') : avg}</div>
+          <div className="stat-label">{isStudy ? 'Study type' : 'Avg score'}</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{session.concepts?.length ?? 0}</div>
           <div className="stat-label">Concepts extracted</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value" style={{ textTransform: 'capitalize', fontSize: '1rem', paddingTop: 4 }}>
-            {session.knowledgeSource}
+          <div className="stat-value" style={{ textTransform: 'capitalize', fontSize: isStudy ? '0.95rem' : '1rem', paddingTop: 4 }}>
+            {isStudy ? (session.sourceType ?? session.knowledgeSource) : session.knowledgeSource}
           </div>
-          <div className="stat-label">Knowledge source</div>
+          <div className="stat-label">{isStudy ? 'Source format' : 'Knowledge source'}</div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="tabs">
-        {(['overview', 'questions', 'transcript'] as Tab[]).map(t => (
+        {tabs.map(t => (
           <button
             key={t}
             className={`tab-btn${tab === t ? ' active' : ''}`}
             onClick={() => setTab(t)}
           >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-            {t === 'questions' && ` (${session.evaluations.length})`}
+            {isStudy && t === 'questions' ? 'Prompts' : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'questions' && ` (${isStudy ? session.questions.length : session.evaluations.length})`}
             {t === 'transcript' && ` (${session.messages.length})`}
           </button>
         ))}
@@ -118,7 +134,24 @@ export default function ReportPage() {
       {/* Tab: Overview */}
       {tab === 'overview' && (
         <div>
-          {session.summary && (
+          {isStudy && (
+            <div className="study-summary-box" style={{ marginBottom: 24 }}>
+              <div className="page-subtitle" style={{ marginBottom: 8 }}>
+                {isAlgorithmStudy ? 'Algorithm study note' : 'Study note'}
+              </div>
+              <div className="qa-section-text">
+                {session.summary ?? 'Seeded study session with prompts and concepts, but no interview transcript yet.'}
+              </div>
+              {(session.sourcePath || session.seeded) && (
+                <div className="study-source-meta">
+                  {session.sourcePath && <span>Source: <code>{session.sourcePath}</code></span>}
+                  {session.seeded && <span>Seeded placeholder session</span>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isStudy && session.summary && (
             <div style={{ marginBottom: 24 }}>
               <div className="page-subtitle" style={{ marginBottom: 8 }}>Summary</div>
               <div className="summary-box">{session.summary}</div>
@@ -135,7 +168,11 @@ export default function ReportPage() {
           {!session.summary && (!session.concepts || session.concepts.length === 0) && (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
-              <div className="empty-state-msg">Session not yet finalized — complete the interview to see the overview.</div>
+              <div className="empty-state-msg">
+                {isStudy
+                  ? 'Study session has no summary or concepts yet.'
+                  : 'Session not yet finalized — complete the interview to see the overview.'}
+              </div>
             </div>
           )}
         </div>
@@ -144,7 +181,24 @@ export default function ReportPage() {
       {/* Tab: Questions */}
       {tab === 'questions' && (
         <div className="question-list">
-          {session.evaluations.length === 0 ? (
+          {isStudy ? (
+            session.questions.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">🧠</div>
+                <div className="empty-state-msg">No study prompts yet.</div>
+              </div>
+            ) : (
+              session.questions.map((question, idx) => (
+                <StudyPromptCard
+                  key={idx}
+                  idx={idx}
+                  question={question}
+                  open={openQ === idx}
+                  onToggle={() => setOpenQ(openQ === idx ? null : idx)}
+                />
+              ))
+            )
+          ) : session.evaluations.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">❓</div>
               <div className="empty-state-msg">No questions answered yet.</div>
@@ -165,7 +219,7 @@ export default function ReportPage() {
       )}
 
       {/* Tab: Transcript */}
-      {tab === 'transcript' && (
+      {!isStudy && tab === 'transcript' && (
         <div className="transcript">
           {session.messages.length === 0 ? (
             <div className="empty-state">
@@ -182,6 +236,35 @@ export default function ReportPage() {
               </div>
             ))
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StudyPromptCard({ idx, question, open, onToggle }: {
+  idx: number
+  question: string
+  open: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="question-card study-prompt-card">
+      <div className="question-card-header" onClick={onToggle}>
+        <span className="question-num">P{idx + 1}</span>
+        <span className="question-text">{question}</span>
+        <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>{open ? '▲' : '▼'}</span>
+      </div>
+
+      {open && (
+        <div className="question-card-body">
+          <div>
+            <div className="qa-section-label">Prompt</div>
+            <div className="qa-section-text">{question}</div>
+          </div>
+          <div className="study-callout">
+            This is a seeded study prompt. No interview transcript or scoring has been recorded for this session yet.
+          </div>
         </div>
       )}
     </div>

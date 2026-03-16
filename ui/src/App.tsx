@@ -3,6 +3,7 @@ import NavBar from './components/NavBar'
 import SessionsPage from './pages/SessionsPage'
 import ReportPage from './pages/ReportPage'
 import GraphPage from './pages/GraphPage'
+import FlashcardsPage from './pages/FlashcardsPage'
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/sessions/:id" element={<ReportPage />} />
           <Route path="/graph" element={<GraphPage />} />
+          <Route path="/flashcards" element={<FlashcardsPage />} />
         </Routes>
       </main>
     </div>

@@ -8,6 +8,8 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { createAIProvider, type AIProvider } from "./ai/index.js";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
+import { applySM2 } from "./srsUtils.js";
+import type { ReviewRating, Flashcard } from "@mock-interview/shared";
 
 const ai: AIProvider = createAIProvider();
 
@@ -99,6 +101,38 @@ app.get("/api/reports/:id", (req, res) => {
     return;
   }
   res.type("text/markdown").send(fs.readFileSync(reportPath, "utf8"));
+});
+
+// ── Flashcards ─────────────────────────────────────────────────────────────
+
+const FLASHCARDS_FILE = path.join(DATA_DIR, "flashcards.json");
+
+function loadFlashcards(): Flashcard[] {
+  if (!fs.existsSync(FLASHCARDS_FILE)) return [];
+  const data = JSON.parse(fs.readFileSync(FLASHCARDS_FILE, "utf8"));
+  return Array.isArray(data) ? data : (data.flashcards ?? []);
+}
+
+function saveFlashcards(cards: Flashcard[]) {
+  fs.writeFileSync(FLASHCARDS_FILE, JSON.stringify({ flashcards: cards }, null, 2));
+}
+
+app.get("/api/flashcards", (_req, res) => {
+  res.json(loadFlashcards());
+});
+
+app.post("/api/flashcards/:id/review", (req, res) => {
+  const cards = loadFlashcards();
+  const idx = cards.findIndex(c => c.id === req.params.id);
+  if (idx === -1) { res.status(404).json({ error: "Card not found" }); return; }
+
+  const rating = Number(req.body.rating) as ReviewRating;
+  if (![1, 2, 3, 4].includes(rating)) { res.status(400).json({ error: "rating must be 1–4" }); return; }
+
+  const srs = applySM2(cards[idx], rating);
+  cards[idx] = { ...cards[idx], ...srs, lastReviewedAt: new Date().toISOString() };
+  saveFlashcards(cards);
+  res.json(cards[idx]);
 });
 
 registerWeakReportRoutes(app, {

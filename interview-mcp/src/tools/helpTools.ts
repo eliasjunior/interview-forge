@@ -12,7 +12,16 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
     async ({ toolName }) => {
       const tools = [
         { name: "server_status", how: "Preflight MCP connectivity and runtime status", example: {} },
-        { name: "start_interview", how: "Start interview session", example: { topic: "JWT authentication" } },
+        { name: "start_interview", how: "Start interview from a curated knowledge topic", example: { topic: "JWT authentication" } },
+        {
+          name: "start_scoped_interview",
+          how: "Start an interview grounded in custom content (project spec, README, architecture doc). Questions are generated from the content with a configurable focus angle.",
+          example: {
+            topic: "Mortgage API",
+            content: "POST /api/mortgage-check — checks if a mortgage is feasible given income, loanValue, homeValue, maturityPeriod. Business rules: mortgage must not exceed 4× income or home value.",
+            focus: "robustness, reliability, and extensibility in a production environment",
+          },
+        },
         { name: "ask_question", how: "Get current question", example: { sessionId: "..." } },
         { name: "submit_answer", how: "Submit candidate answer", example: { sessionId: "...", answer: "..." } },
         { name: "evaluate_answer", how: "Evaluate answer (AI on: sessionId only)", example: { sessionId: "..." } },

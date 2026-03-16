@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <style>
+      .title { font: 700 26px Arial, sans-serif; fill: #102a43; }
+      .phase { font: 700 18px Arial, sans-serif; fill: #243b53; }
+      .node { fill: #f8fbff; stroke: #486581; stroke-width: 2; rx: 14; ry: 14; }
+      .cluster { fill: #eef6ff; stroke: #9fb3c8; stroke-width: 2; rx: 24; ry: 24; }
+      .label { font: 600 16px Arial, sans-serif; fill: #102a43; }
+      .small { font: 500 14px Arial, sans-serif; fill: #243b53; }
+      .arrow { stroke: #334e68; stroke-width: 2.5; fill: none; marker-end: url(#m); }
+      .bridge { stroke: #7b8794; stroke-width: 2.5; fill: none; marker-end: url(#m); stroke-dasharray: 8 6; }
+    </style>
+    <marker id="m" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334e68" />
+    </marker>
+  </defs>
+
+  <text x="800" y="48" text-anchor="middle" class="title">Giving an image represented by NxN matrix, where each pixel in the image is 4 bytes, write a method to rotate the image by 90 degrees. Can you do this in place?</text>
+  <text x="800" y="82" text-anchor="middle" class="small">Flow direction: left to right</text>
+
+  <rect x="40" y="120" width="340" height="640" class="cluster" />
+  <text x="210" y="155" text-anchor="middle" class="phase">Phase 1: Problem Setup</text>
+  <rect x="85" y="190" width="250" height="70" class="node" />
+  <text x="210" y="233" text-anchor="middle" class="label">NxN only</text>
+  <rect x="85" y="310" width="250" height="70" class="node" />
+  <text x="210" y="353" text-anchor="middle" class="label">90° clockwise</text>
+  <rect x="85" y="430" width="250" height="70" class="node" />
+  <text x="210" y="473" text-anchor="middle" class="label">In-place target</text>
+  <rect x="85" y="550" width="250" height="70" class="node" />
+  <text x="210" y="593" text-anchor="middle" class="label">No extra matrix</text>
+
+  <rect x="430" y="120" width="340" height="640" class="cluster" />
+  <text x="600" y="155" text-anchor="middle" class="phase">Phase 2: Mapping</text>
+  <rect x="475" y="190" width="250" height="70" class="node" />
+  <text x="600" y="233" text-anchor="middle" class="label">Cell mapping</text>
+  <text x="600" y="255" text-anchor="middle" class="small">(r, c) → (c, N-1-r)</text>
+  <rect x="475" y="310" width="250" height="70" class="node" />
+  <text x="600" y="353" text-anchor="middle" class="label">Column to row</text>
+  <rect x="475" y="430" width="250" height="70" class="node" />
+  <text x="600" y="473" text-anchor="middle" class="label">Reverse order</text>
+  <rect x="475" y="550" width="250" height="70" class="node" />
+  <text x="600" y="593" text-anchor="middle" class="label">4 cells per move</text>
+
+  <rect x="820" y="120" width="340" height="640" class="cluster" />
+  <text x="990" y="155" text-anchor="middle" class="phase">Phase 3: In-Place Rotation</text>
+  <rect x="865" y="190" width="250" height="70" class="node" />
+  <text x="990" y="233" text-anchor="middle" class="label">Process layers</text>
+  <rect x="865" y="310" width="250" height="70" class="node" />
+  <text x="990" y="353" text-anchor="middle" class="label">Compute offset</text>
+  <rect x="865" y="430" width="250" height="70" class="node" />
+  <text x="990" y="473" text-anchor="middle" class="label">Left → Top</text>
+  <rect x="865" y="550" width="250" height="70" class="node" />
+  <text x="990" y="593" text-anchor="middle" class="label">Bottom → Left</text>
+  <rect x="865" y="670" width="250" height="70" class="node" />
+  <text x="990" y="713" text-anchor="middle" class="label">Right → Bottom</text>
+
+  <rect x="1210" y="120" width="340" height="640" class="cluster" />
+  <text x="1380" y="155" text-anchor="middle" class="phase">Phase 4: Result</text>
+  <rect x="1255" y="190" width="250" height="70" class="node" />
+  <text x="1380" y="233" text-anchor="middle" class="label">Top → Right</text>
+  <rect x="1255" y="310" width="250" height="70" class="node" />
+  <text x="1380" y="353" text-anchor="middle" class="label">Next layer inward</text>
+  <rect x="1255" y="430" width="250" height="70" class="node" />
+  <text x="1380" y="473" text-anchor="middle" class="label">Center unchanged</text>
+  <rect x="1255" y="550" width="250" height="90" class="node" />
+  <text x="1380" y="588" text-anchor="middle" class="label">Correctness + O(N²)</text>
+  <text x="1380" y="612" text-anchor="middle" class="small">with O(1) space</text>
+
+  <path d="M210 260 L210 310" class="arrow" />
+  <path d="M210 380 L210 430" class="arrow" />
+  <path d="M210 500 L210 550" class="arrow" />
+
+  <path d="M600 260 L600 310" class="arrow" />
+  <path d="M600 380 L600 430" class="arrow" />
+  <path d="M600 500 L600 550" class="arrow" />
+
+  <path d="M990 260 L990 310" class="arrow" />
+  <path d="M990 380 L990 430" class="arrow" />
+  <path d="M990 500 L990 550" class="arrow" />
+  <path d="M990 620 L990 670" class="arrow" />
+
+  <path d="M1380 260 L1380 310" class="arrow" />
+  <path d="M1380 380 L1380 430" class="arrow" />
+  <path d="M1380 500 L1380 550" class="arrow" />
+
+  <path d="M335 225 L475 225" class="bridge" />
+  <path d="M725 585 L865 225" class="bridge" />
+  <path d="M1115 705 L1255 225" class="bridge" />
+</svg>

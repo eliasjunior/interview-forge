@@ -10,7 +10,7 @@ import { fileURLToPath } from "url";
 
 import { createAIProvider, type AIProvider } from "./ai/index.js";
 import { createKnowledgeStore, type KnowledgeStore } from "./knowledge/index.js";
-import type { Session, Concept, KnowledgeGraph } from "@mock-interview/shared";
+import type { Session, Concept, KnowledgeGraph, Flashcard } from "@mock-interview/shared";
 import {
   assertState,
   generateId,
@@ -20,6 +20,7 @@ import {
   buildReport,
   buildTranscript,
   mergeConceptsIntoGraph,
+  generateFlashcards,
 } from "./interviewUtils.js";
 import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
@@ -37,9 +38,10 @@ function stateError(msg: string) {
 }
 
 const DATA_DIR = path.resolve(__dirname, "../data");
-const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
-const GRAPH_FILE = path.join(DATA_DIR, "graph.json");
-const REPORTS_DIR = path.join(DATA_DIR, "reports");
+const SESSIONS_FILE    = path.join(DATA_DIR, "sessions.json");
+const GRAPH_FILE       = path.join(DATA_DIR, "graph.json");
+const FLASHCARDS_FILE  = path.join(DATA_DIR, "flashcards.json");
+const REPORTS_DIR      = path.join(DATA_DIR, "reports");
 const UI_PORT = process.env.PORT ?? "3001";
 
 function ensureDataDir() {
@@ -66,6 +68,18 @@ function loadGraph(): KnowledgeGraph {
 function saveGraph(graph: KnowledgeGraph) {
   ensureDataDir();
   fs.writeFileSync(GRAPH_FILE, JSON.stringify(graph, null, 2));
+}
+
+function loadFlashcards(): Flashcard[] {
+  ensureDataDir();
+  if (!fs.existsSync(FLASHCARDS_FILE)) return [];
+  const data = JSON.parse(fs.readFileSync(FLASHCARDS_FILE, "utf-8"));
+  return Array.isArray(data) ? data : (data.flashcards ?? []);
+}
+
+function saveFlashcards(cards: Flashcard[]) {
+  ensureDataDir();
+  fs.writeFileSync(FLASHCARDS_FILE, JSON.stringify({ flashcards: cards }, null, 2));
 }
 
 function saveReport(session: Session) {
@@ -104,7 +118,18 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   saveGraph(mergeConceptsIntoGraph(graph, concepts, session.id));
   const reportFile = saveReport(session);
 
-  return { summary, avgScore, concepts, reportFile };
+  // Generate flashcards for any question scored below the threshold
+  const newCards = generateFlashcards(session);
+  if (newCards.length > 0) {
+    const existing = loadFlashcards();
+    // Merge: skip cards whose id already exists (idempotent re-runs)
+    const existingIds = new Set(existing.map((c) => c.id));
+    const merged = [...existing, ...newCards.filter((c) => !existingIds.has(c.id))];
+    saveFlashcards(merged);
+    console.error(`[flashcards] added ${newCards.length} card(s) for session ${session.id}`);
+  }
+
+  return { summary, avgScore, concepts, reportFile, flashcardsGenerated: newCards.length };
 }
 
 const server = new McpServer({
@@ -122,6 +147,8 @@ const deps: ToolDeps = {
   loadGraph,
   saveGraph,
   saveReport,
+  loadFlashcards,
+  saveFlashcards,
   generateId,
   assertState,
   findLast,

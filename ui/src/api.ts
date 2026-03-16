@@ -1,9 +1,19 @@
-import type { Session, KnowledgeGraph, ReportMeta } from '@mock-interview/shared'
+import type { Session, KnowledgeGraph, ReportMeta, Flashcard, ReviewRating } from '@mock-interview/shared'
 
 const BASE = '/api'
 
 async function req<T>(url: string): Promise<T> {
   const res = await fetch(url)
+  if (!res.ok) throw new Error(`Request failed: ${res.status} ${url}`)
+  return res.json() as Promise<T>
+}
+
+async function post<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
   if (!res.ok) throw new Error(`Request failed: ${res.status} ${url}`)
   return res.json() as Promise<T>
 }
@@ -18,6 +28,11 @@ export const getSession = async (id: string): Promise<Session | null> => {
 export const getReports = (): Promise<ReportMeta[]> => req(`${BASE}/reports`)
 
 export const getGraph = (): Promise<KnowledgeGraph> => req(`${BASE}/graph`)
+
+export const getFlashcards = (): Promise<Flashcard[]> => req(`${BASE}/flashcards`)
+
+export const reviewFlashcard = (id: string, rating: ReviewRating): Promise<Flashcard> =>
+  post(`${BASE}/flashcards/${encodeURIComponent(id)}/review`, { rating })
 
 export interface ReportUiQuestion {
   questionNumber: number

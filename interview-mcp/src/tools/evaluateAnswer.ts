@@ -37,8 +37,17 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
 
       if (deps.ai) {
         const entry = deps.knowledge.findByTopic(session.topic);
-        const criteria = entry?.evaluationCriteria[session.currentQuestionIndex];
-        result = await deps.ai.evaluateAnswer(lastQuestion.content, lastAnswer.content, criteria);
+        const knowledgeCriteria = entry?.evaluationCriteria[session.currentQuestionIndex];
+
+        // For scoped sessions (started via start_scoped_interview), use the project spec
+        // and focus angle as rubric context so the AI evaluates against the original content.
+        const scopedContext = session.customContent
+          ? `Project specification (used as evaluation rubric):\n${session.customContent}` +
+            (session.focusArea ? `\n\nInterview focus: ${session.focusArea}` : "")
+          : undefined;
+
+        const context = knowledgeCriteria ?? scopedContext;
+        result = await deps.ai.evaluateAnswer(lastQuestion.content, lastAnswer.content, context);
       } else {
         if (score === undefined || feedback === undefined || needsFollowUp === undefined) {
           return deps.stateError(

@@ -14,6 +14,10 @@ export type InterviewState =
   | 'FOLLOW_UP'
   | 'ENDED'
 
+export type SessionKind = 'interview' | 'study'
+export type StudyCategory = 'topic' | 'algorithm'
+export type InterviewType = 'design' | 'code'
+
 // ── Session data ──────────────────────────────────────────────────────────────
 
 export interface Message {
@@ -42,6 +46,17 @@ export interface Concept {
 export interface Session {
   id: string
   topic: string
+  /** Interview type — 'design' (default) or 'code' (future). Absent on legacy sessions → treat as 'design'. */
+  interviewType?: InterviewType
+  sessionKind?: SessionKind
+  studyCategory?: StudyCategory
+  sourcePath?: string
+  sourceType?: 'markdown' | 'java'
+  seeded?: boolean
+  /** Raw content/spec passed to start_scoped_interview — used as rubric context during evaluation */
+  customContent?: string
+  /** The interview angle for a scoped session, e.g. "robustness, reliability, and extensibility" */
+  focusArea?: string
   state: InterviewState
   currentQuestionIndex: number
   questions: string[]
@@ -83,6 +98,50 @@ export interface EvaluationResult {
   needsFollowUp: boolean
   followUpQuestion?: string
   deeperDive?: string
+}
+
+// ── Flashcards ────────────────────────────────────────────────────────────────
+
+export type FlashcardDifficulty = 'easy' | 'medium' | 'hard'
+
+export interface Flashcard {
+  id: string
+  /** The question or concept prompt shown to the user */
+  front: string
+  /** Rich explanation: correct answer, key points, common pitfalls */
+  back: string
+  topic: string
+  tags: string[]
+  difficulty: FlashcardDifficulty
+  /** Where the card came from */
+  source: {
+    sessionId: string
+    questionIndex: number
+    originalScore: number   // the score that triggered creation (< 4)
+  }
+  createdAt: string
+
+  // ── Spaced repetition (SM-2) ────────────────────────────────────────────────
+  /** ISO date string — when the card is next due for review */
+  dueDate: string
+  /** Current interval in days between reviews */
+  interval: number
+  /** SM-2 ease factor — starts at 2.5, adjusted by review rating */
+  easeFactor: number
+  /** How many times reviewed successfully in a row */
+  repetitions: number
+  lastReviewedAt?: string
+}
+
+/** Rating passed to review_flashcard — mirrors SM-2 quality 1–4 */
+export type ReviewRating = 1 | 2 | 3 | 4
+
+export interface FlashcardReviewResult {
+  cardId: string
+  rating: ReviewRating
+  nextDueDate: string
+  nextInterval: number
+  nextEaseFactor: number
 }
 
 // ── HTTP API responses (used by ui) ───────────────────────────────────────────

@@ -7,8 +7,18 @@ export type {
   GraphNode,
   GraphEdge,
   KnowledgeGraph,
+  Flashcard,
+  FlashcardDifficulty,
 } from "@mock-interview/shared";
-import type { InterviewState, Session, Evaluation, Concept, KnowledgeGraph } from "@mock-interview/shared";
+import type {
+  InterviewState,
+  Session,
+  Evaluation,
+  Concept,
+  KnowledgeGraph,
+  Flashcard,
+  FlashcardDifficulty,
+} from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────
 // State machine
@@ -169,6 +179,88 @@ export function buildReport(session: Session): string {
   }
 
   return lines.join("\n");
+}
+
+// ─────────────────────────────────────────────
+// Flashcard generation
+// ─────────────────────────────────────────────
+
+const FLASHCARD_SCORE_THRESHOLD = 4;
+
+function mapScoreToDifficulty(score: number): FlashcardDifficulty {
+  if (score <= 2) return "hard";
+  if (score === 3) return "medium";
+  return "easy";
+}
+
+/** Extract simple tags from a topic string: "JWT authentication" → ["jwt", "authentication"] */
+function topicToTags(topic: string): string[] {
+  return topic
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
+ * Builds the back-of-card content from evaluation fields available after an
+ * interview ends. Works in both AI and file-only mode — no external calls needed.
+ */
+function buildFlashcardBack(e: Evaluation): string {
+  const lines: string[] = [];
+
+  lines.push(`## Your answer`, ``, `> ${e.answer.replace(/\n/g, "\n> ")}`, ``);
+  lines.push(`## Feedback`, ``, e.feedback, ``);
+
+  if (e.deeperDive?.trim()) {
+    lines.push(`## Where to go deeper`, ``, e.deeperDive.trim(), ``);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Generates flashcards for every unique question in the session that scored
+ * below the threshold. When a question has a follow-up (same questionIndex),
+ * we keep the evaluation with the lowest score so the card reflects the
+ * weakest understanding.
+ *
+ * Returns an empty array if there are no weak evaluations.
+ */
+export function generateFlashcards(session: Session): Flashcard[] {
+  // Deduplicate by questionIndex — keep the evaluation with the lowest score
+  const weakByIndex = new Map<number, Evaluation>();
+  for (const e of session.evaluations) {
+    if (e.score >= FLASHCARD_SCORE_THRESHOLD) continue;
+    const existing = weakByIndex.get(e.questionIndex);
+    if (!existing || e.score < existing.score) {
+      weakByIndex.set(e.questionIndex, e);
+    }
+  }
+
+  if (weakByIndex.size === 0) return [];
+
+  const now = new Date().toISOString();
+
+  return Array.from(weakByIndex.values()).map((e) => ({
+    id: `fc-${session.id}-q${e.questionIndex}`,
+    front: e.question,
+    back: buildFlashcardBack(e),
+    topic: session.topic,
+    tags: topicToTags(session.topic),
+    difficulty: mapScoreToDifficulty(e.score),
+    source: {
+      sessionId: session.id,
+      questionIndex: e.questionIndex,
+      originalScore: e.score,
+    },
+    createdAt: now,
+    // SM-2 initial values — card is due immediately so it can be reviewed right away
+    dueDate: now,
+    interval: 1,
+    easeFactor: 2.5,
+    repetitions: 0,
+  }));
 }
 
 // ─────────────────────────────────────────────

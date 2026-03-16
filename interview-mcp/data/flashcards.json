@@ -1,0 +1,188 @@
+{
+  "flashcards": [
+    {
+      "id": "fc-1772743307856-xe3eld-q2",
+      "front": "What are the most common pitfalls and mistakes developers make with JWT authentication?",
+      "back": "## Common JWT Pitfalls\n\n**1. Long-lived tokens (most critical)**\n- Access tokens should expire in 5–15 minutes\n- Use short-lived ATs + long-lived Refresh Tokens (RTs)\n- RTs stored server-side (DB/cache) so they CAN be revoked\n\n**2. Storing tokens in the wrong place**\n- ❌ `localStorage` / `sessionStorage` — vulnerable to XSS\n- ✅ `HttpOnly` + `Secure` + `SameSite=Strict` cookies — JS cannot read them\n\n**3. Putting secrets in the payload**\n- JWT payload is Base64-encoded, NOT encrypted\n- Anyone can decode it: `atob(token.split('.')[1])`\n- Never store passwords, PII, or API keys in claims\n\n**4. The `alg: none` attack**\n- An attacker strips the signature and sets `alg: none`\n- Always explicitly allow only `HS256` or `RS256` on the server\n\n**5. Missing token revocation strategy**\n- JWTs are stateless — you cannot invalidate them before expiry\n- Solution: short expiry + RT rotation + a token blocklist for logout/breach\n\n**Key mental model:** The payload is a signed claim, not a secret envelope.",
+      "topic": "JWT authentication",
+      "tags": [
+        "jwt",
+        "security",
+        "authentication",
+        "pitfalls",
+        "refresh-token",
+        "xss"
+      ],
+      "difficulty": "medium",
+      "source": {
+        "sessionId": "1772743307856-xe3eld",
+        "questionIndex": 2,
+        "originalScore": 3
+      },
+      "createdAt": "2026-03-12T00:00:00.000Z",
+      "dueDate": "2026-03-17T13:56:02.561Z",
+      "interval": 1,
+      "easeFactor": 2.1,
+      "repetitions": 0,
+      "lastReviewedAt": "2026-03-16T13:56:02.561Z"
+    },
+    {
+      "id": "fc-1772743307856-xe3eld-q4",
+      "front": "What tradeoffs should you consider when using JWT in a high-scale production system?",
+      "back": "## JWT at Scale — Tradeoffs\n\n**1. Stateless = no revocation by default**\n- You cannot invalidate an individual token before it expires\n- Mitigation: short-lived ATs (5–15 min) + RT rotation + a blocklist (Redis) for forced logout/breach response\n\n**2. Token size grows with claims**\n- Every request carries the full token in a cookie/header\n- Avoid bloating claims — keep payload minimal\n- Benchmark with your average payload before choosing between JWT and opaque tokens\n\n**3. Key management**\n- Symmetric (HS256): single secret shared across all instances → secret rotation is painful\n- Asymmetric (RS256): private key signs, public key verifies → scales naturally, public key distributable via JWKS endpoint\n- At scale, prefer RS256 + a key rotation strategy\n\n**4. Clock skew in distributed systems**\n- `exp` / `iat` / `nbf` rely on server clocks being in sync\n- Always allow a small skew tolerance (~30s) and use NTP\n\n**5. Refresh token rotation**\n- On every RT use, issue a new RT and invalidate the old one\n- Detects token theft: if stolen RT is used after rotation, both are revoked\n\n**Rule of thumb:** JWT shines for read-heavy, stateless auth. If you need instant revocation (e.g., banking), add a thin session layer or use opaque tokens.",
+      "topic": "JWT authentication",
+      "tags": [
+        "jwt",
+        "scalability",
+        "security",
+        "key-management",
+        "rs256",
+        "refresh-token",
+        "distributed-systems"
+      ],
+      "difficulty": "hard",
+      "source": {
+        "sessionId": "1772743307856-xe3eld",
+        "questionIndex": 4,
+        "originalScore": 2
+      },
+      "createdAt": "2026-03-12T00:00:00.000Z",
+      "dueDate": "2026-03-17T16:49:35.472Z",
+      "interval": 1,
+      "easeFactor": 2.1,
+      "repetitions": 0,
+      "lastReviewedAt": "2026-03-16T16:49:35.472Z"
+    },
+    {
+      "id": "fc-1773086427013-z9oqom-q0",
+      "front": "Give a high-level overview of Java concurrency and explain why it matters.",
+      "back": "## Java Concurrency — High Level\n\n**Why it matters**\n- CPUs have multiple cores — a single-threaded program uses 1\n- Concurrency lets a program be responsive (e.g. UI thread stays live) and throughput-efficient (parallel I/O calls)\n\n**Core abstractions (oldest → newest)**\n| Layer | API | Use when |\n|---|---|---|\n| Low-level | `Thread`, `Runnable` | Rarely — too manual |\n| Thread pools | `ExecutorService`, `Executors.newFixedThreadPool(n)` | Task queues, controlled parallelism |\n| Futures | `Future<T>` | Block until result (limited composition) |\n| Modern async | `CompletableFuture<T>` | Chain, combine, handle errors without blocking |\n| Virtual threads | `Thread.ofVirtual()` (Java 21) | High-concurrency I/O without thread pool tuning |\n\n**Key insight:** Threads share heap memory. That shared mutable state is what makes concurrency hard — race conditions, deadlocks, and visibility bugs all stem from it.\n\n**One-liner answer:** Java concurrency lets your program do multiple things at once using threads; the challenge is safely coordinating access to shared state.",
+      "topic": "java concurrency",
+      "tags": [
+        "java",
+        "concurrency",
+        "threads",
+        "completablefuture",
+        "executorservice"
+      ],
+      "difficulty": "medium",
+      "source": {
+        "sessionId": "1773086427013-z9oqom",
+        "questionIndex": 0,
+        "originalScore": 3
+      },
+      "createdAt": "2026-03-12T00:00:00.000Z",
+      "dueDate": "2026-03-13T20:59:35.868Z",
+      "interval": 1,
+      "easeFactor": 2.3,
+      "repetitions": 0,
+      "lastReviewedAt": "2026-03-12T20:59:35.868Z"
+    },
+    {
+      "id": "fc-1773086427013-z9oqom-q1",
+      "front": "Walk through a real-world Java concurrency example using CompletableFuture — fetch user + orders in parallel and combine them.",
+      "back": "## CompletableFuture — Parallel Fetch Pattern\n\n```java\nCompletableFuture<User> userFuture = CompletableFuture\n    .supplyAsync(() -> userService.getUser(userId), executor);\n\nCompletableFuture<List<Order>> ordersFuture = CompletableFuture\n    .supplyAsync(() -> orderService.getOrders(userId), executor);\n\nDashboard dashboard = userFuture\n    .thenCombine(ordersFuture, (user, orders) -> new Dashboard(user, orders))\n    .exceptionally(ex -> Dashboard.error(ex.getMessage()))\n    .get(5, TimeUnit.SECONDS);  // timeout!\n```\n\n**Why this pattern works**\n- Both calls start simultaneously — total time ≈ max(userTime, ordersTime) not sum\n- `thenCombine` merges results only when BOTH complete\n- `exceptionally` handles failures from either future gracefully\n- Always add a timeout to `.get()` — never block indefinitely in production\n\n**Common chaining methods**\n| Method | Purpose |\n|---|---|\n| `thenApply(fn)` | Transform result (like map) |\n| `thenCompose(fn)` | Chain another async call (like flatMap) |\n| `thenCombine(other, fn)` | Merge two independent futures |\n| `allOf(f1, f2, ...)` | Wait for all to complete |\n| `anyOf(f1, f2, ...)` | Return first to complete |",
+      "topic": "java concurrency",
+      "tags": [
+        "java",
+        "concurrency",
+        "completablefuture",
+        "async",
+        "parallel",
+        "thenCombine"
+      ],
+      "difficulty": "medium",
+      "source": {
+        "sessionId": "1773086427013-z9oqom",
+        "questionIndex": 1,
+        "originalScore": 3
+      },
+      "createdAt": "2026-03-12T00:00:00.000Z",
+      "dueDate": "2026-03-13T21:00:00.954Z",
+      "interval": 1,
+      "easeFactor": 2.3,
+      "repetitions": 0,
+      "lastReviewedAt": "2026-03-12T21:00:00.954Z"
+    },
+    {
+      "id": "fc-1773086427013-z9oqom-q2",
+      "front": "What are the most common Java concurrency pitfalls? How do you prevent a deadlock?",
+      "back": "## Java Concurrency Pitfalls\n\n**1. Shared mutable state without protection**\n- `HashMap` / `ArrayList` are NOT thread-safe\n- Use `ConcurrentHashMap`, `CopyOnWriteArrayList`, or synchronize explicitly\n\n**2. Deadlock**\n- Thread A holds Lock 1, waits for Lock 2\n- Thread B holds Lock 2, waits for Lock 1 → infinite wait\n- **Prevention:** always acquire locks in the same order across all threads\n\n```java\n// Safe: always lock account with lower id first\nObject first  = id1 < id2 ? lock1 : lock2;\nObject second = id1 < id2 ? lock2 : lock1;\nsynchronized (first)  {\n  synchronized (second) { /* transfer */ }\n}\n```\n\n**3. Race condition**\n- Two threads read-modify-write the same value without synchronization\n- Fix: `AtomicInteger`, `synchronized`, or `volatile` (for visibility only)\n\n**4. Visibility bug**\n- Thread A writes a field; Thread B never sees the update (CPU cache)\n- Fix: `volatile` for flags, or use proper synchronization\n\n**5. Thread starvation**\n- High-priority threads monopolise the CPU; low-priority ones never run\n- Use fair locks: `new ReentrantLock(true)`\n\n**Quick reference**\n| Problem | Tool |\n|---|---|\n| Non-atomic counter | `AtomicInteger` |\n| Deadlock | Consistent lock order |\n| Unsafe collection | `ConcurrentHashMap` |\n| Visibility | `volatile` |\n| Complex coordination | `ReentrantLock`, `Semaphore` |",
+      "topic": "java concurrency",
+      "tags": [
+        "java",
+        "concurrency",
+        "deadlock",
+        "race-condition",
+        "synchronized",
+        "atomic",
+        "thread-safety"
+      ],
+      "difficulty": "hard",
+      "source": {
+        "sessionId": "1773086427013-z9oqom",
+        "questionIndex": 2,
+        "originalScore": 2
+      },
+      "createdAt": "2026-03-12T00:00:00.000Z",
+      "dueDate": "2026-03-13T21:00:15.630Z",
+      "interval": 1,
+      "easeFactor": 2.3,
+      "repetitions": 0,
+      "lastReviewedAt": "2026-03-12T21:00:15.630Z"
+    },
+    {
+      "id": "fc-1773086427013-z9oqom-q3",
+      "front": "How would you explain Java concurrency to a junior developer? What mental models and concepts should they learn first?",
+      "back": "## Teaching Java Concurrency — Progressive Path\n\n**Step 1 — The analogy**\n> \"Imagine a restaurant kitchen. One chef (single thread) does everything sequentially. Multiple chefs (threads) can work in parallel — but they must not grab the same ingredient at the same time or chaos ensues.\"\n\n**Step 2 — Start with the problem, not the API**\n1. Show a broken counter: two threads incrementing a shared `int` → wrong result\n2. Fix it with `AtomicInteger` → show it working\n3. Explain WHY it was broken (read-modify-write is not atomic)\n\n**Step 3 — Teach the tools in order**\n1. `Runnable` + `Thread` — understand the basics\n2. `ExecutorService` — never manage threads manually in production\n3. `synchronized` / `volatile` — understand visibility and atomicity\n4. `CompletableFuture` — modern async, replaces most manual threading\n5. `java.util.concurrent` collections — know they exist\n\n**Step 4 — Three bugs to memorise**\n- **Race condition** — two threads fight over shared state\n- **Deadlock** — two threads wait for each other forever\n- **Starvation** — one thread never gets CPU time\n\n**Red flags for juniors to avoid**\n- `Thread.sleep()` for synchronisation (it's not)\n- Calling `.get()` without a timeout\n- Sharing mutable objects between threads \"just because it's read-only most of the time\"",
+      "topic": "java concurrency",
+      "tags": [
+        "java",
+        "concurrency",
+        "teaching",
+        "mental-model",
+        "beginner",
+        "executorservice"
+      ],
+      "difficulty": "medium",
+      "source": {
+        "sessionId": "1773086427013-z9oqom",
+        "questionIndex": 3,
+        "originalScore": 2
+      },
+      "createdAt": "2026-03-12T00:00:00.000Z",
+      "dueDate": "2026-03-13T21:00:22.953Z",
+      "interval": 1,
+      "easeFactor": 2.3,
+      "repetitions": 0,
+      "lastReviewedAt": "2026-03-12T21:00:22.953Z"
+    },
+    {
+      "id": "fc-1773086427013-z9oqom-q4",
+      "front": "What are the tradeoffs of using Java concurrency in a high-scale production system?",
+      "back": "## Java Concurrency at Scale — Tradeoffs\n\n**1. Complexity vs throughput**\n- Concurrent code is harder to read, test, and debug\n- But without it, a single slow I/O call blocks the entire request thread\n- Rule: use async for I/O-bound work; for CPU-bound, benchmark first\n\n**2. Thread pool sizing**\n- Too few threads → requests queue up, latency spikes\n- Too many threads → context switching overhead, memory pressure (each thread ~1MB stack)\n- Formula for I/O-bound: `threads ≈ cores × (1 + wait_time / cpu_time)`\n- Formula for CPU-bound: `threads ≈ cores + 1`\n\n**3. Context switching overhead**\n- OS switches between threads — expensive at high thread counts\n- Solution (Java 21+): Virtual threads — millions of lightweight threads, no stack-per-thread overhead\n\n**4. Back-pressure**\n- If producers are faster than consumers, queues grow unbounded → OOM\n- Use bounded queues: `new ThreadPoolExecutor(..., new ArrayBlockingQueue<>(1000))`\n- Or reactive streams (Project Reactor / RxJava) for built-in back-pressure\n\n**5. Distributed concurrency**\n- In a multi-instance deployment, shared mutable state must live outside the JVM (Redis, DB)\n- Distributed locks (Redisson) for cross-instance coordination\n\n**TL;DR:** Threading adds throughput but multiplies failure modes. Prefer async I/O patterns, right-size thread pools, and push shared state to external stores.",
+      "topic": "java concurrency",
+      "tags": [
+        "java",
+        "concurrency",
+        "scalability",
+        "thread-pool",
+        "virtual-threads",
+        "production",
+        "tradeoffs"
+      ],
+      "difficulty": "hard",
+      "source": {
+        "sessionId": "1773086427013-z9oqom",
+        "questionIndex": 4,
+        "originalScore": 3
+      },
+      "createdAt": "2026-03-12T00:00:00.000Z",
+      "dueDate": "2026-03-13T21:00:28.290Z",
+      "interval": 1,
+      "easeFactor": 2.3,
+      "repetitions": 0,
+      "lastReviewedAt": "2026-03-12T21:00:28.290Z"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import type { AIProvider } from "../ai/index.js";
 import type { KnowledgeStore } from "../knowledge/index.js";
-import type { Concept, Evaluation, KnowledgeGraph, Session } from "@mock-interview/shared";
+import type { Concept, Evaluation, Flashcard, KnowledgeGraph, Session } from "@mock-interview/shared";
 
 export type StateError = ReturnType<ToolDeps["stateError"]>;
 
@@ -18,6 +18,8 @@ export interface ToolDeps {
   loadGraph(): KnowledgeGraph;
   saveGraph(graph: KnowledgeGraph): void;
   saveReport(session: Session): string;
+  loadFlashcards(): Flashcard[];
+  saveFlashcards(cards: Flashcard[]): void;
 
   generateId(): string;
   assertState(session: Session, toolName: string): { ok: true } | { ok: false; error: string };

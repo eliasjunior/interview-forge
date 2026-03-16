@@ -7,8 +7,12 @@ export function registerStartInterviewTool(server: McpServer, deps: ToolDeps) {
   server.tool(
     "start_interview",
     "Start a new mock interview session. Returns a session ID and sets state to ASK_QUESTION.",
-    { topic: z.string().describe("Technical topic for the interview (e.g. 'React hooks', 'System design')") },
-    async ({ topic }) => {
+    {
+      topic: z.string().describe("Technical topic for the interview (e.g. 'URL shortener', 'JWT authentication', 'REST API design')"),
+      interviewType: z.enum(["design"]).optional()
+        .describe("Interview type. Currently only 'design' is supported (default). 'code' is reserved for future use."),
+    },
+    async ({ topic, interviewType = "design" }) => {
       const sessions = deps.loadSessions();
       const id = deps.generateId();
 
@@ -34,6 +38,8 @@ export function registerStartInterviewTool(server: McpServer, deps: ToolDeps) {
       const session: Session = {
         id,
         topic: entry ? entry.topic : topic,
+        interviewType,
+        sessionKind: "interview",
         state: "ASK_QUESTION",
         currentQuestionIndex: 0,
         questions,
@@ -53,6 +59,7 @@ export function registerStartInterviewTool(server: McpServer, deps: ToolDeps) {
             sessionId: id,
             state: session.state,
             topic: session.topic,
+            interviewType,
             knowledgeSource,
             ...(entry && { topicSummary: entry.summary }),
             totalQuestions: session.questions.length,

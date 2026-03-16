@@ -20,6 +20,12 @@ export default function NavBar() {
         >
           Knowledge Graph
         </NavLink>
+        <NavLink
+          to="/flashcards"
+          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        >
+          Flashcards 🃏
+        </NavLink>
       </div>
     </nav>
   )

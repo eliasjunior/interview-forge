@@ -12,11 +12,15 @@ import { registerEndInterviewTool } from "./endInterview.js";
 import { registerGetSessionTool } from "./getSession.js";
 import { registerListSessionsTool } from "./listSessions.js";
 import { registerListTopicsTool } from "./listTopics.js";
+import { registerGetDueFlashcardsTool } from "./getDueFlashcards.js";
+import { registerReviewFlashcardTool } from "./reviewFlashcard.js";
+import { registerStartScopedInterviewTool } from "./startScopedInterview.js";
 
 export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerServerStatusTool(server, deps);
   registerHelpTools(server, deps);
   registerStartInterviewTool(server, deps);
+  registerStartScopedInterviewTool(server, deps);
   registerAskQuestionTool(server, deps);
   registerSubmitAnswerTool(server, deps);
   registerEvaluateAnswerTool(server, deps);
@@ -26,4 +30,6 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerGetSessionTool(server, deps);
   registerListSessionsTool(server, deps);
   registerListTopicsTool(server, deps);
+  registerGetDueFlashcardsTool(server, deps);
+  registerReviewFlashcardTool(server, deps);
 }
