@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import NavBar from './components/NavBar'
 import SessionsPage from './pages/SessionsPage'
 import ReportPage from './pages/ReportPage'
@@ -6,10 +6,13 @@ import GraphPage from './pages/GraphPage'
 import FlashcardsPage from './pages/FlashcardsPage'
 
 export default function App() {
+  const location = useLocation()
+  const isGraph = location.pathname === '/graph'
+
   return (
     <div className="app">
       <NavBar />
-      <main className="main-content">
+      <main className={isGraph ? 'graph-main' : 'main-content'}>
         <Routes>
           <Route path="/" element={<Navigate to="/sessions" replace />} />
           <Route path="/sessions" element={<SessionsPage />} />

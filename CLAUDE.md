@@ -21,7 +21,7 @@ Claude Desktop / Claude Code (orchestrator LLM)
     ├──► interview-mcp (state machine, data owner)
     └──► report-mcp (read-mostly, analytics)
               │
-         interview-mcp/data/  (shared files: sessions.json, graph.json, reports/)
+         interview-mcp/data/  (shared runtime DB: app.db, plus reports/)
               │
          interview-mcp HTTP :3001
               │ fetch /api/*
@@ -31,6 +31,14 @@ Claude Desktop / Claude Code (orchestrator LLM)
 **Two LLMs are in play:**
 - **Orchestrator** — Claude inside Claude Desktop/Code (drives the conversation, calls tools)
 - **Worker** — Claude via Anthropic API (`src/ai/`) — generates questions, scores answers, extracts concepts. Optional: `AI_ENABLED=false` disables all API calls.
+
+## Interview Behavior Rules
+
+- In live interview mode, the candidate should see only the interview question and neutral next-step instructions.
+- `evaluationCriteria`, rubrics, expected-answer structure, scoring hints, and similar fields are evaluator-only context.
+- Never reveal evaluator-only context to the candidate, even if a tool payload includes it alongside the question.
+- When `AI_ENABLED=false`, the orchestrator may use `evaluationCriteria` to score the answer, but it must keep that rubric hidden while asking the question.
+- The interview flow should remain: ask the question, wait for the candidate's answer, evaluate, then continue. Do not front-load the grading rubric into the candidate prompt.
 
 ## Key Files & Paths
 
@@ -45,9 +53,7 @@ interview-mcp/
 │   ├── interviewUtils.ts       # Pure utils: state guards, report builder, graph merge, flashcard generator
 │   └── srsUtils.ts             # SM-2 spaced repetition algorithm (pure, side-effect-free)
 ├── data/
-│   ├── sessions.json           # All session records (written after every state change)
-│   ├── graph.json              # Cumulative knowledge graph
-│   ├── flashcards.json         # All flashcards with SRS state { flashcards: Flashcard[] }
+│   ├── app.db                  # Shared runtime database (sessions, graph, flashcards)
 │   ├── reports/                # One .md report per completed session
 │   └── knowledge/              # Curated topic .md files (committed to git)
 └── .env                        # ANTHROPIC_API_KEY, AI_ENABLED
@@ -99,7 +105,7 @@ Session states: `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW
 
 ### What it does
 
-After an interview ends (`end_interview` tool), the system automatically generates flashcards for every question where the candidate scored **below 4**. Cards are stored in `interview-mcp/data/flashcards.json` and scheduled using the **SM-2 spaced repetition algorithm**.
+After an interview ends (`end_interview` tool), the system automatically generates flashcards for every question where the candidate scored **below 4**. Cards are stored in `interview-mcp/data/app.db` and scheduled using the **SM-2 spaced repetition algorithm**.
 
 Each card contains:
 - **Front** — the original interview question
@@ -129,7 +135,7 @@ Cards are **idempotent**: re-running `end_interview` on the same session will no
 
 **`review_flashcard`**
 - Args: `cardId` (string), `rating` (1–4)
-- Applies SM-2, updates `flashcards.json`, returns `nextDueDate`, `nextInterval`, `easeFactor`, `repetitions`
+- Applies SM-2, updates `app.db`, returns `nextDueDate`, `nextInterval`, `easeFactor`, `repetitions`
 
 **Typical Claude review session flow:**
 ```
@@ -191,7 +197,7 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM local t
 - **Shared types only in `shared/src/types.ts`** — never add a local `types.ts` to a package
 - **Do not set `ANTHROPIC_API_KEY` in `.mcp.json` env block** — it overrides dotenv with an empty string
 - Worker LLM model: `claude-haiku-4-5-20251001` (low latency/cost, called multiple times per turn)
-- Storage: local JSON files only (`data/`), no database
+- Storage: shared SQLite runtime database (`interview-mcp/data/app.db`) plus report/public artifacts on disk
 - **Flashcard generation is automatic** — triggered by `end_interview`, no manual step needed
 - **SM-2 logic lives only in `srsUtils.ts`** — never duplicate scheduling logic in tools or HTTP handlers
 

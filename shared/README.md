@@ -51,7 +51,7 @@ Use `import type` (not `import`) — these are compile-time types only.
 - `word`: the concept label
 - `cluster`: one of `core concepts | practical usage | tradeoffs | best practices`
 
-**`Session`** — the full session record persisted to `sessions.json`:
+**`Session`** — the full session record persisted in the shared runtime store:
 - `id`, `topic`, `state`, `currentQuestionIndex`
 - `questions[]`, `messages[]`, `evaluations[]`
 - `summary?`, `concepts?`
@@ -68,7 +68,7 @@ Use `import type` (not `import`) — these are compile-time types only.
 - `source`, `target`: node IDs
 - `weight`: incremented each time the pair appears in a session
 
-**`KnowledgeGraph`** — the full graph persisted to `graph.json`:
+**`KnowledgeGraph`** — the full graph persisted in the shared runtime store:
 - `nodes[]`, `edges[]`
 - `sessions[]`: IDs of sessions that contributed to this graph
 

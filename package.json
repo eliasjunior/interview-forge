@@ -22,5 +22,8 @@
     "start:http": "npm run start:http -w interview-mcp",
     "start:report": "npm run start -w report-mcp",
     "preview:ui": "npm run preview -w ui"
+  },
+  "devDependencies": {
+    "drizzle-orm": "^0.45.1"
   }
 }

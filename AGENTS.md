@@ -63,6 +63,14 @@ This is a learning project. Key MCP concepts to explore:
 - Prefer a preflight check before interview commands, such as `help_tools`, `list_topics`, or a dedicated health/status tool when available.
 - Treat MCP connection problems as a blocking issue for tool execution, not as something to silently work around.
 
+## Interview Guardrails
+
+- Treat interview questions and evaluation rubrics as separate roles, even if a tool returns both in one payload.
+- Candidate-facing output must include only the actual interview prompt and any neutral procedural instructions needed to continue the session.
+- Do not reveal evaluator-only fields such as `evaluationCriteria`, rubric text, expected answer structure, scoring hints, model answers, or hidden grading guidance to the candidate.
+- If a tool response contains both candidate-visible and evaluator-only fields, filter the response before presenting it in chat.
+- Keep the interview realistic: ask the question, wait for the candidate's answer, then evaluate it. Do not leak the grading criteria while asking the question.
+
 ## No Simulation Rule
 
 - If a user asks to run a tool, do not simulate, roleplay, or manually imitate the tool result when the actual tool call cannot be executed.

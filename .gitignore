@@ -7,6 +7,11 @@
 # Monorepo — hoisted node_modules
 node_modules/
 
+# Local SQLite runtime files
+interview-mcp/data/*.db
+interview-mcp/data/*.db-shm
+interview-mcp/data/*.db-wal
+
 # macOS metadata
 .DS_Store
 **/.DS_Store

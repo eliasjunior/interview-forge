@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
-if (!process.env.ANTHROPIC_API_KEY) dotenv.config({ override: true });
-else dotenv.config();
+dotenv.config();
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -8,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { createAIProvider, type AIProvider } from "./ai/index.js";
+import type { AIProvider } from "./ai/index.js";
 import { createKnowledgeStore, type KnowledgeStore } from "./knowledge/index.js";
 import type { Session, Concept, KnowledgeGraph, Flashcard } from "@mock-interview/shared";
 import {
@@ -24,11 +23,12 @@ import {
 } from "./interviewUtils.js";
 import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
+import { createDb } from "./db/client.js";
+import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const AI_ENABLED = process.env.AI_ENABLED !== "false";
-const ai: AIProvider | null = AI_ENABLED ? createAIProvider() : null;
+const ai: AIProvider | null = null;
 const knowledge: KnowledgeStore = createKnowledgeStore();
 
 function stateError(msg: string) {
@@ -38,48 +38,39 @@ function stateError(msg: string) {
 }
 
 const DATA_DIR = path.resolve(__dirname, "../data");
-const SESSIONS_FILE    = path.join(DATA_DIR, "sessions.json");
-const GRAPH_FILE       = path.join(DATA_DIR, "graph.json");
-const FLASHCARDS_FILE  = path.join(DATA_DIR, "flashcards.json");
 const REPORTS_DIR      = path.join(DATA_DIR, "reports");
 const UI_PORT = process.env.PORT ?? "3001";
+const db = createDb();
+const repositories = createSqliteRepositories(db);
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
 function loadSessions(): Record<string, Session> {
-  ensureDataDir();
-  if (!fs.existsSync(SESSIONS_FILE)) return {};
-  return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8"));
+  return Object.fromEntries(
+    repositories.sessions.list().map((session) => [session.id, session])
+  );
 }
 
 function saveSessions(sessions: Record<string, Session>) {
-  ensureDataDir();
-  fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+  repositories.sessions.replaceAll(sessions);
 }
 
 function loadGraph(): KnowledgeGraph {
-  ensureDataDir();
-  if (!fs.existsSync(GRAPH_FILE)) return { nodes: [], edges: [], sessions: [] };
-  return JSON.parse(fs.readFileSync(GRAPH_FILE, "utf-8"));
+  return repositories.graph.get();
 }
 
 function saveGraph(graph: KnowledgeGraph) {
-  ensureDataDir();
-  fs.writeFileSync(GRAPH_FILE, JSON.stringify(graph, null, 2));
+  repositories.graph.save(graph);
 }
 
 function loadFlashcards(): Flashcard[] {
-  ensureDataDir();
-  if (!fs.existsSync(FLASHCARDS_FILE)) return [];
-  const data = JSON.parse(fs.readFileSync(FLASHCARDS_FILE, "utf-8"));
-  return Array.isArray(data) ? data : (data.flashcards ?? []);
+  return repositories.flashcards.list();
 }
 
 function saveFlashcards(cards: Flashcard[]) {
-  ensureDataDir();
-  fs.writeFileSync(FLASHCARDS_FILE, JSON.stringify({ flashcards: cards }, null, 2));
+  repositories.flashcards.replaceAll(cards);
 }
 
 function saveReport(session: Session) {
@@ -162,7 +153,7 @@ registerAllTools(server, deps);
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`interview-mcp v0.2.0 — mode: ${AI_ENABLED ? "AI + knowledge files" : "knowledge files only"} — running on stdio`);
+  console.error("interview-mcp v0.2.0 — mode: knowledge files only — running on stdio");
 }
 
 main().catch((err) => {

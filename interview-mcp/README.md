@@ -40,7 +40,7 @@ Before diving into the code, it helps to understand what MCP is and how the diff
 │  • A plain Node.js process, no web server           │
 │  • Exposes named tools with typed schemas           │
 │  • Returns structured data in every response        │
-│  • Owns all shared state (sessions.json, graph.json)│
+│  • Owns all shared runtime state (SQLite app.db)    │
 │  • Enforces the interview state machine             │
 │  • Optionally calls the AI API for the LLM work     │
 └────────────────────────┬────────────────────────────┘
@@ -133,8 +133,7 @@ interview-mcp/
 │   ├── knowledge/          # FileKnowledgeStore — reads data/knowledge/*.md
 │   └── interviewUtils.ts   # Pure utilities: state guards, report builder, graph merge, summary
 ├── data/
-│   ├── sessions.json       # All session records (persisted after every state change)
-│   ├── graph.json          # Cumulative knowledge graph
+│   ├── app.db              # Shared runtime database (sessions, graph, flashcards)
 │   ├── reports/            # One .md report file per completed session
 │   └── knowledge/          # Curated topic files — committed to git
 │       ├── java-concurrency.md
@@ -208,16 +207,15 @@ When an interview ends (via `next_question` completing all questions, or `end_in
 1. Calls `extractConcepts` and `generateDeeperDives` **in parallel** via `Promise.all`
 2. Attaches deeper-dive bullet points to each evaluation
 3. Computes the session summary and average score
-4. Persists the updated session to `data/sessions.json`
-5. Merges new concepts into `data/graph.json`
+4. Persists the updated session to `data/app.db`
+5. Merges new concepts into the graph tables in `data/app.db`
 6. Writes the Markdown report to `data/reports/{sessionId}.md`
 
 ### Storage
 
-All data is stored as local JSON files in `data/`. No database required.
+Runtime state is stored in SQLite at `data/app.db`.
 
-- **`sessions.json`** — keyed by session ID, written after every state change
-- **`graph.json`** — cumulative graph, merged after every completed session
+- **`app.db`** — sessions, graph, flashcards, and related normalized rows
 - **`reports/{id}.md`** — one Markdown report per completed session
 
 This `data/` directory is the **shared data layer** for the whole monorepo. `report-mcp` points its data paths here (configurable via `DATA_DIR` env var).
@@ -234,7 +232,7 @@ This is the data API consumed by the `ui` React app and `report-mcp`'s dynamic r
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/graph` | Returns `graph.json` — the full knowledge graph |
+| `GET /api/graph` | Returns the full knowledge graph from `data/app.db` |
 | `GET /api/sessions` | Returns all sessions as an array |
 | `GET /api/reports` | Lists all report files with topic, average score, and date |
 | `GET /api/reports/:id` | Returns the raw Markdown for a single report |
@@ -393,7 +391,7 @@ To add a new topic in file-only mode, create a new `.md` file following the form
 Claude (orchestrator)
     │  MCP tools over stdio
     ▼
-server.ts  ──── state machine ────► sessions.json
+server.ts  ──── state machine ────► app.db
     │        │
     │        └── knowledge/  ◄─── data/knowledge/*.md  (questions + criteria)
     │
@@ -402,7 +400,7 @@ server.ts  ──── state machine ────► sessions.json
     │   ├── extractConcepts
     │   └── generateDeeperDives
     │
-    ├──────────────────────────────► graph.json
+    ├──────────────────────────────► graph tables in app.db
     └──────────────────────────────► reports/{id}.md
 
 http.ts (port 3001) ◄──── data/ ──── ui / report-mcp
@@ -419,7 +417,7 @@ server.ts  ──── state machine ────► │   from ask_question re
     │        └── knowledge/  ◄─── data/knowledge/*.md  (questions + criteria)
     │
     │  on finalize (no AI calls)
-    ├──────────────────────────────► sessions.json
+    ├──────────────────────────────► app.db
     └──────────────────────────────► reports/{id}.md  (no deeper dives)
 
 http.ts (port 3001) ◄──── data/ ──── ui / report-mcp

@@ -23,6 +23,7 @@ import {
 } from "./reportUtils.js";
 import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
+import { createSQLiteReportDataStore } from "./data/sqlite.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,8 +35,8 @@ const ai: AIProvider | null = AI_ENABLED ? createAIProvider() : null;
 //
 // Both services live as siblings under the same workspace:
 //   <workspace>/
-//   ├── interview-mcp/   ← owns the data + public dirs
-//   └── report-mcp/      ← reads sessions/graph, writes reports + generated UI
+//   ├── interview-mcp/   ← owns app.db, reports/, and public/
+//   └── report-mcp/      ← reads shared app.db, writes reports + generated UI
 //
 // Override with DATA_DIR / PUBLIC_DIR env vars if the layout differs.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,11 +46,10 @@ const DATA_DIR = process.env.DATA_DIR
 const PUBLIC_DIR = process.env.PUBLIC_DIR
   ?? path.resolve(__dirname, "../../interview-mcp/public");
 
-const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
-const GRAPH_FILE = path.join(DATA_DIR, "graph.json");
 const REPORTS_DIR = path.join(DATA_DIR, "reports");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
 const UI_PORT = process.env.PORT ?? "3001";
+const dataStore = createSQLiteReportDataStore({ dataDir: DATA_DIR });
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -62,20 +62,15 @@ function stateError(msg: string) {
 }
 
 function loadSessions(): Record<string, Session> {
-  ensureDataDir();
-  if (!fs.existsSync(SESSIONS_FILE)) return {};
-  return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8"));
+  return dataStore.loadSessions();
 }
 
 function saveSessions(sessions: Record<string, Session>) {
-  ensureDataDir();
-  fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+  dataStore.saveSessions(sessions);
 }
 
 function loadGraph(): KnowledgeGraph {
-  ensureDataDir();
-  if (!fs.existsSync(GRAPH_FILE)) return { nodes: [], edges: [], sessions: [] };
-  return JSON.parse(fs.readFileSync(GRAPH_FILE, "utf-8"));
+  return dataStore.loadGraph();
 }
 
 function saveReport(session: Session): string {

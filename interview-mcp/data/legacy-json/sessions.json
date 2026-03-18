@@ -1,0 +1,1091 @@
+{
+  "1772743307856-xe3eld": {
+    "id": "1772743307856-xe3eld",
+    "topic": "JWT authentication",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Give me a high-level overview of JWT authentication and explain why it matters.",
+      "Walk me through a practical example or real-world use case for JWT authentication.",
+      "What are the most common pitfalls or mistakes developers make with JWT authentication?",
+      "How would you explain JWT authentication to a junior developer who has never seen it?",
+      "If you had to use JWT authentication in a high-scale production system, what tradeoffs would you consider?"
+    ],
+    "messages": [
+      {
+        "role": "interviewer",
+        "content": "Give me a high-level overview of JWT authentication and explain why it matters.",
+        "timestamp": "2026-03-05T20:41:54.656Z"
+      },
+      {
+        "role": "candidate",
+        "content": "JWT JSON web token, scenario without JWT and using session, user types user/password, app goes to the db to retrieve the pwd and matches the password, save the a cookie in the session and usually it has a expire date, this works fine but not really scalable. now with JWT, what if we could login once, do one trip to DB, and create a token, this token can identify the user, with no session, and no more trips to the DB, the is the main idea of JWT.",
+        "timestamp": "2026-03-05T20:48:48.413Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "Walk me through a practical example or real-world use case for JWT authentication.",
+        "timestamp": "2026-03-05T20:49:09.475Z"
+      },
+      {
+        "role": "candidate",
+        "content": "practical example - access my home-video web app, assume home-video is access only via https, types user/pwd, application checks the pwd, usually stored in DB or a vault. app now generates an access token (AT), and we add this token in a special cookies, there are some special cookies that JS does not has access to it (HttpOnly cookies), so we store the AT there. now user leave the app but comes back a few hours later, and try to access GET /videos, that request has a special cookie that the app retrieves and read, there has some info about the user, what he can do, and also the token itself, app has a private key and verify if that token has being tempered or not, if it all good, the request carry out and server the resource, the user does not need to type the password again, this was seemless, stateless and no trip to the DB or over the wire.",
+        "timestamp": "2026-03-05T20:59:38.461Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "What are the most common pitfalls or mistakes developers make with JWT authentication?",
+        "timestamp": "2026-03-05T20:59:44.553Z"
+      },
+      {
+        "role": "candidate",
+        "content": "Long expiration date — the JWT token should be short lived. One way to make sure the user does not type the password again is the use of refresh tokens. Another mistake is adding the token in common cookies (not HttpOnly), making it vulnerable for attackers.",
+        "timestamp": "2026-03-05T21:03:55.918Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "Can you elaborate further and give a concrete example?",
+        "timestamp": "2026-03-05T21:04:04.314Z"
+      },
+      {
+        "role": "candidate",
+        "content": "Common time for short-lived tokens is minutes — 15 minutes for instance. Refresh tokens: when the token is about to expire, we can write some filters that identify the expiration, generate a new token and invalidate the old one. Also, secrets should not be added to the payload, as the AT is not encrypted — it's hashed (signed).",
+        "timestamp": "2026-03-05T21:11:30.104Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "How would you explain JWT authentication to a junior developer who has never seen it?",
+        "timestamp": "2026-03-05T21:11:38.061Z"
+      },
+      {
+        "role": "candidate",
+        "content": "Assuming the junior dev understands the basics of a web app where the user needs to authenticate, and to avoid typing the credentials we can use some mechanisms. The old traditional way is to create a session of the user, that when he comes back and tries to login with a browser for example, the server knows how to identify that user, however it has some limitations regarding scalability. Imagine if the user can login once and come back to the app without re-typing the password, also the app does not need to retrieve the info in the DB every time, and also not keep any session — JWT is stateless. The token though should live short because of security, about 15 minutes, but we can refresh the token and the user still doesn't need to type the password.",
+        "timestamp": "2026-03-05T21:22:41.937Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "If you had to use JWT authentication in a high-scale production system, what tradeoffs would you consider?",
+        "timestamp": "2026-03-05T21:22:49.780Z"
+      },
+      {
+        "role": "candidate",
+        "content": "It adds some complexity. If a token gets stolen we cannot invalidate it, not easily.",
+        "timestamp": "2026-03-05T21:38:39.259Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "Can you elaborate further and give a concrete example?",
+        "timestamp": "2026-03-05T21:38:43.473Z"
+      },
+      {
+        "role": "candidate",
+        "content": "In a high scale the token will be shared across instances, making it very hard to track it down. You can only invalidate a refresh token where you can store it in the DB. There is a limitation in the signature size, I don't know the max size.",
+        "timestamp": "2026-03-05T21:41:57.599Z"
+      }
+    ],
+    "evaluations": [
+      {
+        "questionIndex": 0,
+        "question": "Give me a high-level overview of JWT authentication and explain why it matters.",
+        "answer": "JWT JSON web token, scenario without JWT and using session, user types user/password, app goes to the db to retrieve the pwd and matches the password, save the a cookie in the session and usually it has a expire date, this works fine but not really scalable. now with JWT, what if we could login once, do one trip to DB, and create a token, this token can identify the user, with no session, and no more trips to the DB, the is the main idea of JWT.",
+        "score": 4,
+        "feedback": "Strong answer — clear and well-structured.",
+        "needsFollowUp": false
+      },
+      {
+        "questionIndex": 1,
+        "question": "Walk me through a practical example or real-world use case for JWT authentication.",
+        "answer": "practical example - access my home-video web app, assume home-video is access only via https, types user/pwd, application checks the pwd, usually stored in DB or a vault. app now generates an access token (AT), and we add this token in a special cookies, there are some special cookies that JS does not has access to it (HttpOnly cookies), so we store the AT there. now user leave the app but comes back a few hours later, and try to access GET /videos, that request has a special cookie that the app retrieves and read, there has some info about the user, what he can do, and also the token itself, app has a private key and verify if that token has being tempered or not, if it all good, the request carry out and server the resource, the user does not need to type the password again, this was seemless, stateless and no trip to the DB or over the wire.",
+        "score": 5,
+        "feedback": "Excellent — thorough, structured, and insightful.",
+        "needsFollowUp": false
+      },
+      {
+        "questionIndex": 2,
+        "question": "What are the most common pitfalls or mistakes developers make with JWT authentication?",
+        "answer": "Long expiration date — the JWT token should be short lived. One way to make sure the user does not type the password again is the use of refresh tokens. Another mistake is adding the token in common cookies (not HttpOnly), making it vulnerable for attackers.",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 2,
+        "question": "Can you elaborate further and give a concrete example?",
+        "answer": "Common time for short-lived tokens is minutes — 15 minutes for instance. Refresh tokens: when the token is about to expire, we can write some filters that identify the expiration, generate a new token and invalidate the old one. Also, secrets should not be added to the payload, as the AT is not encrypted — it's hashed (signed).",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 3,
+        "question": "How would you explain JWT authentication to a junior developer who has never seen it?",
+        "answer": "Assuming the junior dev understands the basics of a web app where the user needs to authenticate, and to avoid typing the credentials we can use some mechanisms. The old traditional way is to create a session of the user, that when he comes back and tries to login with a browser for example, the server knows how to identify that user, however it has some limitations regarding scalability. Imagine if the user can login once and come back to the app without re-typing the password, also the app does not need to retrieve the info in the DB every time, and also not keep any session — JWT is stateless. The token though should live short because of security, about 15 minutes, but we can refresh the token and the user still doesn't need to type the password.",
+        "score": 5,
+        "feedback": "Excellent — thorough, structured, and insightful.",
+        "needsFollowUp": false
+      },
+      {
+        "questionIndex": 4,
+        "question": "If you had to use JWT authentication in a high-scale production system, what tradeoffs would you consider?",
+        "answer": "It adds some complexity. If a token gets stolen we cannot invalidate it, not easily.",
+        "score": 2,
+        "feedback": "Partial — missing important concepts.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 4,
+        "question": "Can you elaborate further and give a concrete example?",
+        "answer": "In a high scale the token will be shared across instances, making it very hard to track it down. You can only invalidate a refresh token where you can store it in the DB. There is a limitation in the signature size, I don't know the max size.",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      }
+    ],
+    "createdAt": "2026-03-05T20:41:48.138Z",
+    "summary": "## Interview Summary — JWT authentication\nDate: 3/5/2026\nQuestions: 7 | Avg score: 3.6/5\n\n### Question breakdown\n  Q1 [4/5]: Strong answer — clear and well-structured.\n  Q2 [5/5]: Excellent — thorough, structured, and insightful.\n  Q3 [3/5]: Adequate, but could go deeper on key points.\n  Q4 [3/5]: Adequate, but could go deeper on key points.\n  Q5 [5/5]: Excellent — thorough, structured, and insightful.\n  Q6 [2/5]: Partial — missing important concepts.\n  Q7 [3/5]: Adequate, but could go deeper on key points.",
+    "concepts": [
+      {
+        "word": "overview",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "jwt authentication",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "example",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "use case",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "practical",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "tradeoff",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "pitfall",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "mistake",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "junior",
+        "cluster": "best practices"
+      },
+      {
+        "word": "explain",
+        "cluster": "best practices"
+      }
+    ],
+    "endedAt": "2026-03-05T21:42:02.336Z",
+    "sessionKind": "interview",
+    "seeded": false
+  },
+  "1773086427013-z9oqom": {
+    "id": "1773086427013-z9oqom",
+    "topic": "java concurrency",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Give me a high-level overview of java concurrency and explain why it matters.",
+      "Walk me through a practical example or real-world use case for java concurrency.",
+      "What are the most common pitfalls or mistakes developers make with java concurrency?",
+      "How would you explain java concurrency to a junior developer who has never seen it?",
+      "If you had to use java concurrency in a high-scale production system, what tradeoffs would you consider?"
+    ],
+    "messages": [
+      {
+        "role": "interviewer",
+        "content": "Give me a high-level overview of java concurrency and explain why it matters.",
+        "timestamp": "2026-03-09T20:00:29.684Z"
+      },
+      {
+        "role": "candidate",
+        "content": "concurrency in java is thought the class Threads or interface Runnable, it makes java program to run other tasks in parallel, for example we can have a thread for IO while wont block the main thread, so that the main thread can execute other tasks",
+        "timestamp": "2026-03-09T20:03:49.684Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "Can you elaborate further and give a concrete example?",
+        "timestamp": "2026-03-09T20:04:30.925Z"
+      },
+      {
+        "role": "candidate",
+        "content": "in modern java we have CompletableFuture that already provide several methods to deal with async tasks, its very rich and can use lambda to write simple functions and also catch exceptions more gracefully. with lambda we can compose and combine multiple lambda functions. and with ExecutorService provide a fixed thread pool as one of it API",
+        "timestamp": "2026-03-09T20:17:00.330Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "Walk me through a practical example or real-world use case for java concurrency.",
+        "timestamp": "2026-03-09T20:17:19.751Z"
+      },
+      {
+        "role": "candidate",
+        "content": "I dont know the syntax, but I can create 2 completableFuture, userFuture, to get the user, for example userService.getUser(userID) and a second completableFuture orderFuture, orderService.getOrder(user) then combine the result in a Dashboard object",
+        "timestamp": "2026-03-09T20:32:45.561Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "What are the most common pitfalls or mistakes developers make with java concurrency?",
+        "timestamp": "2026-03-09T20:33:05.195Z"
+      },
+      {
+        "role": "candidate",
+        "content": "1. Shared mutable state without protection. Wrong collection choice - Using HashMap / ArrayList from multiple threads without synchronization. 2. Deadlocks, thread A waits for Thread B, but thread B is waiting on Thread A. 3. race condition, Thread A should finish Before Thread B, but thread B finishes first.",
+        "timestamp": "2026-03-09T20:37:06.077Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "Can you elaborate further and give a concrete example?",
+        "timestamp": "2026-03-09T20:37:15.913Z"
+      },
+      {
+        "role": "candidate",
+        "content": "to prevent a deadlock we need to consistent lock order, using synchronized to avoid B get the lock before it should.",
+        "timestamp": "2026-03-09T20:42:34.347Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "How would you explain java concurrency to a junior developer who has never seen it?",
+        "timestamp": "2026-03-09T20:42:54.319Z"
+      },
+      {
+        "role": "candidate",
+        "content": "Java concurrency is complex, you need to read the fundamentals, start simple examples, read about deadlocks, race condition, then study the Java modern library",
+        "timestamp": "2026-03-09T20:47:36.918Z"
+      },
+      {
+        "role": "interviewer",
+        "content": "If you had to use java concurrency in a high-scale production system, what tradeoffs would you consider?",
+        "timestamp": "2026-03-09T20:47:58.358Z"
+      },
+      {
+        "role": "candidate",
+        "content": "using threads add more complexity, dealing with async code is not as simple as sync code, but we need threads in a high-scale system, threads make it possible your system to execute tasks seemingly, for example it can handle different tasks like calling an API and the main thread wont be blocked.",
+        "timestamp": "2026-03-09T20:57:25.822Z"
+      }
+    ],
+    "evaluations": [
+      {
+        "questionIndex": 0,
+        "question": "Give me a high-level overview of java concurrency and explain why it matters.",
+        "answer": "concurrency in java is thought the class Threads or interface Runnable, it makes java program to run other tasks in parallel, for example we can have a thread for IO while wont block the main thread, so that the main thread can execute other tasks",
+        "strongAnswer": "Java concurrency is about coordinating multiple threads that share heap memory so work can progress without each task blocking the whole process.\nWhat matters is not only parallel work, but correctness under the Java Memory Model: atomicity, visibility, ordering, and deadlock avoidance.\nIn practice, prefer ExecutorService, concurrent collections, immutability, and higher-level primitives over managing raw threads directly.",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?",
+        "deeperDive": "ERROR: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CYtB9n92hD7QyPcTZfkWP\"}"
+      },
+      {
+        "questionIndex": 0,
+        "question": "Can you elaborate further and give a concrete example?",
+        "answer": "in modern java we have CompletableFuture that already provide several methods to deal with async tasks, its very rich and can use lambda to write simple functions and also catch exceptions more gracefully. with lambda we can compose and combine multiple lambda functions. and with ExecutorService provide a fixed thread pool as one of it API",
+        "strongAnswer": "Example: a request needs user data, orders, and recommendations; run those calls in parallel with CompletableFuture on a bounded ExecutorService, then combine the results.\nThat reduces end-to-end latency because independent I/O waits overlap instead of running serially.\nThe safe design still needs timeouts, exception handling, and a thread-pool size chosen for the workload.",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 1,
+        "question": "Walk me through a practical example or real-world use case for java concurrency.",
+        "answer": "I dont know the syntax, but I can create 2 completableFuture, userFuture, to get the user, for example userService.getUser(userID) and a second completableFuture orderFuture, orderService.getOrder(user) then combine the result in a Dashboard object",
+        "strongAnswer": "A common case is a dashboard endpoint that needs profile, orders, and notifications from separate services.\nUse CompletableFuture.supplyAsync for each independent call, combine them with allOf or thenCombine, and return once all results are ready.\nRun this on a bounded executor, propagate failures clearly, and avoid blocking joins deep inside worker threads.",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 2,
+        "question": "What are the most common pitfalls or mistakes developers make with java concurrency?",
+        "answer": "1. Shared mutable state without protection. Wrong collection choice - Using HashMap / ArrayList from multiple threads without synchronization. 2. Deadlocks, thread A waits for Thread B, but thread B is waiting on Thread A. 3. race condition, Thread A should finish Before Thread B, but thread B finishes first.",
+        "strongAnswer": "The biggest mistakes are unsafely sharing mutable state, assuming volatile makes compound operations atomic, and using non-thread-safe collections across threads.\nTeams also create deadlocks through inconsistent lock ordering and hurt throughput with oversized pools, blocking tasks, or unbounded queues.\nBest practice is to minimize shared state, prefer ConcurrentHashMap and immutable data, and define explicit lock and executor policies.",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 2,
+        "question": "Can you elaborate further and give a concrete example?",
+        "answer": "to prevent a deadlock we need to consistent lock order, using synchronized to avoid B get the lock before it should.",
+        "strongAnswer": "Concrete example: thread A locks account then ledger, while thread B locks ledger then account; each can block forever waiting for the other.\nA separate race happens when two threads do count++ or check-then-act without synchronization, because read-modify-write is not atomic.\nUse consistent lock ordering, atomic classes or synchronized blocks for compound updates, and avoid holding locks during I/O.",
+        "score": 2,
+        "feedback": "Partial — missing important concepts.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 3,
+        "question": "How would you explain java concurrency to a junior developer who has never seen it?",
+        "answer": "Java concurrency is complex, you need to read the fundamentals, start simple examples, read about deadlocks, race condition, then study the Java modern library",
+        "strongAnswer": "Explain it as many workers using the same kitchen: concurrency lets several tasks make progress at once, but shared tools must be coordinated.\nIn Java, threads can share memory, so bugs happen when two threads read or change the same data without the right rules.\nStart juniors with ExecutorService, synchronized, and concurrent collections before lower-level lock tuning.",
+        "score": 2,
+        "feedback": "Partial — missing important concepts.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      },
+      {
+        "questionIndex": 4,
+        "question": "If you had to use java concurrency in a high-scale production system, what tradeoffs would you consider?",
+        "answer": "using threads add more complexity, dealing with async code is not as simple as sync code, but we need threads in a high-scale system, threads make it possible your system to execute tasks seemingly, for example it can handle different tasks like calling an API and the main thread wont be blocked.",
+        "strongAnswer": "At scale, concurrency improves throughput and latency hiding, but it raises operational risk through contention, queue growth, context switching, and harder debugging.\nThe key tradeoffs are pool sizing, bounded versus unbounded queues, backpressure, and whether tasks are CPU-bound or mostly waiting on I/O.\nUse bounded executors, measure saturation, isolate critical workloads, and prefer simpler designs when parallelism does not clearly improve the bottleneck.",
+        "score": 3,
+        "feedback": "Adequate, but could go deeper on key points.",
+        "needsFollowUp": true,
+        "followUpQuestion": "Can you elaborate further and give a concrete example?"
+      }
+    ],
+    "createdAt": "2026-03-09T20:00:27.338Z",
+    "summary": "## Interview Summary — java concurrency\nDate: 3/9/2026\nQuestions: 7 | Avg score: 2.7/5\n\n### Question breakdown\n  Q1 [3/5]: Adequate, but could go deeper on key points.\n  Q2 [3/5]: Adequate, but could go deeper on key points.\n  Q3 [3/5]: Adequate, but could go deeper on key points.\n  Q4 [3/5]: Adequate, but could go deeper on key points.\n  Q5 [2/5]: Partial — missing important concepts.\n  Q6 [2/5]: Partial — missing important concepts.\n  Q7 [3/5]: Adequate, but could go deeper on key points.",
+    "concepts": [
+      {
+        "word": "overview",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "java concurrency",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "example",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "use case",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "practical",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "tradeoff",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "pitfall",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "mistake",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "junior",
+        "cluster": "best practices"
+      },
+      {
+        "word": "explain",
+        "cluster": "best practices"
+      }
+    ],
+    "endedAt": "2026-03-09T20:57:37.384Z",
+    "sessionKind": "interview",
+    "seeded": false
+  },
+  "seed-java-os-jvm-internals": {
+    "id": "seed-java-os-jvm-internals",
+    "topic": "Java OS & JVM Internals",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Walk me through what happens at the OS and JVM level when you run `java -jar app.jar`.",
+      "How many threads exist in a JVM process before your `main()` method executes, and what types are they?",
+      "Your production Java service has 400 threads, high CPU, and slow responses. How do you diagnose and interpret a thread dump?",
+      "A thread dump shows 200 threads BLOCKED on the same lock. Walk me through how you identify the root cause and fix it.",
+      "How do heap dumps and thread dumps complement each other during a production incident?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `java-os-jvm.md`. Focus: JVM startup, internal JVM threads, thread dumps, lock contention, heap-vs-thread diagnostics, and practical production debugging.",
+    "concepts": [
+      {
+        "word": "jvm startup",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "thread dump",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "heap dump",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "blocked threads",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "production debugging",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:00:00.000Z",
+    "endedAt": "2026-03-12T12:00:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "topic",
+    "sourcePath": "interview-mcp/data/knowledge/java-os-jvm.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-tls-and-mtls": {
+    "id": "seed-tls-and-mtls",
+    "topic": "TLS and mTLS",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "What is the difference between TLS and mTLS, and when would you choose mTLS?",
+      "What is the difference between a keystore and a truststore?",
+      "Walk me through the mTLS handshake and explain how private key ownership is proven.",
+      "What does PKIX chain validation verify in practice?",
+      "How would you configure and debug mTLS in a Spring Boot service?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `mtls-tls.md`. Focus: TLS vs mTLS, keystore/truststore roles, handshake flow, PKIX validation, Spring Boot setup, and production debugging.",
+    "concepts": [
+      {
+        "word": "tls",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "mtls",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "keystore",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "truststore",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "certificate chain",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:01:00.000Z",
+    "endedAt": "2026-03-12T12:01:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "topic",
+    "sourcePath": "interview-mcp/data/knowledge/mtls-tls.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-payment-api-design": {
+    "id": "seed-payment-api-design",
+    "topic": "Payment API Design",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Design a payment processing endpoint that is idempotent, calls an external fraud service, and handles concurrent requests safely.",
+      "Why must you persist the payment record before calling the external fraud service?",
+      "Explain two idempotency strategies for a payment API and what breaks without them.",
+      "How do you handle two concurrent execute requests safely with JPA?",
+      "When should a payment endpoint return 201, 202, 409, 503, or 504?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `payment-api-design.md`. Focus: idempotency, two-transaction design, optimistic locking, status transitions, and HTTP semantics for payment flows.",
+    "concepts": [
+      {
+        "word": "idempotency",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "optimistic locking",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "202 accepted",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "fraud service",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "persist before call",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:02:00.000Z",
+    "endedAt": "2026-03-12T12:02:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "topic",
+    "sourcePath": "interview-mcp/data/knowledge/payment-api-design.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-rest-api-design-spring-boot-jpa": {
+    "id": "seed-rest-api-design-spring-boot-jpa",
+    "topic": "REST API Design, Spring Boot & JPA",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Design a `GET /api/v1/orders` endpoint. Explain your choices for versioning, idempotency, status codes, and pagination.",
+      "Walk me through the Spring Boot request lifecycle from the incoming request to the database and back.",
+      "When does Spring `@Transactional` roll back a transaction, and what are the common pitfalls?",
+      "What is the JPA N+1 problem and how would you detect and fix it?",
+      "Compare `JOIN FETCH`, `@EntityGraph`, and DTO projections. When would you choose each?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `rest-spring-jpa.md`. Focus: REST semantics, Spring request flow, transaction boundaries, rollback pitfalls, JPA fetch strategy, and N+1 mitigation.",
+    "concepts": [
+      {
+        "word": "rest design",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "transactional",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "n+1",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "pagination",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "dto projections",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:03:00.000Z",
+    "endedAt": "2026-03-12T12:03:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "topic",
+    "sourcePath": "interview-mcp/data/knowledge/rest-spring-jpa.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-rotate-matrix": {
+    "id": "seed-rotate-matrix",
+    "topic": "Rotate Matrix",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Why does this problem require an `N x N` matrix, and what breaks if the matrix is not square?",
+      "What is the coordinate mapping for a cell `(r, c)` after a 90-degree clockwise rotation?",
+      "How would you solve this with an extra matrix first, and why is that not in place?",
+      "How do layers work in the in-place solution, and why do you only iterate to `n / 2` layers?",
+      "What are the time and space complexities of the in-place approach?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `rotate-matrix-algorithm.md`. Focus: coordinate mapping, layer-based reasoning, four-way swaps, square-matrix constraints, and complexity analysis.",
+    "concepts": [
+      {
+        "word": "matrix rotation",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "coordinate mapping",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "4-way swap",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "layer traversal",
+        "cluster": "best practices"
+      },
+      {
+        "word": "o(n^2)",
+        "cluster": "tradeoffs"
+      }
+    ],
+    "createdAt": "2026-03-12T12:04:00.000Z",
+    "endedAt": "2026-03-12T12:04:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/rotate-matrix-algorithm.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-model-context-protocol-mcp": {
+    "id": "seed-model-context-protocol-mcp",
+    "topic": "Model Context Protocol (MCP)",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "What problem does MCP solve in an enterprise LLM architecture?",
+      "What are the roles of the host, orchestrator, and MCP servers?",
+      "How do resources differ from tools, and why does that distinction matter?",
+      "Why is capability discovery more than just service endpoint registration?",
+      "How would you split one large enterprise integration server into smaller MCP servers?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `misc/MCP.md`. Focus: enterprise MCP architecture, host vs orchestrator responsibilities, resources vs tools, capability metadata, and trust-boundary design.",
+    "concepts": [
+      {
+        "word": "mcp",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "resources",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "tools",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "orchestrator",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "trust boundaries",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:05:00.000Z",
+    "endedAt": "2026-03-12T12:05:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "topic",
+    "sourcePath": "interview-mcp/data/knowledge/misc/MCP.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-palindrome-permutation-brute-force": {
+    "id": "seed-palindrome-permutation-brute-force",
+    "topic": "Palindrome Permutation (Brute Force)",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Why is trying every permutation a brute-force solution for palindrome permutation?",
+      "How do you derive the time complexity `O(n * n!)` for this approach?",
+      "What space costs appear with recursive generation and with storing permutations?",
+      "What observations let you avoid brute force entirely for this problem?",
+      "How would you explain why factorial-time solutions are usually unacceptable in interviews?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from the permutation memory notes. Focus: factorial growth, brute-force reasoning, complexity analysis, and how to explain why counting-based solutions are superior.",
+    "concepts": [
+      {
+        "word": "permutation",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "factorial growth",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "palindrome",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "complexity analysis",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "brute force",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:06:00.000Z",
+    "endedAt": "2026-03-12T12:06:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/StringsArrays/permutation.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-matrix-fundamentals-before-complex-problems": {
+    "id": "seed-matrix-fundamentals-before-complex-problems",
+    "topic": "Matrix Fundamentals Before Complex Problems",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "Why do matrix problems become easier when you think in coordinates instead of pictures?",
+      "What are the four basic moves in a matrix and how do you express them?",
+      "Why does `n - 1` appear so often in matrix boundary logic?",
+      "What do main diagonal and anti-diagonal mean in coordinate terms?",
+      "Why is offset easier once you understand it as distance from the start of a layer?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `a_must_do_before_more_complex_matrix_problems.md`. Focus: coordinate fluency, matrix boundaries, directional movement, diagonals, and offset intuition.",
+    "concepts": [
+      {
+        "word": "matrix coordinates",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "boundaries",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "diagonal",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "offset",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "index reasoning",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:07:00.000Z",
+    "endedAt": "2026-03-12T12:07:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/a_must_do_before_more_complex_matrix_problems.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-interview-prep-matrix-fundamentals-with-exercises": {
+    "id": "seed-interview-prep-matrix-fundamentals-with-exercises",
+    "topic": "Interview Prep: Matrix Fundamentals With Exercises",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "What interview habits keep you grounded when matrix index math gets confusing?",
+      "How do you reason about valid coordinates and boundaries in an `n x n` matrix?",
+      "How would you explain movement formulas such as right, left, up, and down?",
+      "Why is coordinate fluency a prerequisite for problems like rotate matrix or spiral traversal?",
+      "How would you coach someone through the first drills in this matrix prep note?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `interview_prep_matrix_fundamentals_with_exercises.md`. Focus: interview habits, coordinate drills, movement formulas, and building matrix intuition before harder problems.",
+    "concepts": [
+      {
+        "word": "matrix interview prep",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "coordinate drills",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "movement formulas",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "spiral traversal",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "index fluency",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:08:00.000Z",
+    "endedAt": "2026-03-12T12:08:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/interview_prep_matrix_fundamentals_with_exercises.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-rotate-matrix-in-place": {
+    "id": "seed-rotate-matrix-in-place",
+    "topic": "Rotate Matrix In Place",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "How do layers and offsets work in an in-place rotate-matrix solution?",
+      "Which four positions move during one swap cycle?",
+      "Why does the center cell stay unchanged in odd-sized matrices?",
+      "Why is the algorithm `O(N^2)` time and `O(1)` extra space?",
+      "What common interview mistakes happen when implementing this in place?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `summary_rotate_matrix_interview.md`. Focus: layer mechanics, swap ordering, edge cases, complexity, and implementation correctness for the in-place variant.",
+    "concepts": [
+      {
+        "word": "in-place rotation",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "layers",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "offset",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "center cell",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "swap ordering",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:09:00.000Z",
+    "endedAt": "2026-03-12T12:09:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/summary_rotate_matrix_interview.md",
+    "sourceType": "markdown",
+    "seeded": true
+  },
+  "seed-matrix-java-walkthrough": {
+    "id": "seed-matrix-java-walkthrough",
+    "topic": "Matrix.java Walkthrough",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "What transformation does this program apply to the matrix?",
+      "How does the two-pointer row-reversal loop work?",
+      "What assumptions does the printing logic make about matrix shape?",
+      "How would you evolve this into a full rotate-matrix solution?",
+      "What edge cases would you test before reusing this logic?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `algorithm/Matrix.java`. Basic algorithm walkthrough: row reversal with two pointers, square-matrix assumptions, and how this relates to matrix transformation interview problems.",
+    "concepts": [
+      {
+        "word": "row reversal",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "two pointers",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "matrix mutation",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "shape assumptions",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "test cases",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:10:00.000Z",
+    "endedAt": "2026-03-12T12:10:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/Matrix.java",
+    "sourceType": "java",
+    "seeded": true
+  },
+  "seed-rotatematrix-java-walkthrough": {
+    "id": "seed-rotatematrix-java-walkthrough",
+    "topic": "RotateMatrix.java Walkthrough",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "How does this program visualize layer-by-layer matrix rotation?",
+      "What do `first`, `last`, and `offset` represent in the implementation?",
+      "Why is a 4-way swap the right primitive here?",
+      "How does the manual rendering help explain the algorithm in an interview?",
+      "What would you simplify if you wanted only the core algorithm without the visualization layer?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `algorithm/RotateMatrix.java`. Basic info only for now: this is a teaching-oriented Java program that visualizes the in-place rotate-matrix algorithm step by step.",
+    "concepts": [
+      {
+        "word": "matrix rotation demo",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "layer visualization",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "offset",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "teaching aid",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "algorithm explanation",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:11:00.000Z",
+    "endedAt": "2026-03-12T12:11:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/RotateMatrix.java",
+    "sourceType": "java",
+    "seeded": true
+  },
+  "seed-sliding-window-permutation-search": {
+    "id": "seed-sliding-window-permutation-search",
+    "topic": "Sliding Window Permutation Search",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "What problem is `SlideWindow.java` trying to solve?",
+      "Why is the current implementation not a true optimized sliding-window solution yet?",
+      "How do frequency arrays help compare permutations in strings?",
+      "What is the time complexity of recomputing each window from scratch?",
+      "How would you refactor this into a linear-time sliding-window approach?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `algorithm/SlideWindow.java`. Basic algorithm interview seed: permutation matching in a larger string, frequency counting, and how to improve from window recomputation to a true sliding window.",
+    "concepts": [
+      {
+        "word": "sliding window",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "frequency array",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "permutation match",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "time complexity",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "incremental update",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:12:00.000Z",
+    "endedAt": "2026-03-12T12:12:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/SlideWindow.java",
+    "sourceType": "java",
+    "seeded": true
+  },
+  "seed-one-away-string-edit-check": {
+    "id": "seed-one-away-string-edit-check",
+    "topic": "One Away String Edit Check",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "What does the `oneWay` method check, and what interview problem is it modeling?",
+      "Why does the helper function normalize by passing the larger string first?",
+      "How does the two-pointer scan distinguish replace from insert/delete cases?",
+      "What edge cases should you test for a one-edit-away solution?",
+      "What are the time and space complexities of this approach?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `algorithm/StringsArrays/OneWay.java`. Basic algorithm interview seed: one-edit-away string comparison using two pointers and length normalization.",
+    "concepts": [
+      {
+        "word": "string edit distance",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "two pointers",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "insert delete replace",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "edge cases",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "linear scan",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:13:00.000Z",
+    "endedAt": "2026-03-12T12:13:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/StringsArrays/OneWay.java",
+    "sourceType": "java",
+    "seeded": true
+  },
+  "seed-java-thread-lab": {
+    "id": "seed-java-thread-lab",
+    "topic": "Java Thread Lab",
+    "state": "ENDED",
+    "currentQuestionIndex": 5,
+    "questions": [
+      "What concurrency and JVM behaviors is `threads/Lab.java` designed to demonstrate?",
+      "Why does the program keep adding contention threads over time?",
+      "How do the metrics endpoint, thread dumps, and heap behavior work together in this lab?",
+      "What would you look for in a thread dump captured while this lab is running?",
+      "How could this lab support an interview answer about lock contention or thread starvation?"
+    ],
+    "messages": [],
+    "evaluations": [],
+    "summary": "Seeded session from `algorithm/threads/Lab.java`. Basic info only for now: this Java program is a hands-on concurrency lab for thread contention, JVM diagnostics, metrics, and production-style thread-dump analysis.",
+    "concepts": [
+      {
+        "word": "thread contention",
+        "cluster": "core concepts"
+      },
+      {
+        "word": "thread dumps",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "metrics endpoint",
+        "cluster": "practical usage"
+      },
+      {
+        "word": "lock contention",
+        "cluster": "tradeoffs"
+      },
+      {
+        "word": "diagnostics",
+        "cluster": "best practices"
+      }
+    ],
+    "createdAt": "2026-03-12T12:14:00.000Z",
+    "endedAt": "2026-03-12T12:14:00.000Z",
+    "knowledgeSource": "file",
+    "sessionKind": "study",
+    "studyCategory": "algorithm",
+    "sourcePath": "interview-mcp/data/knowledge/algorithm/threads/Lab.java",
+    "sourceType": "java",
+    "seeded": true
+  }
+}

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import path from "path";
+import type { Session } from "@mock-interview/shared";
 
 interface SessionMeta {
   topic?: string;
@@ -11,7 +12,7 @@ type SessionsById = Record<string, SessionMeta>;
 
 export interface WeakReportsDeps {
   generatedUiDir: string;
-  sessionsFile: string;
+  loadSessions(): Record<string, Session>;
   fsLike: {
     existsSync(path: string): boolean;
     readdirSync(path: string): string[];
@@ -20,8 +21,7 @@ export interface WeakReportsDeps {
 }
 
 function loadSessions(deps: WeakReportsDeps): SessionsById {
-  if (!deps.fsLike.existsSync(deps.sessionsFile)) return {};
-  return JSON.parse(deps.fsLike.readFileSync(deps.sessionsFile, "utf8")) as SessionsById;
+  return deps.loadSessions();
 }
 
 export function registerWeakReportRoutes(app: Express, deps: WeakReportsDeps) {

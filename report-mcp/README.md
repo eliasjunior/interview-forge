@@ -29,12 +29,11 @@ report-mcp/
 └── .env                    # ANTHROPIC_API_KEY + AI_ENABLED (not committed)
 ```
 
-**Data access:** `report-mcp` does not own any data files. It reads from and writes to `interview-mcp/data/` (configurable via `DATA_DIR` and `PUBLIC_DIR` env vars). This keeps the data layer in a single place owned by `interview-mcp`.
+**Data access:** `report-mcp` does not own runtime data. It reads from the shared SQLite database in `interview-mcp/data/app.db` and writes report artifacts to `interview-mcp/data/` and `interview-mcp/public/` (configurable via `DATA_DIR` and `PUBLIC_DIR` env vars). This keeps the data layer in a single place owned by `interview-mcp`.
 
 ```
 interview-mcp/data/
-├── sessions.json     ← report-mcp reads this
-├── graph.json        ← report-mcp reads this
+├── app.db            ← report-mcp reads sessions + graph from this
 ├── reports/          ← report-mcp writes .md files here (regenerate_report)
 └── knowledge/        ← report-mcp does not touch this
 ```
@@ -55,7 +54,7 @@ The server exposes **7 MCP tools**.
 | `get_report_weak_subjects` | Identifies low-scoring questions for a session and returns structured context plus a `nextCall` scaffold for `generate_report_ui`. |
 | `get_report_full_context` | Returns all evaluated Q/A pairs for a session plus a `nextCall` scaffold for `generate_report_ui`. |
 | `generate_report_ui` | Writes a per-session JSON dataset to `interview-mcp/data/public/generated/` and returns a viewer URL. |
-| `get_graph` | Returns the full cumulative knowledge graph from `graph.json`. |
+| `get_graph` | Returns the full cumulative knowledge graph from the shared SQLite store. |
 
 ### Dynamic Report Viewer Flow
 
@@ -180,8 +179,7 @@ Claude (orchestrator)
     ▼
 report-mcp/server.ts
     │
-    ├── reads ──► interview-mcp/data/sessions.json
-    ├── reads ──► interview-mcp/data/graph.json
+    ├── reads ──► interview-mcp/data/app.db
     │
     │  regenerate_report (AI_ENABLED=true)
     ├── ai/ ──► Anthropic API (generateDeeperDives)

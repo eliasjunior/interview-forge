@@ -28,11 +28,17 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
 }
 
 export default function GraphPage() {
-  const svgRef = useRef<SVGSVGElement>(null)
+  const svgRef     = useRef<SVGSVGElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
-  const [graph, setGraph] = useState<KnowledgeGraph | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+
+  // Store D3 selections in refs so we can update them without re-running the sim
+  const nodeSelRef = useRef<d3.Selection<SVGGElement, SimNode, SVGGElement, unknown> | null>(null)
+  const linkSelRef = useRef<d3.Selection<SVGLineElement, SimLink, SVGGElement, unknown> | null>(null)
+
+  const [graph, setGraph]             = useState<KnowledgeGraph | null>(null)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
 
   useEffect(() => {
     getGraph()
@@ -41,18 +47,20 @@ export default function GraphPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // ── Build / rebuild simulation whenever graph data changes ─────────────
   useEffect(() => {
     if (!graph || !svgRef.current) return
     const svg = d3.select(svgRef.current)
     svg.selectAll('*').remove()
+    nodeSelRef.current = null
+    linkSelRef.current = null
 
     const rect = svgRef.current.getBoundingClientRect()
-    const W = rect.width || 800
-    const H = rect.height || 600
+    const W = rect.width  || 1200
+    const H = rect.height || 700
 
     if (graph.nodes.length === 0) return
 
-    // Clone nodes/edges for simulation mutation
     const nodes: SimNode[] = graph.nodes.map(n => ({ ...n }))
     const nodeById = new Map(nodes.map(n => [n.id, n]))
 
@@ -64,25 +72,25 @@ export default function GraphPage() {
         weight: e.weight,
       }))
 
-    // ── Zoom ────────────────────────────────────────────────────────────────
+    // ── Zoom ──────────────────────────────────────────────────────────────
     const root = svg.append('g')
     svg.call(
       d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.2, 4])
+        .scaleExtent([0.15, 5])
         .on('zoom', e => root.attr('transform', e.transform))
     )
 
-    // ── Simulation ──────────────────────────────────────────────────────────
+    // ── Simulation ────────────────────────────────────────────────────────
     const sim = d3.forceSimulation<SimNode>(nodes)
       .force('link', d3.forceLink<SimNode, SimLink>(links)
         .id(d => d.id)
-        .distance(d => Math.max(60, 120 / (d.weight + 1)))
+        .distance(d => Math.max(70, 140 / (d.weight + 1)))
       )
-      .force('charge', d3.forceManyBody().strength(-120))
+      .force('charge', d3.forceManyBody().strength(-160))
       .force('center', d3.forceCenter(W / 2, H / 2))
-      .force('collision', d3.forceCollide(22))
+      .force('collision', d3.forceCollide(26))
 
-    // ── Edges ────────────────────────────────────────────────────────────────
+    // ── Edges ─────────────────────────────────────────────────────────────
     const maxWeight = Math.max(...links.map(l => l.weight), 1)
     const linkSel = root.append('g')
       .selectAll<SVGLineElement, SimLink>('line')
@@ -92,7 +100,9 @@ export default function GraphPage() {
       .attr('stroke-opacity', 0.7)
       .attr('stroke-width', d => 0.5 + (d.weight / maxWeight) * 2.5)
 
-    // ── Nodes ────────────────────────────────────────────────────────────────
+    linkSelRef.current = linkSel as unknown as d3.Selection<SVGLineElement, SimLink, SVGGElement, unknown>
+
+    // ── Nodes ─────────────────────────────────────────────────────────────
     const nodeSel = root.append('g')
       .selectAll<SVGGElement, SimNode>('g')
       .data(nodes)
@@ -116,36 +126,42 @@ export default function GraphPage() {
       .attr('fill', d => nodeColor(d))
       .attr('fill-opacity', 0.85)
       .attr('stroke', d => nodeColor(d))
-      .attr('stroke-width', 1.5)
+      .attr('stroke-width', 2)
       .attr('stroke-opacity', 0.4)
 
     nodeSel.append('text')
       .text(d => d.label)
       .attr('text-anchor', 'middle')
-      .attr('dy', d => 10 + d.clusters.length * 2.5)
+      .attr('dy', d => 13 + d.clusters.length * 2.5)
       .attr('fill', '#e5ecf7')
+      .attr('fill-opacity', 1)
       .attr('font-size', '10px')
       .attr('font-family', '"Avenir Next", "Segoe UI", sans-serif')
       .attr('pointer-events', 'none')
 
-    // ── Tooltip ──────────────────────────────────────────────────────────────
+    nodeSelRef.current = nodeSel as unknown as d3.Selection<SVGGElement, SimNode, SVGGElement, unknown>
+
+    // ── Tooltip ───────────────────────────────────────────────────────────
     const tooltip = d3.select(tooltipRef.current)
 
     nodeSel
       .on('mouseenter', (_, d) => {
         tooltip
           .style('display', 'block')
-          .html(`<strong>${d.label}</strong><br/>${d.clusters.join(', ')}`)
+          .html(
+            `<strong style="color:#e5ecf7">${d.label}</strong>` +
+            `<div style="margin-top:4px;color:#9db0d0;font-size:0.78rem">${d.clusters.join(' · ')}</div>`
+          )
       })
       .on('mousemove', (event) => {
         const containerRect = svgRef.current!.parentElement!.getBoundingClientRect()
         tooltip
-          .style('left', `${event.clientX - containerRect.left + 12}px`)
-          .style('top', `${event.clientY - containerRect.top - 10}px`)
+          .style('left', `${event.clientX - containerRect.left + 14}px`)
+          .style('top',  `${event.clientY - containerRect.top  - 12}px`)
       })
       .on('mouseleave', () => tooltip.style('display', 'none'))
 
-    // ── Tick ─────────────────────────────────────────────────────────────────
+    // ── Tick ──────────────────────────────────────────────────────────────
     sim.on('tick', () => {
       linkSel
         .attr('x1', d => (d.source as SimNode).x ?? 0)
@@ -159,19 +175,86 @@ export default function GraphPage() {
     return () => { sim.stop() }
   }, [graph])
 
+  // ── Apply filter overlay whenever activeFilter changes ─────────────────
+  useEffect(() => {
+    const nodeSel = nodeSelRef.current
+    const linkSel = linkSelRef.current
+    if (!nodeSel || !linkSel) return
+
+    if (activeFilter === null) {
+      // Reset all
+      nodeSel.select('circle')
+        .attr('fill-opacity', 0.85)
+        .attr('stroke-opacity', 0.4)
+        .attr('stroke-width', 2)
+      nodeSel.select('text')
+        .attr('fill-opacity', 1)
+      linkSel
+        .attr('stroke-opacity', 0.7)
+        .attr('stroke', '#2a3957')
+    } else {
+      nodeSel.select('circle')
+        .attr('fill-opacity',   d => d.clusters.includes(activeFilter) ? 1   : 0.12)
+        .attr('stroke-opacity', d => d.clusters.includes(activeFilter) ? 1   : 0.08)
+        .attr('stroke-width',   d => d.clusters.includes(activeFilter) ? 2.5 : 1)
+      nodeSel.select('text')
+        .attr('fill-opacity', d => d.clusters.includes(activeFilter) ? 1 : 0.18)
+      linkSel
+        .attr('stroke-opacity', d => {
+          const s = d.source as SimNode
+          const t = d.target as SimNode
+          const both = s.clusters.includes(activeFilter) && t.clusters.includes(activeFilter)
+          return both ? 0.75 : 0.07
+        })
+        .attr('stroke', d => {
+          const s = d.source as SimNode
+          const t = d.target as SimNode
+          const both = s.clusters.includes(activeFilter) && t.clusters.includes(activeFilter)
+          return both ? CLUSTER_COLOR[activeFilter] : '#2a3957'
+        })
+    }
+  }, [activeFilter])
+
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Knowledge Graph</h1>
-        <p className="page-subtitle">
-          {graph
-            ? `${graph.nodes.length} concepts · ${graph.edges.length} connections · ${graph.sessions.length} sessions`
-            : 'Concepts extracted from all completed interview sessions'}
-        </p>
+    <div className="graph-page">
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <div className="graph-page-header">
+        <div>
+          <h1 className="page-title">Knowledge Graph</h1>
+          <p className="page-subtitle">
+            {graph
+              ? `${graph.nodes.length} concepts · ${graph.edges.length} connections · ${graph.sessions.length} sessions`
+              : 'Concepts extracted from all completed interview sessions'}
+          </p>
+        </div>
+
+        {/* ── Cluster filter pills ─────────────────────────────────── */}
+        {graph && graph.nodes.length > 0 && (
+          <div className="graph-filter-row">
+            <span className="graph-filter-label">Filter</span>
+            {CLUSTER_LABELS.map(c => (
+              <button
+                key={c}
+                className={`legend-filter-btn ${activeFilter === c ? 'active' : ''}`}
+                style={{ '--cluster-color': CLUSTER_COLOR[c] } as React.CSSProperties}
+                onClick={() => setActiveFilter(prev => prev === c ? null : c)}
+              >
+                <span className="legend-dot" style={{ background: CLUSTER_COLOR[c] }} />
+                {c}
+              </button>
+            ))}
+            {activeFilter && (
+              <button className="legend-filter-clear" onClick={() => setActiveFilter(null)}>
+                ✕ clear
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* ── States ──────────────────────────────────────────────────── */}
       {loading && <div className="loading">Loading graph…</div>}
-      {error && <div className="error-msg">Failed to load graph: {error}</div>}
+      {error   && <div className="error-msg">Failed to load graph: {error}</div>}
 
       {!loading && !error && graph?.nodes.length === 0 && (
         <div className="empty-state">
@@ -180,23 +263,17 @@ export default function GraphPage() {
         </div>
       )}
 
+      {/* ── Canvas ──────────────────────────────────────────────────── */}
       {!loading && !error && graph && graph.nodes.length > 0 && (
         <div className="graph-container">
           <svg ref={svgRef} className="graph-svg" />
           <div ref={tooltipRef} className="graph-tooltip" style={{ display: 'none' }} />
+
+          {/* Mini legend bottom-right */}
           <div className="graph-legend">
-            {CLUSTER_LABELS.map(c => (
-              <div key={c} className="legend-item">
-                <div className="legend-dot" style={{ background: CLUSTER_COLOR[c] }} />
-                {c}
-              </div>
-            ))}
-            <div className="legend-item" style={{ marginTop: 4, borderTop: '1px solid var(--line)', paddingTop: 8, fontSize: '0.75rem' }}>
-              Node size = cluster count
-            </div>
-            <div className="legend-item" style={{ fontSize: '0.75rem' }}>
-              Edge width = co-occurrence weight
-            </div>
+            <div className="legend-hint">Node size = cluster count</div>
+            <div className="legend-hint">Edge width = co-occurrence</div>
+            <div className="legend-hint" style={{ marginTop: 4 }}>Scroll to zoom · Drag nodes</div>
           </div>
         </div>
       )}

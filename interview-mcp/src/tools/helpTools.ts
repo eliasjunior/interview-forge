@@ -47,7 +47,11 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
           text: JSON.stringify({
             count: filtered.length,
             tools: filtered,
-            tip: "Call any tool with the example payload as a starting point. For report generation, use the report-mcp service.",
+            preflight: {
+              requiredFirstTool: "server_status",
+              why: "Verify the MCP server is connected and the runtime is healthy before starting an interview.",
+            },
+            tip: "Call server_status first. After a healthy preflight, call any other tool with the example payload as a starting point. For report generation, use the report-mcp service.",
           }),
         }],
       };

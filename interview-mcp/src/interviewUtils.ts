@@ -160,7 +160,10 @@ export function buildReport(session: Session): string {
   if (session.concepts && session.concepts.length > 0) {
     const byCluster: Record<string, string[]> = {};
     for (const c of session.concepts) {
-      (byCluster[c.cluster] ??= []).push(c.word);
+      if (!byCluster[c.cluster]) {
+        byCluster[c.cluster] = [];
+      }
+      byCluster[c.cluster].push(c.word);
     }
     lines.push(`## Concepts Extracted`, ``);
     for (const [cluster, words] of Object.entries(byCluster)) {
@@ -286,7 +289,10 @@ export function mergeConceptsIntoGraph(
 
   const clusterMap: Record<string, string[]> = {};
   for (const c of concepts) {
-    (clusterMap[c.cluster] ??= []).push(c.word.toLowerCase());
+    if (!clusterMap[c.cluster]) {
+      clusterMap[c.cluster] = [];
+    }
+    clusterMap[c.cluster].push(c.word.toLowerCase());
   }
 
   for (const words of Object.values(clusterMap)) {

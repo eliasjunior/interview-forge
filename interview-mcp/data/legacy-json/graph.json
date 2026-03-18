@@ -1,0 +1,132 @@
+{
+  "nodes": [
+    {
+      "id": "overview",
+      "label": "overview",
+      "clusters": [
+        "core concepts"
+      ]
+    },
+    {
+      "id": "jwt authentication",
+      "label": "jwt authentication",
+      "clusters": [
+        "core concepts"
+      ]
+    },
+    {
+      "id": "example",
+      "label": "example",
+      "clusters": [
+        "practical usage"
+      ]
+    },
+    {
+      "id": "use case",
+      "label": "use case",
+      "clusters": [
+        "practical usage"
+      ]
+    },
+    {
+      "id": "practical",
+      "label": "practical",
+      "clusters": [
+        "practical usage"
+      ]
+    },
+    {
+      "id": "tradeoff",
+      "label": "tradeoff",
+      "clusters": [
+        "tradeoffs"
+      ]
+    },
+    {
+      "id": "pitfall",
+      "label": "pitfall",
+      "clusters": [
+        "tradeoffs"
+      ]
+    },
+    {
+      "id": "mistake",
+      "label": "mistake",
+      "clusters": [
+        "tradeoffs"
+      ]
+    },
+    {
+      "id": "junior",
+      "label": "junior",
+      "clusters": [
+        "best practices"
+      ]
+    },
+    {
+      "id": "explain",
+      "label": "explain",
+      "clusters": [
+        "best practices"
+      ]
+    },
+    {
+      "id": "java concurrency",
+      "label": "java concurrency",
+      "clusters": [
+        "core concepts"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "jwt authentication",
+      "target": "overview",
+      "weight": 1
+    },
+    {
+      "source": "example",
+      "target": "use case",
+      "weight": 2
+    },
+    {
+      "source": "example",
+      "target": "practical",
+      "weight": 2
+    },
+    {
+      "source": "practical",
+      "target": "use case",
+      "weight": 2
+    },
+    {
+      "source": "pitfall",
+      "target": "tradeoff",
+      "weight": 2
+    },
+    {
+      "source": "mistake",
+      "target": "tradeoff",
+      "weight": 2
+    },
+    {
+      "source": "mistake",
+      "target": "pitfall",
+      "weight": 2
+    },
+    {
+      "source": "explain",
+      "target": "junior",
+      "weight": 2
+    },
+    {
+      "source": "java concurrency",
+      "target": "overview",
+      "weight": 1
+    }
+  ],
+  "sessions": [
+    "1772743307856-xe3eld",
+    "1773086427013-z9oqom"
+  ]
+}

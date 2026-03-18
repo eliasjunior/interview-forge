@@ -1,0 +1,17 @@
+{
+  "sessionId": "1773744782570-x1i6lo",
+  "topic": "JWT — JSON Web Token",
+  "title": "Runtime Smoke Report — JWT — JSON Web Token",
+  "generatedAt": "2026-03-17T10:55:46.241Z",
+  "questions": [
+    {
+      "questionNumber": 1,
+      "question": "What is a JWT and what problem does it solve compared to traditional session-based authentication?",
+      "candidateAnswer": "JWT is a signed token that lets services verify claims without looking up server-side session state on every request. It improves stateless scalability, but only if the server validates the signature, checks expiration, and uses a safe refresh-token and revocation strategy.",
+      "interviewerFeedback": "Strong answer with clear coverage of stateless auth, validation, and token lifecycle risks.",
+      "strongAnswer": "What is a JWT and what problem does it solve compared to traditional session-based authentication: concise stronger answer.\nHighlight the core mechanism and one tradeoff.\nTie it back to the original question directly.",
+      "subject": "What is a JWT and what problem does it solve compared to traditional session-based authentication",
+      "score": 4
+    }
+  ]
+}

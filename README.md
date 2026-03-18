@@ -10,7 +10,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 
 1. **Conducts interviews** — Claude picks questions from curated knowledge files (or generates them with AI), asks them one at a time, follows up, and enforces a strict state machine so the session never gets out of sync.
 2. **Evaluates answers** — after each answer, the server scores it (1–5), writes detailed feedback, and surfaces a stronger model answer. Scoring can be done by a background worker LLM or by the orchestrator Claude itself (no API key needed).
-3. **Builds a knowledge graph** — every completed session extracts concepts and merges them into a growing graph. Topics, strengths, and gaps accumulate across sessions.
+3. **Builds a knowledge graph** — every completed session extracts concepts and merges them into a growing graph. Topics, strengths, and gaps accumulate across sessions. The full-screen D3 canvas supports zoom, drag, and one-click cluster filtering to highlight only *core concepts*, *tradeoffs*, etc.
 4. **Generates flashcards** — questions you scored below 4 are automatically turned into spaced-repetition flashcards (SM-2 algorithm). Due cards surface daily.
 5. **Produces reports** — a Markdown report and an interactive HTML viewer are generated per session, showing scores, feedback, and model answers side-by-side.
 6. **Visualises everything** — a React dashboard shows session history, the knowledge graph (D3), report viewer, and a flashcard review UI.
@@ -31,8 +31,8 @@ mock-interview-mcp/
 
 | Package | Role |
 |---|---|
-| `interview-mcp` | **Data owner.** Runs the interview, persists sessions, builds the graph, generates flashcards, serves the REST API on port 3001. |
-| `report-mcp` | **Read-mostly analytics.** Reads `interview-mcp`'s data files, regenerates reports, queries weak subjects, produces the interactive HTML report viewer. |
+| `interview-mcp` | **Data owner.** Runs the interview, persists sessions, graph, and flashcards in SQLite, serves the REST API on port 3001. |
+| `report-mcp` | **Read-mostly analytics.** Reads the shared SQLite database owned by `interview-mcp`, regenerates reports, queries weak subjects, produces the interactive HTML report viewer. |
 | `ui` | **Frontend only.** No local data — fetches everything from `interview-mcp`'s REST API via a Vite proxy. |
 | `shared` | **Types only.** No runtime code. TypeScript interfaces imported at compile time by the other three packages. |
 
@@ -55,9 +55,8 @@ mock-interview-mcp/
 └──────────────────────┘     stdio (MCP)     │  analytics + reports    │
                                              └────────────┬────────────┘
                                                           │
-                                              interview-mcp/data/
-                                              (sessions.json, graph.json,
-                                               flashcards.json, reports/)
+                                             interview-mcp/data/
+                                              (app.db, reports/)
                                                           │
                                              ┌────────────▼────────────┐
                                              │  interview-mcp          │
@@ -70,7 +69,7 @@ mock-interview-mcp/
                                              └─────────────────────────┘
 ```
 
-**Data ownership:** `interview-mcp` is the single source of truth for all data files. `report-mcp` reads from (and writes reports back to) `interview-mcp/data/` — its path is configurable via `DATA_DIR`.
+**Data ownership:** `interview-mcp` is the single source of truth for runtime data in `interview-mcp/data/app.db`. `report-mcp` reads from that database and writes reports back to `interview-mcp/data/` — its path is configurable via `DATA_DIR`.
 
 ---
 
@@ -111,7 +110,7 @@ This server is focused on analysing and presenting completed sessions.
 | `get_report_weak_subjects` | Identifies low-scoring questions and returns structured context, ready to pipe into `generate_report_ui`. |
 | `get_report_full_context` | Returns all evaluated Q/A pairs for a session, with a pre-filled `nextCall` scaffold for `generate_report_ui`. |
 | `generate_report_ui` | Writes a per-session JSON dataset and returns a viewer URL (`/generated/report-ui.html?sessionId=…`). |
-| `get_graph` | Returns the full cumulative knowledge graph from `graph.json`. |
+| `get_graph` | Returns the full cumulative knowledge graph from the shared SQLite store. |
 
 ---
 
@@ -158,6 +157,31 @@ Open **http://localhost:5173/flashcards** for flashcard review.
 
 Add both servers to your `.mcp.json` (Claude Desktop) or project `.mcp.json` (Claude Code). See `interview-mcp/README.md` and `report-mcp/README.md` for the exact config blocks.
 
+For `interview-mcp`, prefer the compiled server entrypoint instead of `tsx`:
+
+```json
+{
+  "mcpServers": {
+    "interview-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "node",
+        "/Users/eliasjunior/Projects/first-mcp/interview-mcp/dist/server.js"
+      ],
+      "cwd": "/Users/eliasjunior/Projects/first-mcp/interview-mcp"
+    }
+  }
+}
+```
+
+Build the package before reloading Codex/Desktop:
+
+```bash
+npm run build:interview
+```
+
+After the host reconnects, always run `server_status` first. Only start an interview after that preflight succeeds.
+
 ---
 
 ## Monorepo scripts
@@ -198,7 +222,7 @@ Set `AI_ENABLED=true` to let the server generate questions for any topic not in 
 
 ## Flashcard system
 
-After `end_interview`, the server automatically generates flashcards for any question scored below 4. Cards are stored in `data/flashcards.json` and scheduled with the **SM-2 spaced repetition algorithm**.
+After `end_interview`, the server automatically generates flashcards for any question scored below 4. Cards are stored in `data/app.db` and scheduled with the **SM-2 spaced repetition algorithm**.
 
 A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM** and prints a summary of due cards grouped by topic.
 
@@ -246,4 +270,4 @@ All domain types live in `shared/src/types.ts` and are imported as `@mock-interv
 
 ### Storage
 
-Local JSON files only — no database. All data lives in `interview-mcp/data/`.
+Runtime state lives in SQLite (`interview-mcp/data/app.db`). Knowledge source files and generated report artifacts remain in `interview-mcp/data/` and `interview-mcp/public/generated/`.

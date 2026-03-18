@@ -1,17 +1,15 @@
 import dotenv from "dotenv";
-if (!process.env.ANTHROPIC_API_KEY) dotenv.config({ override: true });
-else dotenv.config();
+dotenv.config();
 import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import { createAIProvider, type AIProvider } from "./ai/index.js";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
 import { applySM2 } from "./srsUtils.js";
-import type { ReviewRating, Flashcard } from "@mock-interview/shared";
-
-const ai: AIProvider = createAIProvider();
+import type { ReviewRating, Flashcard, Session } from "@mock-interview/shared";
+import { createDb } from "./db/client.js";
+import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -20,6 +18,8 @@ const REPORTS_DIR = path.join(DATA_DIR, "reports");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
 
 const PORT = process.env.PORT ?? 3001;
+const db = createDb();
+const repositories = createSqliteRepositories(db);
 
 const app = express();
 app.use(cors());
@@ -28,25 +28,28 @@ app.use(express.json());
 // Serve the neural map frontend
 app.use(express.static(PUBLIC_DIR));
 
+function loadSessions(): Record<string, Session> {
+  return Object.fromEntries(
+    repositories.sessions.list().map((session) => [session.id, session])
+  );
+}
+
+function loadFlashcards(): Flashcard[] {
+  return repositories.flashcards.list();
+}
+
+function saveFlashcards(cards: Flashcard[]) {
+  repositories.flashcards.replaceAll(cards);
+}
+
 // API: Get the full knowledge graph
 app.get("/api/graph", (_req, res) => {
-  const graphPath = path.join(DATA_DIR, "graph.json");
-  if (!fs.existsSync(graphPath)) {
-    res.json({ nodes: [], edges: [], sessions: [] });
-    return;
-  }
-  res.json(JSON.parse(fs.readFileSync(graphPath, "utf8")));
+  res.json(repositories.graph.get());
 });
 
 // API: List all sessions
 app.get("/api/sessions", (_req, res) => {
-  const sessionsPath = path.join(DATA_DIR, "sessions.json");
-  if (!fs.existsSync(sessionsPath)) {
-    res.json([]);
-    return;
-  }
-  const sessions = JSON.parse(fs.readFileSync(sessionsPath, "utf8"));
-  res.json(Object.values(sessions));
+  res.json(repositories.sessions.list());
 });
 
 // API: List all reports (id + topic + date)
@@ -55,10 +58,7 @@ app.get("/api/reports", (_req, res) => {
     res.json([]);
     return;
   }
-  const sessionsPath = path.join(DATA_DIR, "sessions.json");
-  const sessions = fs.existsSync(sessionsPath)
-    ? JSON.parse(fs.readFileSync(sessionsPath, "utf8"))
-    : {};
+  const sessions = loadSessions();
 
   const files = fs.readdirSync(REPORTS_DIR).filter(f => f.endsWith(".md"));
   const list = files.map(f => {
@@ -77,20 +77,12 @@ app.get("/api/reports", (_req, res) => {
   res.json(list);
 });
 
-// DEBUG: Test deeper dive generation for a session
-app.get("/api/debug/deeper-dives/:id", async (req, res) => {
-  const sessionsPath = path.join(DATA_DIR, "sessions.json");
-  if (!fs.existsSync(sessionsPath)) { res.status(404).json({ error: "No sessions" }); return; }
-  const sessions = JSON.parse(fs.readFileSync(sessionsPath, "utf8"));
-  const session = sessions[req.params.id];
-  if (!session) { res.status(404).json({ error: "Session not found" }); return; }
-  try {
-    const dives = await ai.generateDeeperDives(session.topic, session.evaluations);
-    res.json({ ok: true, count: dives.filter(Boolean).length, dives });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.json({ ok: false, error: msg });
-  }
+// AI-backed deeper dives are intentionally disabled in this package.
+app.get("/api/debug/deeper-dives/:id", (_req, res) => {
+  res.status(410).json({
+    ok: false,
+    error: "Deeper-dive generation is no longer available because AI calls are disabled.",
+  });
 });
 
 // API: Get a single report as Markdown
@@ -102,20 +94,6 @@ app.get("/api/reports/:id", (req, res) => {
   }
   res.type("text/markdown").send(fs.readFileSync(reportPath, "utf8"));
 });
-
-// ── Flashcards ─────────────────────────────────────────────────────────────
-
-const FLASHCARDS_FILE = path.join(DATA_DIR, "flashcards.json");
-
-function loadFlashcards(): Flashcard[] {
-  if (!fs.existsSync(FLASHCARDS_FILE)) return [];
-  const data = JSON.parse(fs.readFileSync(FLASHCARDS_FILE, "utf8"));
-  return Array.isArray(data) ? data : (data.flashcards ?? []);
-}
-
-function saveFlashcards(cards: Flashcard[]) {
-  fs.writeFileSync(FLASHCARDS_FILE, JSON.stringify({ flashcards: cards }, null, 2));
-}
 
 app.get("/api/flashcards", (_req, res) => {
   res.json(loadFlashcards());
@@ -137,7 +115,7 @@ app.post("/api/flashcards/:id/review", (req, res) => {
 
 registerWeakReportRoutes(app, {
   generatedUiDir: GENERATED_UI_DIR,
-  sessionsFile: path.join(DATA_DIR, "sessions.json"),
+  loadSessions,
   fsLike: fs,
 });
 
