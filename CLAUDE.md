@@ -343,3 +343,93 @@ start_scoped_interview {
   focus: "robustness, reliability, and extensibility in a production environment"
 }
 ```
+
+---
+
+## Algorithm Practice
+
+### Path A — Current approach (supported today)
+
+Use `start_scoped_interview` with a hand-crafted problem as `content`. The candidate explains their approach verbally/in pseudocode; evaluation focuses on pattern identification, complexity analysis, and edge cases.
+
+**Format for `content`:**
+
+```
+# Problem: Binary Search
+
+## Problem Statement
+Given a sorted array and a target value, return its index or -1 if not found.
+
+## Constraints
+- Array is sorted ascending
+- No duplicates
+- Length 1–10^4
+
+## Expected approach
+- Pattern: binary search
+- Time: O(log n), Space: O(1)
+- Key invariant: left <= right, boundaries shrink every iteration
+
+## Common mistakes
+- Using < instead of <= in while condition → misses single-element array
+- Not adjusting mid correctly → infinite loop
+- Off-by-one in boundary update (left = mid instead of mid + 1)
+```
+
+**Invocation:**
+```
+start_scoped_interview {
+  topic: "Binary Search",
+  content: "...problem + expected approach + common mistakes...",
+  focus: "pattern identification, time/space complexity, edge cases"
+}
+```
+
+**After the drill:**
+- `log_mistake` for any pattern errors, boundary mistakes, or complexity gaps
+- `start_drill { topic: "Binary Search" }` on the next session to target the same weak spots
+
+**Limitations of Path A:**
+- Evaluation is text-based — no code execution
+- No structured problem library — problems must be written manually per session
+- `interviewType` defaults to `"design"` — no code-specific routing
+
+---
+
+### Path B — Future: proper algorithm support (parked)
+
+When algorithm practice becomes a primary use case, the following should be built:
+
+**1. Algorithm knowledge files**
+New files in `interview-mcp/data/knowledge/` following the same format but with:
+- Problem statement + constraints
+- Expected pattern + complexity
+- Common mistake patterns (not evaluation criteria)
+- One or two canonical examples
+
+Candidate files: `binary-search.md`, `two-pointers.md`, `sliding-window.md`, `bfs-dfs.md`, `dynamic-programming.md`
+
+**2. Activate `interviewType: "code"`**
+Currently reserved in the type system. When activated:
+- Different question format: problem + constraints block
+- Evaluation rubric: approach pattern → complexity → edge cases → code quality
+- `start_interview { topic: "Binary Search", interviewType: "code" }`
+
+**3. `practice_pattern` tool**
+Single-pattern, single-problem drill. Shorter than a full interview:
+- One problem
+- Recall: "what's the invariant / when does this pattern apply?"
+- Attempt: explain approach + write pseudocode
+- Feedback: pattern correctness, complexity, edge cases missed
+- Auto log_mistake + generate flashcard
+
+**Micro-skill taxonomy for algorithms:**
+
+| Pattern | Micro-skills |
+|---|---|
+| Binary search | Boundary condition (`<` vs `<=`), mid calculation, shrink direction |
+| Two pointers | Collision vs same-direction, when to advance which pointer |
+| Sliding window | Expand/shrink condition, window validity invariant |
+| DFS/BFS | Stack vs queue, visited set, when to mark visited |
+| Dynamic programming | State definition, recurrence relation, base cases, top-down vs bottom-up |
+| Backtracking | Pruning condition, state restore on backtrack |
