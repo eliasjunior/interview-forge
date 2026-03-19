@@ -26,6 +26,12 @@ export default function NavBar() {
         >
           Flashcards 🃏
         </NavLink>
+        <NavLink
+          to="/mistakes"
+          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        >
+          Mistake Log
+        </NavLink>
       </div>
     </nav>
   )

@@ -96,6 +96,10 @@ function createSpyRepositories() {
         calls.graph = graph;
       },
     },
+    mistakes: {
+      list: () => [],
+      insert: () => undefined,
+    },
   };
 
   return { repositories, calls };

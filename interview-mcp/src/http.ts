@@ -95,6 +95,11 @@ app.get("/api/reports/:id", (req, res) => {
   res.type("text/markdown").send(fs.readFileSync(reportPath, "utf8"));
 });
 
+app.get("/api/mistakes", (req, res) => {
+  const topic = typeof req.query.topic === "string" ? req.query.topic : undefined;
+  res.json(repositories.mistakes.list(topic));
+});
+
 app.get("/api/flashcards", (_req, res) => {
   res.json(loadFlashcards());
 });

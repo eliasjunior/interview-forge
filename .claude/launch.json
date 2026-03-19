@@ -18,6 +18,19 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:ui", "--prefix", "interview-mcp"],
       "port": 3001
+    },
+    {
+      "name": "interview-http",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:http", "--prefix", "interview-mcp"],
+      "port": 3001,
+      "autoPort": false
+    },
+    {
+      "name": "ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "ui"],
+      "port": 5173
     }
   ]
 }

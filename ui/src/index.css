@@ -942,3 +942,86 @@ html, body, #root {
   vertical-align: top;
 }
 .fc-table tr:first-child td { background: var(--bg-soft); font-weight: 600; }
+
+/* ── Mistakes page ──────────────────────────────────────────────────────────── */
+
+.mistakes-page { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+.mistakes-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.mistakes-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.mistakes-count { color: var(--muted); font-size: 0.9rem; }
+
+.mistakes-empty {
+  color: var(--muted);
+  padding: 2rem;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+.mistakes-empty code {
+  background: var(--bg-soft);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.85em;
+  color: #93c5fd;
+}
+
+.mistakes-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.mistake-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.mistake-card:hover { border-color: var(--accent); }
+.mistake-card.expanded { border-color: var(--accent); }
+
+.mistake-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.mistake-card-left { display: flex; align-items: flex-start; gap: 0.6rem; flex: 1; min-width: 0; }
+
+.mistake-topic-badge {
+  flex-shrink: 0;
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mistake-text { font-size: 0.9rem; color: var(--fg); line-height: 1.4; }
+.mistake-date { flex-shrink: 0; color: var(--muted); font-size: 0.78rem; padding-top: 2px; }
+
+.mistake-card-body {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mistake-section { display: flex; flex-direction: column; gap: 0.2rem; }
+.mistake-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.mistake-value { margin: 0; font-size: 0.88rem; color: var(--fg); line-height: 1.5; }

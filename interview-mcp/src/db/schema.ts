@@ -156,6 +156,15 @@ export const graphSessions = sqliteTable("graph_sessions", {
   sessionId: text("session_id").notNull().unique().references(() => sessions.id, { onDelete: "cascade" }),
 });
 
+export const mistakes = sqliteTable("mistakes", {
+  id: text("id").primaryKey(),
+  mistake: text("mistake").notNull(),
+  pattern: text("pattern").notNull(),
+  fix: text("fix").notNull(),
+  topic: text("topic"),
+  createdAt: text("created_at").notNull(),
+});
+
 export const sessionsRelations = relations(sessions, ({ many }) => ({
   questions: many(sessionQuestions),
   messages: many(sessionMessages),

@@ -84,7 +84,7 @@ ui/src/
 
 Session states: `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW_UP` (loops), then `ENDED`.
 
-**14 MCP tools:** `server_status`, `help_tools`, `start_interview`, `ask_question`, `submit_answer`, `evaluate_answer`, `ask_followup`, `next_question`, `end_interview`, `get_session`, `list_sessions`, `list_topics`, `get_due_flashcards`, `review_flashcard`
+**18 MCP tools:** `server_status`, `help_tools`, `start_interview`, `start_scoped_interview`, `start_drill`, `ask_question`, `submit_answer`, `evaluate_answer`, `ask_followup`, `next_question`, `end_interview`, `get_session`, `list_sessions`, `list_topics`, `get_due_flashcards`, `review_flashcard`, `log_mistake`, `list_mistakes`
 
 **REST API (port 3001):**
 - `GET /api/sessions` — all sessions
@@ -93,6 +93,7 @@ Session states: `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW
 - `GET /api/graph` — knowledge graph JSON
 - `GET /api/flashcards` — all flashcards
 - `POST /api/flashcards/:id/review` — submit a review rating `{ rating: 1|2|3|4 }`, applies SM-2, returns updated card
+- `GET /api/mistakes` — all logged mistakes (optional `?topic=` filter)
 - `GET /generated/report-ui.html` — HTML report viewer
 
 ## report-mcp — Tools
@@ -214,6 +215,7 @@ Key domain types (all imported via `@mock-interview/shared`):
 | `FlashcardDifficulty` | `'easy' \| 'medium' \| 'hard'` |
 | `ReviewRating` | `1 \| 2 \| 3 \| 4` |
 | `FlashcardReviewResult` | Return shape of a review operation |
+| `Mistake` | Mistake log entry: `mistake`, `pattern`, `fix`, optional `topic`, `createdAt` |
 
 ## Interview Types
 
@@ -286,6 +288,44 @@ Each session card on `/sessions` shows a `🏗️ Design` badge (teal) for inter
 **Do not modify this file.** The `AIProvider` interface (`port.ts`) and its adapters (`anthropic.ts`, `cache.ts`) are considered stable and parked. They cover exactly four operations: `generateQuestions`, `evaluateAnswer`, `extractConcepts`, `generateDeeperDives`.
 
 **New tools must not add methods to `AIProvider`.** If a new tool needs AI-style logic (e.g. generating questions from custom content), that logic must live entirely inside the tool file itself — self-contained, without touching the provider layer. See `startScopedInterview.ts` as the reference pattern: content parsing and question building happen in the tool, no provider calls.
+
+## Drill Tool (`start_drill`)
+
+Starts a targeted drill on weak spots from a past interview. Implements the deliberate practice loop automatically.
+
+**Requirements:** at least one completed `ENDED` session for the topic. If none exists → returns an error pointing to `start_interview` first.
+
+**What it does:**
+1. Finds the most recent completed session for the topic (or a specific `sessionId`)
+2. Extracts evaluations where `score < 4` → these become the drill questions
+3. Loads logged mistakes for the topic from the mistake log
+4. Builds `recallContext` (known mistakes + weak areas) — returned to the orchestrator to run the recall step
+5. Creates a new session tagged `sessionKind: "drill"` with `customContent` containing previous feedback as rubric
+
+**Orchestrator flow (enforced via `instruction` in the response):**
+```
+start_drill { topic }
+  → show recallContext to candidate (known mistakes + weak areas)
+  → ask: "What do you remember? Where will you struggle?"
+  → wait for response
+  → ask_question → submit_answer → evaluate_answer → next_question (repeat)
+  → end_interview → log_mistake (for any new gaps)
+```
+
+**Sessions tagged `sessionKind: "drill"` are distinguishable** in `list_sessions` from full interviews.
+
+**Edge cases:**
+- **No completed sessions for the topic** → error: `"Complete a full interview first: start_interview { topic: '...' }"`. Do not attempt a drill without source data.
+- **All questions scored ≥ 4 and no logged mistakes** → returns `status: "no_weak_spots"` with avg score. Suggest a new full interview to find fresh gaps.
+- **`sessionId` provided but not found** → error immediately.
+- **`sessionId` provided but session not `ENDED`** → error; only completed sessions can be used as source.
+
+```
+start_drill { topic: "Java OS & JVM Internals" }
+start_drill { topic: "JWT authentication", sessionId: "..." }  # target specific session
+```
+
+---
 
 ## Scoped Interview Tool (`start_scoped_interview`)
 

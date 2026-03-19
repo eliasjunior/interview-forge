@@ -1,4 +1,4 @@
-import type { Session, KnowledgeGraph, ReportMeta, Flashcard, ReviewRating } from '@mock-interview/shared'
+import type { Session, KnowledgeGraph, ReportMeta, Flashcard, ReviewRating, Mistake } from '@mock-interview/shared'
 
 const BASE = '/api'
 
@@ -30,6 +30,9 @@ export const getReports = (): Promise<ReportMeta[]> => req(`${BASE}/reports`)
 export const getGraph = (): Promise<KnowledgeGraph> => req(`${BASE}/graph`)
 
 export const getFlashcards = (): Promise<Flashcard[]> => req(`${BASE}/flashcards`)
+
+export const getMistakes = (topic?: string): Promise<Mistake[]> =>
+  req(`${BASE}/mistakes${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`)
 
 export const reviewFlashcard = (id: string, rating: ReviewRating): Promise<Flashcard> =>
   post(`${BASE}/flashcards/${encodeURIComponent(id)}/review`, { rating })

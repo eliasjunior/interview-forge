@@ -4,6 +4,7 @@ import SessionsPage from './pages/SessionsPage'
 import ReportPage from './pages/ReportPage'
 import GraphPage from './pages/GraphPage'
 import FlashcardsPage from './pages/FlashcardsPage'
+import MistakesPage from './pages/MistakesPage'
 
 export default function App() {
   const location = useLocation()
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/sessions/:id" element={<ReportPage />} />
           <Route path="/graph" element={<GraphPage />} />
           <Route path="/flashcards" element={<FlashcardsPage />} />
+          <Route path="/mistakes" element={<MistakesPage />} />
         </Routes>
       </main>
     </div>

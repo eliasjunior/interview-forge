@@ -14,7 +14,7 @@ export type InterviewState =
   | 'FOLLOW_UP'
   | 'ENDED'
 
-export type SessionKind = 'interview' | 'study'
+export type SessionKind = 'interview' | 'study' | 'drill'
 export type StudyCategory = 'topic' | 'algorithm'
 export type InterviewType = 'design' | 'code'
 
@@ -142,6 +142,21 @@ export interface FlashcardReviewResult {
   nextDueDate: string
   nextInterval: number
   nextEaseFactor: number
+}
+
+// ── Mistake log ───────────────────────────────────────────────────────────────
+
+export interface Mistake {
+  id: string
+  /** What went wrong */
+  mistake: string
+  /** When / in what context it happens */
+  pattern: string
+  /** The correct approach or fix */
+  fix: string
+  /** Optional topic tag (e.g. "Java Thread States") */
+  topic?: string
+  createdAt: string
 }
 
 // ── HTTP API responses (used by ui) ───────────────────────────────────────────

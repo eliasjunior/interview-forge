@@ -31,6 +31,15 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
         { name: "get_session", how: "Get full session data", example: { sessionId: "..." } },
         { name: "list_sessions", how: "List sessions", example: {} },
         { name: "list_topics", how: "List curated knowledge topics", example: {} },
+        { name: "get_due_flashcards", how: "Get flashcards due for spaced-repetition review today", example: { topic: "JWT authentication" } },
+        { name: "review_flashcard", how: "Submit a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy) — applies SM-2 and schedules next review", example: { cardId: "...", rating: 3 } },
+        { name: "log_mistake", how: "Record a micro-skill mistake: what went wrong, the pattern (when it happens), and the fix. Call this after any drill or evaluation.", example: { mistake: "Off-by-one in binary search", pattern: "Always happens with while condition", fix: "Use left <= right and adjust boundaries carefully", topic: "Algorithms" } },
+        { name: "list_mistakes", how: "List all logged mistakes, optionally filtered by topic", example: { topic: "Java Thread States" } },
+        {
+          name: "start_drill",
+          how: "Start a targeted drill on weak spots from a past interview. Pulls questions scored < 4 and logged mistakes for the topic, surfaces a recall prompt, then starts a focused drill session. Requires at least one completed interview on the topic first.",
+          example: { topic: "Java OS & JVM Internals" },
+        },
       ];
 
       const filtered = toolName
