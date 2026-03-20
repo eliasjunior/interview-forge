@@ -23,5 +23,33 @@
       "tag": "0002_mistake_log",
       "breakpoints": true
     }
+    ,{
+      "idx": 3,
+      "version": "6",
+      "when": 1773866800000,
+      "tag": "0003_skill_backlog",
+      "breakpoints": true
+    }
+    ,{
+      "idx": 4,
+      "version": "6",
+      "when": 1773950400000,
+      "tag": "0004_exercises",
+      "breakpoints": true
+    }
+    ,{
+      "idx": 5,
+      "version": "6",
+      "when": 1773954000000,
+      "tag": "0005_exercise_scenario",
+      "breakpoints": true
+    }
+    ,{
+      "idx": 6,
+      "version": "6",
+      "when": 1774000000000,
+      "tag": "0006_exercise_tags",
+      "breakpoints": true
+    }
   ]
 }

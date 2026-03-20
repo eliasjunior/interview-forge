@@ -18,6 +18,12 @@ import { registerStartScopedInterviewTool } from "./startScopedInterview.js";
 import { registerLogMistakeTool } from "./logMistake.js";
 import { registerListMistakesTool } from "./listMistakes.js";
 import { registerStartDrillTool } from "./startDrill.js";
+import { registerAddSkillTool } from "./addSkill.js";
+import { registerListSkillsTool } from "./listSkills.js";
+import { registerUpdateSkillTool } from "./updateSkill.js";
+import { registerPracticeMicroSkillTool } from "./practiceMicroSkill.js";
+import { registerCreateExerciseTool } from "./createExercise.js";
+import { registerListExercisesTool } from "./listExercises.js";
 
 export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerServerStatusTool(server, deps);
@@ -38,4 +44,10 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerLogMistakeTool(server, deps);
   registerListMistakesTool(server, deps);
   registerStartDrillTool(server, deps);
+  registerAddSkillTool(server, deps);
+  registerListSkillsTool(server, deps);
+  registerUpdateSkillTool(server, deps);
+  registerPracticeMicroSkillTool(server, deps);
+  registerCreateExerciseTool(server, deps);
+  registerListExercisesTool(server, deps);
 }

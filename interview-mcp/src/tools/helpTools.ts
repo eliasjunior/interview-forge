@@ -40,6 +40,50 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
           how: "Start a targeted drill on weak spots from a past interview. Pulls questions scored < 4 and logged mistakes for the topic, surfaces a recall prompt, then starts a focused drill session. Requires at least one completed interview on the topic first.",
           example: { topic: "Java OS & JVM Internals" },
         },
+        {
+          name: "add_skill",
+          how: "Add a transferable micro-skill to the skill backlog with sub-skills and related problems.",
+          example: { name: "2D index transformations", subSkills: ["layer boundaries", "coordinate mapping", "offset reasoning"], relatedProblems: ["rotate matrix", "spiral matrix"], confidence: 1 },
+        },
+        {
+          name: "list_skills",
+          how: "List skills in the backlog. Filter by maxConfidence to find what to drill next.",
+          example: { maxConfidence: 2 },
+        },
+        {
+          name: "update_skill",
+          how: "Update confidence on a skill or sub-skill after a drill. If subSkill is provided, recalculates overall skill confidence as the average of all sub-skills.",
+          example: { name: "2D index transformations", subSkill: "layer boundaries", confidence: 3 },
+        },
+        {
+          name: "practice_micro_skill",
+          how: "Start a focused micro-skill drill. Runs the 5-step loop: recall → targeted question → evaluate → flashcard → update confidence. Auto-picks lowest-confidence sub-skill if subSkill is omitted.",
+          example: { skill: "2D index transformations", subSkill: "layer boundaries" },
+        },
+        {
+          name: "create_exercise",
+          how: "Create a structured practice exercise in the knowledge center. Writes a rich .md file, persists metadata, and returns complexity signals + a prerequisite roadmap. If the exercise is too hard (difficulty ≥ 4 or unmet prerequisites), the tool tells you to show the roadmap and ask the candidate where to start.",
+          example: {
+            name: "RaceConditionLab",
+            topic: "java-concurrency",
+            language: "java",
+            difficulty: 2,
+            description: "Observe a real race condition on a shared counter, then fix it step by step",
+            tags: ["concurrency", "shared-state", "synchronization"],
+            learningGoal: "Understand why unsynchronized increments lose updates and how AtomicInteger solves it",
+            problemStatement: "Write a program that starts N threads each incrementing a shared counter M times. Print actual vs expected count. Then fix it.",
+            steps: ["Implement with a plain int field — observe wrong result", "Fix with synchronized method", "Fix with AtomicInteger", "Compare throughput"],
+            evaluationCriteria: ["Identifies the race condition correctly", "Uses AtomicInteger or synchronized correctly", "Explains happens-before"],
+            hints: ["Try 10 threads × 100,000 increments to make the race reliable"],
+            relatedConcepts: ["java-concurrency.md: race condition, atomicity, happens-before"],
+            prerequisites: [],
+          },
+        },
+        {
+          name: "list_exercises",
+          how: "List practice exercises, optionally filtered by topic, max difficulty, or tags. Returns exercises grouped by topic, sorted by difficulty. Use this to find what to practice next.",
+          example: { tags: ["matrix"], maxDifficulty: 3 },
+        },
       ];
 
       const filtered = toolName

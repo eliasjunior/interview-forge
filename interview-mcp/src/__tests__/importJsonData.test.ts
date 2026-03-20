@@ -100,6 +100,18 @@ function createSpyRepositories() {
       list: () => [],
       insert: () => undefined,
     },
+    skills: {
+      list: () => [],
+      findByName: () => null,
+      insert: () => undefined,
+      update: () => undefined,
+    },
+    exercises: {
+      list: () => [],
+      findByName: () => null,
+      findBySlug: () => null,
+      insert: () => undefined,
+    },
   };
 
   return { repositories, calls };

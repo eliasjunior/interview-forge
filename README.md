@@ -38,6 +38,267 @@ mock-interview-mcp/
 
 ---
 
+## How to use it
+
+All interactions happen in natural language inside **Claude Desktop** or **Claude Code**. Claude decides which tools to call — you just describe what you want. Below are the main workflows with example prompts and the tool sequence Claude runs behind the scenes.
+
+---
+
+### 1. Full interview
+
+The core loop. Claude asks questions one at a time, waits for your answer, scores it, optionally asks a follow-up, then moves to the next question. At the end it generates a report and flashcards for weak answers automatically.
+
+**You say:**
+```
+Start a mock interview on JWT authentication
+```
+
+**Claude runs:**
+```
+server_status
+  → start_interview { topic: "JWT authentication" }
+  → ask_question { sessionId }
+  → [you answer]
+  → submit_answer { sessionId, answer: "..." }
+  → evaluate_answer { sessionId }
+  → ask_followup { sessionId }   ← only if score < 3 or answer was incomplete
+  → next_question { sessionId }
+  → [repeat per question]
+  → end_interview { sessionId }   ← generates report + flashcards
+```
+
+**Available topics:** JWT, REST + Spring/JPA, Payment API Design, URL Shortener, mTLS/TLS, Java Concurrency, Java OS & JVM Internals, Rotate Matrix.
+
+---
+
+### 2. Targeted drill on weak spots
+
+After a full interview, drill back on questions where you scored below 4. Claude loads your previous feedback as the rubric and runs a focused session.
+
+**You say:**
+```
+Drill me on my weak spots from the last JWT interview
+```
+
+**Claude runs:**
+```
+start_drill { topic: "JWT authentication" }
+  → [shows recallContext: known mistakes + weak areas]
+  → asks: "What do you remember? Where will you struggle?"
+  → [you respond]
+  → ask_question → submit_answer → evaluate_answer → next_question
+  → end_interview → log_mistake for any new gaps
+```
+
+> Requires at least one completed interview for the topic first.
+
+---
+
+### 3. Scoped interview on custom content
+
+Start an interview from any spec, README, or architecture doc you paste in. Claude extracts questions from the content itself — no knowledge file needed.
+
+**You say:**
+```
+Run a scoped interview on this Payment API spec, focus on reliability and edge cases:
+
+[paste your spec here]
+```
+
+**Claude runs:**
+```
+start_scoped_interview {
+  topic: "Payment API",
+  content: "...your pasted spec...",
+  focus: "robustness, reliability, and extensibility"
+}
+  → ask_question → submit_answer → evaluate_answer → ... → end_interview
+```
+
+---
+
+### 4. Flashcard review
+
+Cards are generated automatically when you score below 4. Review due cards using SM-2 spaced repetition — Claude flips each card and waits for your self-rating.
+
+**You say:**
+```
+Review my due flashcards for JWT
+```
+
+**Claude runs:**
+```
+get_due_flashcards { topic: "JWT authentication" }
+  → [for each card]
+     review_flashcard { cardId, rating: 1|2|3|4 }
+```
+
+**Rating guide:** `1` = forgot, `2` = hard, `3` = good, `4` = easy. The next due date is set automatically.
+
+You can also review cards in the browser at **http://localhost:5173/flashcards**.
+
+---
+
+### 5. Micro-skill practice
+
+For algorithm-style skills (e.g. "2D index transformations"), track confidence per sub-skill and drill the weakest one.
+
+**You say:**
+```
+Add a skill for 2D index transformations with sub-skills: layer boundaries, coordinate mapping, offset reasoning
+```
+```
+Practice micro-skill: 2D index transformations — focus on layer boundaries
+```
+
+**Claude runs:**
+```
+add_skill {
+  name: "2D index transformations",
+  subSkills: ["layer boundaries", "coordinate mapping", "offset reasoning"],
+  relatedProblems: ["rotate matrix", "spiral matrix"],
+  confidence: 1
+}
+
+practice_micro_skill { skill: "2D index transformations", subSkill: "layer boundaries" }
+  → shows recallQuestions + known mistakes
+  → ask_question → submit_answer → evaluate_answer → end_interview
+  → update_skill { name, subSkill, confidence: 2 }
+```
+
+**You say:**
+```
+What micro-skills do I still need to drill? (confidence ≤ 2)
+```
+
+**Claude runs:**
+```
+list_skills { maxConfidence: 2 }
+```
+
+---
+
+### 6. Coding exercises
+
+Hands-on implementation tasks grounded in real-world scenarios. The tool writes a full `.md` exercise file, persists metadata plus cross-topic tags, assesses complexity, and either presents the exercise or proposes simpler prerequisites first.
+
+**You say:**
+```
+Create an exercise for Java concurrency — implement a producer-consumer queue like you'd use in a background job system
+```
+
+**Claude runs:**
+```
+create_exercise {
+  name: "ProducerConsumerBlockingQueue",
+  topic: "java-concurrency",
+  difficulty: 3,
+  tags: ["concurrency", "shared-state", "synchronization"],
+  scenario: "Background email/job processing system",
+  problemMeaning: [
+    "Prevent overload by bounding queue size",
+    "Introduce backpressure when queue is full",
+    "Decouple request handling from heavy processing"
+  ],
+  ...
+}
+```
+
+If the exercise is too hard or has unmet prerequisites, Claude shows the roadmap:
+```
+Before this exercise I recommend completing:
+1. RaceConditionLab (Easy) — understand synchronized before wait/notify
+
+Do you want to start with the prerequisites, or jump straight in?
+```
+
+After completing the exercise:
+```
+log_mistake { ... }           ← for any gaps found
+start_scoped_interview { topic, content: problemStatement }  ← verbal follow-up drill
+end_interview                 ← flashcard auto-generated
+```
+
+**You say:**
+```
+List all my exercises for Java concurrency, max difficulty 3
+```
+
+**Claude runs:**
+```
+list_exercises { topic: "java-concurrency", maxDifficulty: 3 }
+```
+
+You can also group related exercises without pretending they are the same exact problem:
+
+**You say:**
+```
+Show me all matrix problems
+```
+
+**Claude runs:**
+```
+list_exercises { tags: ["matrix"] }
+```
+
+For example, `ZeroMatrix` and `RotateMatrixInPlace` can both live under the same broader matrix family via tags like:
+
+```json
+["matrix", "2d-indexing", "array-traversal"]
+```
+
+---
+
+### 7. Reports and knowledge graph
+
+**You say:**
+```
+Show me the report for my last JWT session
+```
+
+**Claude runs:**
+```
+list_sessions
+  → get_report_full_context { sessionId }
+  → generate_report_ui { sessionId, ... }
+  → returns URL: /generated/report-ui.html?sessionId=...
+```
+
+**You say:**
+```
+What are my weakest subjects across all sessions?
+```
+
+**Claude runs:**
+```
+get_report_weak_subjects { sessionId }
+```
+
+---
+
+### Full deliberate practice loop
+
+The recommended cycle for deep learning on any topic:
+
+```
+1. start_interview { topic }          ← understand the domain
+   → end_interview                    ← flashcards for weak spots
+
+2. start_drill { topic }              ← targeted verbal recall of weak answers
+
+3. create_exercise { topic, ... }     ← hands-on implementation
+   → candidate codes the exercise
+   → log_mistake for gaps
+   → start_scoped_interview           ← verbal follow-up on the same problem
+
+4. get_due_flashcards → review        ← SM-2 long-term retention
+
+5. list_skills { maxConfidence: 2 }   ← identify next micro-skill to drill
+   → practice_micro_skill             ← focused drill on the weakest sub-skill
+```
+
+---
+
 ## Architecture
 
 ```
@@ -75,9 +336,11 @@ mock-interview-mcp/
 
 ## MCP tools reference
 
-### interview-mcp — 14 tools
+### interview-mcp — 24 tools
 
 This server drives the interview session from start to finish.
+
+**Core interview flow**
 
 | Tool | What it does |
 |---|---|
@@ -85,16 +348,46 @@ This server drives the interview session from start to finish.
 | `help_tools` | Lists all tools with short descriptions and example payloads. |
 | `list_topics` | Lists all knowledge topics available for interviews. |
 | `start_interview` | Creates a new session, loads questions from a knowledge file (or generates via AI). Returns `sessionId`. |
+| `start_scoped_interview` | Starts an interview from user-provided content (spec, README, architecture doc). Questions are generated locally by parsing the content — no AI call needed. |
+| `start_drill` | Starts a targeted drill on weak spots from a past interview. Requires at least one completed session for the topic. |
 | `ask_question` | Returns the current question for a session in `ASK_QUESTION` state. |
 | `submit_answer` | Records the candidate's answer and advances state to `EVALUATE_ANSWER`. |
 | `evaluate_answer` | Scores the answer (1–5), writes feedback and a model answer. Advances to `FOLLOW_UP`. |
 | `ask_followup` | Generates and asks a follow-up question based on the candidate's answer. |
 | `next_question` | Moves to the next question, or ends the session if all questions are done. |
-| `end_interview` | Force-ends the session, builds the Markdown report, merges concepts into the graph, generates flashcards for weak answers. |
+| `end_interview` | Ends the session, builds the Markdown report, merges concepts into the graph, generates flashcards for weak answers. |
 | `get_session` | Returns the full session record (state, questions, evaluations, graph). |
 | `list_sessions` | Lists all sessions with summary metadata. |
-| `get_due_flashcards` | Returns flashcards due for review today (sorted most-overdue first). Supports optional topic filter. |
-| `review_flashcard` | Submits a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy) for a card; applies SM-2 and schedules the next review. |
+
+**Flashcards (SM-2 spaced repetition)**
+
+| Tool | What it does |
+|---|---|
+| `get_due_flashcards` | Returns flashcards due for review today, sorted most-overdue first. Supports optional topic filter. |
+| `review_flashcard` | Submits a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy); applies SM-2 and schedules the next review. |
+
+**Mistake log**
+
+| Tool | What it does |
+|---|---|
+| `log_mistake` | Records a mistake pattern with what went wrong, when it happens, and the correct fix. |
+| `list_mistakes` | Lists all logged mistakes, optionally filtered by topic. |
+
+**Skill backlog (micro-skill deliberate practice)**
+
+| Tool | What it does |
+|---|---|
+| `add_skill` | Adds a transferable micro-skill with sub-skills, related problems, and initial confidence (1–5). |
+| `list_skills` | Lists skills in the backlog, optionally filtered by `maxConfidence` to surface what to drill next. |
+| `update_skill` | Updates confidence after a drill — per sub-skill or overall. |
+| `practice_micro_skill` | Starts a focused micro-skill drill: recall step → `ask_question` → `evaluate_answer` → `end_interview` → `update_skill`. |
+
+**Coding exercises**
+
+| Tool | What it does |
+|---|---|
+| `create_exercise` | Creates a structured exercise grounded in a real-world scenario. Writes a rich `.md` to the knowledge center, persists metadata including tags, and returns a complexity assessment + prerequisite roadmap. |
+| `list_exercises` | Lists exercises, optionally filtered by topic, max difficulty, or tags. Shows scenario, tags, and problem meaning per exercise. |
 
 **Session state machine:** `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW_UP` (loops per question) → `ENDED`
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 
 import type { AIProvider } from "./ai/index.js";
 import { createKnowledgeStore, type KnowledgeStore } from "./knowledge/index.js";
-import type { Session, Concept, KnowledgeGraph, Flashcard, Mistake } from "@mock-interview/shared";
+import type { Session, Concept, KnowledgeGraph, Flashcard, Mistake, Skill, Exercise } from "@mock-interview/shared";
 import {
   assertState,
   generateId,
@@ -39,12 +39,14 @@ function stateError(msg: string) {
 
 const DATA_DIR = path.resolve(__dirname, "../data");
 const REPORTS_DIR      = path.join(DATA_DIR, "reports");
+const EXERCISES_DIR    = path.join(DATA_DIR, "knowledge", "exercises");
 const UI_PORT = process.env.PORT ?? "3001";
 const db = createDb();
 const repositories = createSqliteRepositories(db);
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(EXERCISES_DIR)) fs.mkdirSync(EXERCISES_DIR, { recursive: true });
 }
 
 function loadSessions(): Record<string, Session> {
@@ -79,6 +81,34 @@ function loadMistakes(topic?: string): Mistake[] {
 
 function saveMistake(mistake: Mistake) {
   repositories.mistakes.insert(mistake);
+}
+
+function loadSkills(maxConfidence?: number): Skill[] {
+  return repositories.skills.list(maxConfidence);
+}
+
+function findSkillByName(name: string): Skill | null {
+  return repositories.skills.findByName(name);
+}
+
+function saveSkill(skill: Skill): void {
+  repositories.skills.insert(skill);
+}
+
+function updateSkill(skill: Skill): void {
+  repositories.skills.update(skill);
+}
+
+function loadExercises(topic?: string, maxDifficulty?: number, tags?: string[]): Exercise[] {
+  return repositories.exercises.list(topic, maxDifficulty, tags);
+}
+
+function findExerciseByName(name: string): Exercise | null {
+  return repositories.exercises.findByName(name);
+}
+
+function saveExercise(exercise: Exercise): void {
+  repositories.exercises.insert(exercise);
 }
 
 function saveReport(session: Session) {
@@ -150,6 +180,14 @@ const deps: ToolDeps = {
   saveFlashcards,
   loadMistakes,
   saveMistake,
+  loadSkills,
+  findSkillByName,
+  saveSkill,
+  updateSkill,
+  loadExercises,
+  findExerciseByName,
+  saveExercise,
+  exercisesDir: EXERCISES_DIR,
   generateId,
   assertState,
   findLast,

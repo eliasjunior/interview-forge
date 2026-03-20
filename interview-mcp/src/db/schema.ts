@@ -156,6 +156,32 @@ export const graphSessions = sqliteTable("graph_sessions", {
   sessionId: text("session_id").notNull().unique().references(() => sessions.id, { onDelete: "cascade" }),
 });
 
+export const skills = sqliteTable("skills", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  confidence: integer("confidence").notNull().default(1),
+  subSkills: text("sub_skills").notNull().default("[]"),   // JSON: SkillSubSkill[]
+  relatedProblems: text("related_problems").notNull().default("[]"), // JSON: string[]
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const exercises = sqliteTable("exercises", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  slug: text("slug").notNull().unique(),
+  topic: text("topic").notNull(),
+  language: text("language").notNull().default("any"),
+  difficulty: integer("difficulty").notNull().default(3),
+  description: text("description").notNull(),
+  scenario: text("scenario").notNull().default(""),
+  problemMeaning: text("problem_meaning").notNull().default("[]"), // JSON: string[]
+  tags: text("tags").notNull().default("[]"), // JSON: string[]
+  prerequisites: text("prerequisites").notNull().default("[]"), // JSON: ExercisePrerequisite[]
+  filePath: text("file_path").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const mistakes = sqliteTable("mistakes", {
   id: text("id").primaryKey(),
   mistake: text("mistake").notNull(),

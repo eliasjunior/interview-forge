@@ -144,6 +144,28 @@ export interface FlashcardReviewResult {
   nextEaseFactor: number
 }
 
+// ── Skill backlog ─────────────────────────────────────────────────────────────
+
+export interface SkillSubSkill {
+  name: string
+  /** Confidence 1–5 on this specific sub-skill */
+  confidence: number
+}
+
+export interface Skill {
+  id: string
+  /** Transferable skill name, e.g. "2D index transformations" */
+  name: string
+  /** Overall confidence 1–5 */
+  confidence: number
+  /** Atomic sub-skills within this skill, each with its own confidence */
+  subSkills: SkillSubSkill[]
+  /** Problems where this skill appears, e.g. ["rotate matrix", "spiral matrix"] */
+  relatedProblems: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 // ── Mistake log ───────────────────────────────────────────────────────────────
 
 export interface Mistake {
@@ -156,6 +178,42 @@ export interface Mistake {
   fix: string
   /** Optional topic tag (e.g. "Java Thread States") */
   topic?: string
+  createdAt: string
+}
+
+// ── Exercises ─────────────────────────────────────────────────────────────────
+
+export type ExerciseDifficulty = 1 | 2 | 3 | 4 | 5
+
+export interface ExercisePrerequisite {
+  name: string
+  reason: string
+}
+
+export interface Exercise {
+  id: string
+  /** Display name, e.g. "RaceConditionLab" */
+  name: string
+  /** Slug derived from name, used as filename, e.g. "race-condition-lab" */
+  slug: string
+  /** Knowledge topic this exercise belongs to, e.g. "java-concurrency" */
+  topic: string
+  /** Programming language or "any" */
+  language: string
+  /** 1 (trivial) → 5 (very hard) */
+  difficulty: ExerciseDifficulty
+  /** One-line summary of what the exercise practices */
+  description: string
+  /** Real-world system context, e.g. "Background email/job processing system" */
+  scenario: string
+  /** Why this matters in production — the problem it actually solves */
+  problemMeaning: string[]
+  /** Cross-topic grouping labels, e.g. ["matrix", "2d-indexing", "array-traversal"] */
+  tags: string[]
+  /** Exercises that should be completed before this one */
+  prerequisites: ExercisePrerequisite[]
+  /** Path to the .md file relative to data/knowledge/exercises/ */
+  filePath: string
   createdAt: string
 }
 

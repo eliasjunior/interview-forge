@@ -28,7 +28,7 @@ function conceptStyle(cluster: string) {
 
 type Tab = 'overview' | 'questions' | 'transcript'
 
-function getSessionKind(session: Session): 'interview' | 'study' {
+function getSessionKind(session: Session): 'interview' | 'study' | 'drill' {
   return session.sessionKind ?? 'interview'
 }
 

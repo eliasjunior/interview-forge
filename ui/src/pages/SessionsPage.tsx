@@ -16,7 +16,7 @@ function formatDate(iso: string): string {
   })
 }
 
-function getSessionKind(session: Session): 'interview' | 'study' {
+function getSessionKind(session: Session): 'interview' | 'study' | 'drill' {
   return session.sessionKind ?? 'interview'
 }
 

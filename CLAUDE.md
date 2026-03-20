@@ -84,7 +84,7 @@ ui/src/
 
 Session states: `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW_UP` (loops), then `ENDED`.
 
-**18 MCP tools:** `server_status`, `help_tools`, `start_interview`, `start_scoped_interview`, `start_drill`, `ask_question`, `submit_answer`, `evaluate_answer`, `ask_followup`, `next_question`, `end_interview`, `get_session`, `list_sessions`, `list_topics`, `get_due_flashcards`, `review_flashcard`, `log_mistake`, `list_mistakes`
+**24 MCP tools:** `server_status`, `help_tools`, `start_interview`, `start_scoped_interview`, `start_drill`, `ask_question`, `submit_answer`, `evaluate_answer`, `ask_followup`, `next_question`, `end_interview`, `get_session`, `list_sessions`, `list_topics`, `get_due_flashcards`, `review_flashcard`, `log_mistake`, `list_mistakes`, `add_skill`, `list_skills`, `update_skill`, `practice_micro_skill`, `create_exercise`, `list_exercises`
 
 **REST API (port 3001):**
 - `GET /api/sessions` — all sessions
@@ -216,6 +216,8 @@ Key domain types (all imported via `@mock-interview/shared`):
 | `ReviewRating` | `1 \| 2 \| 3 \| 4` |
 | `FlashcardReviewResult` | Return shape of a review operation |
 | `Mistake` | Mistake log entry: `mistake`, `pattern`, `fix`, optional `topic`, `createdAt` |
+| `Exercise` | Exercise metadata: id, name, slug, topic, language, difficulty (1–5), prerequisites, filePath, createdAt |
+| `ExercisePrerequisite` | `{ name: string; reason: string }` — named dependency with explanation |
 
 ## Interview Types
 
@@ -288,6 +290,183 @@ Each session card on `/sessions` shows a `🏗️ Design` badge (teal) for inter
 **Do not modify this file.** The `AIProvider` interface (`port.ts`) and its adapters (`anthropic.ts`, `cache.ts`) are considered stable and parked. They cover exactly four operations: `generateQuestions`, `evaluateAnswer`, `extractConcepts`, `generateDeeperDives`.
 
 **New tools must not add methods to `AIProvider`.** If a new tool needs AI-style logic (e.g. generating questions from custom content), that logic must live entirely inside the tool file itself — self-contained, without touching the provider layer. See `startScopedInterview.ts` as the reference pattern: content parsing and question building happen in the tool, no provider calls.
+
+## Skill Backlog
+
+Tracks transferable micro-skills — atomic abilities that appear across multiple problems (e.g. "2D index transformations" applies to rotate matrix, spiral matrix, transpose, pathfinding grids). Each skill has sub-skills with individual confidence scores.
+
+**OCP note:** The skill backlog is entirely additive. It shares the `sessionKind: "drill"` session type and existing tool flow (`ask_question → evaluate_answer → end_interview`). No existing tools were modified.
+
+### Tools
+
+| Tool | Description |
+|---|---|
+| `add_skill` | Add a skill with sub-skills, related problems, and initial confidence |
+| `list_skills` | List backlog, optionally filtered by `maxConfidence` |
+| `update_skill` | Update confidence after a drill — sub-skill or overall |
+| `practice_micro_skill` | Start a focused micro-skill drill (5-step loop) |
+
+### `practice_micro_skill` flow
+
+```
+practice_micro_skill { skill: "2D index transformations", subSkill: "layer boundaries" }
+  → recall step: show recallQuestions + known mistakes to candidate
+  → wait for recall response
+  → ask_question → submit_answer → evaluate_answer → end_interview
+  → flashcard auto-generated (existing behavior)
+  → update_skill { name, subSkill, confidence }   ← record new confidence
+```
+
+If `subSkill` is omitted, auto-picks the sub-skill with the lowest confidence.
+
+### Confidence scale
+
+| Score | Meaning |
+|---|---|
+| 1 | Just identified — can't explain it |
+| 2 | Partial recall — gaps under pressure |
+| 3 | Can explain with prompting |
+| 4 | Solid — can derive from first principles |
+| 5 | Automatic — applies it without thinking |
+
+### Full deliberate practice loop
+
+```
+start_scoped_interview { topic: "Rotate Matrix", content: "..." }
+  → identify weak micro-skills from evaluation
+
+add_skill {
+  name: "2D index transformations",
+  subSkills: ["layer boundaries", "coordinate mapping", "offset reasoning"],
+  relatedProblems: ["rotate matrix", "spiral matrix", "transpose"],
+  confidence: 1
+}
+
+practice_micro_skill { skill: "2D index transformations", subSkill: "layer boundaries" }
+  → recall → drill → flashcard → update_skill { confidence: 2 }
+
+practice_micro_skill { skill: "2D index transformations", subSkill: "coordinate mapping" }
+  → recall → drill → flashcard → update_skill { confidence: 2 }
+
+get_due_flashcards → review   ← SM-2 handles long-term retention
+list_skills { maxConfidence: 2 }  ← what to drill next
+```
+
+---
+
+## Exercise System (`create_exercise` / `list_exercises`)
+
+Structured coding exercises tied to knowledge topics. Unlike drills (which replay past weak spots) and scoped interviews (which evaluate understanding verbally), exercises are hands-on implementation tasks — the candidate writes actual code and explains their design choices.
+
+**Philosophy:** practice over memorisation. Exercises are small enough to complete in one sitting (Lab.java scale), but rich enough to surface gaps in understanding. If a problem is too hard, the LLM proposes a progression of simpler prerequisite exercises first.
+
+### Tools
+
+| Tool | Description |
+|---|---|
+| `create_exercise` | Create a structured exercise, write `.md` to knowledge center, persist metadata, return complexity assessment + roadmap |
+| `list_exercises` | List all exercises, optionally filtered by `topic` or `maxDifficulty` |
+
+### `create_exercise` — what the tool does
+
+1. Writes a rich `.md` file to `data/knowledge/exercises/<topic>/<slug>.md`
+2. Persists metadata (id, name, slug, topic, language, difficulty, prerequisites) to SQLite
+3. Runs a complexity assessment:
+   - `tooHard = true` if `difficulty >= 4` **or** any named prerequisite exercise does not yet exist in the DB
+   - Returns `unmetPrerequisites`, `roadmap` (ordered list of prerequisites by difficulty), and a `reason`
+4. Returns an `instruction` block telling the orchestrator what to do next
+
+### Orchestrator flow (enforced by `instruction` in the response)
+
+```
+create_exercise { name, topic, difficulty, ... }
+  → if tooHard OR unmetPrerequisites non-empty:
+      show roadmap to candidate
+      ask: "Do you want to start with the prerequisites, or jump straight in?"
+      → if prerequisites missing: suggest create_exercise for each first
+  → if ready:
+      present Learning Goal + Problem Statement
+      candidate implements the exercise
+      → log_mistake for any gaps found
+      → start_scoped_interview { topic, content: problemStatement } as verbal follow-up drill
+      → end_interview → flashcard auto-generated for weak answers
+```
+
+### Difficulty scale
+
+| Score | Label     | `tooHard`? |
+|-------|-----------|-----------|
+| 1     | Trivial   | No        |
+| 2     | Easy      | No        |
+| 3     | Medium    | No        |
+| 4     | Hard      | Yes       |
+| 5     | Very Hard | Yes       |
+
+### Exercise `.md` format
+
+Files are written under `data/knowledge/exercises/<topic>/` and follow this structure:
+
+```markdown
+# Exercise: <Name>
+
+## Topic / Language / Difficulty
+**Topic:** <topic>
+**Language:** <java | typescript | python | any>
+**Difficulty:** <1-5> — <Label>
+
+## Learning Goal
+<What the candidate will understand after completing this>
+
+## Prerequisites
+- **<ExerciseName>** — <why it must be done first>
+
+## Problem Statement
+<Concrete description of what to build>
+
+## Implementation Steps
+1. <Simplest first step>
+2. ...
+
+## What a Good Solution Looks Like
+- <Evaluation criterion 1>
+- ...
+
+## Hints
+- <Hint shown only when stuck>
+
+## Related Concepts
+- <knowledge-file.md: concept1, concept2>
+```
+
+### Knowledge file coverage → suggested exercises
+
+Each knowledge topic has 2–3 associated exercises at different difficulty levels:
+
+| Topic | Exercises |
+|---|---|
+| `java-concurrency` | RaceConditionLab (Easy), ProducerConsumerBlockingQueue (Medium), ThreadPoolExecutorCustom (Hard) |
+| `jwt` | JwtSignVerify (Easy), JwtExpiry (Easy), JwtRoleGuard (Medium) |
+| `rest-spring-jpa` | CrudEndpoint (Easy), PaginatedEndpoint (Medium), OptimisticLockingRetry (Hard) |
+| `payment-api-design` | IdempotencyKeyStore (Medium), PaymentStateMachine (Medium) |
+| `url-shortener` | InMemoryShortener (Easy), ShortenerWithTTL (Medium), ShortenerLoadSim (Hard) |
+
+### Where exercises fit in the full learning loop
+
+```
+start_interview { topic }          ← understand the domain
+  → end_interview                  ← flashcards generated for weak spots
+  → start_drill { topic }          ← verbal recall of past weak answers
+
+create_exercise { topic, difficulty: 2 }   ← hands-on: implement something small
+  → candidate codes the exercise
+  → log_mistake for gaps
+  → start_scoped_interview (exercise as content) ← verbal follow-up
+
+get_due_flashcards → review        ← SM-2 long-term retention
+list_skills { maxConfidence: 2 }   ← identify next micro-skill to drill
+```
+
+---
 
 ## Drill Tool (`start_drill`)
 
