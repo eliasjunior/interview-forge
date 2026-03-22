@@ -187,6 +187,51 @@ function detectGaps(content: string): string[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Content type detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+function detectContentType(content: string): 'algorithm' | 'api' {
+  const algorithmSignals = [
+    /##\s+Problem Statement/i,
+    /##\s+Constraints/i,
+    /##\s+Expected approach/i,
+    /##\s+Common mistakes/i,
+    /\bTime:\s*O\(/i,
+    /\bSpace:\s*O\(/i,
+    /\bO\([^)]+\)/,
+    /\bpattern:/i,
+    /\binvariant:/i,
+    /\bedge cases?\b/i,
+  ];
+  const hits = algorithmSignals.filter((re) => re.test(content)).length;
+  return hits >= 2 ? 'algorithm' : 'api';
+}
+
+function buildAlgorithmQuestions(topic: string, content: string, focus: string): string[] {
+  return [
+    `Looking at ${topic}, what algorithmic pattern or technique would you apply here, and why? ` +
+    `Walk me through how you recognised the pattern from the problem constraints.`,
+
+    `Describe your step-by-step approach to solving ${topic}. ` +
+    `Focus on: how you set up the initial state, what invariant you maintain through each iteration, ` +
+    `and how you know when to stop.`,
+
+    `Analyse the time and space complexity of your solution to ${topic}. ` +
+    `Justify each bound — don't just state it. ` +
+    `Is there a more space-efficient version, even at a cost to time?`,
+
+    `What edge cases does ${topic} need to handle? ` +
+    `For each one: what goes wrong in a naive implementation, and how does your solution address it?`,
+
+    `What are the most common off-by-one errors or logical mistakes candidates make when implementing ${topic}? ` +
+    `Walk through a specific mistake and show how you would catch it.`,
+
+    `How would you design test cases for ${topic}? ` +
+    `Give at least one minimal example, one edge case, and one large-input scenario.`,
+  ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Content polisher — transform raw spec → structured markdown for the LLM
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -501,19 +546,25 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
         rawContent = content!;
       }
 
-      // ── 2. Extract signals and polish the content ──────────────────────────
-      const spec     = extractSpec(rawContent);
-      const gaps     = detectGaps(rawContent);
-      const polished = polishContent(topic, rawContent, focus);
+      // ── 2. Detect content type, extract signals, polish ───────────────────
+      const contentType = detectContentType(rawContent);
+      const isAlgorithm = contentType === 'algorithm';
+
+      const spec     = isAlgorithm ? { endpoints: [], models: [], rules: [], notes: [] } : extractSpec(rawContent);
+      const gaps     = isAlgorithm ? [] : detectGaps(rawContent);
+      const polished = isAlgorithm ? rawContent : polishContent(topic, rawContent, focus);
 
       console.error(
-        `[start_scoped_interview] topic="${topic}" focus="${focus}" ` +
-        `endpoints=${spec.endpoints.length} models=${spec.models.length} ` +
-        `rules=${spec.rules.length} gaps=${gaps.length}`
+        `[start_scoped_interview] topic="${topic}" focus="${focus}" contentType=${contentType} ` +
+        (isAlgorithm
+          ? `(algorithm — skipping endpoint/model/gap extraction)`
+          : `endpoints=${spec.endpoints.length} models=${spec.models.length} rules=${spec.rules.length} gaps=${gaps.length}`)
       );
 
       // ── 3. Generate questions from the polished signals ────────────────────
-      const questions = buildQuestions(topic, spec, gaps, focus);
+      const questions = isAlgorithm
+        ? buildAlgorithmQuestions(topic, rawContent, focus)
+        : buildQuestions(topic, spec, gaps, focus);
 
       // ── 4. Persist session ─────────────────────────────────────────────────
       const sessions = deps.loadSessions();
@@ -548,12 +599,15 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
             topic,
             focusArea: focus,
             source: resolvedPath ?? "inline content",
-            parsed: {
-              endpoints: spec.endpoints.map((e) => `${e.method} ${e.path}`),
-              models:    spec.models.map((m) => `${m.name} (${m.fields.length} fields)`),
-              rules:     spec.rules,
-              gaps,
-            },
+            parsed: isAlgorithm
+              ? { contentType: 'algorithm' }
+              : {
+                  contentType: 'api',
+                  endpoints: spec.endpoints.map((e) => `${e.method} ${e.path}`),
+                  models:    spec.models.map((m) => `${m.name} (${m.fields.length} fields)`),
+                  rules:     spec.rules,
+                  gaps,
+                },
             totalQuestions: questions.length,
             previewQuestions: questions.slice(0, 2),
             nextTool: "ask_question",
