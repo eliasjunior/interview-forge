@@ -73,6 +73,8 @@ export interface GraphEdgeRow {
   source: string;
   target: string;
   weight: number;
+  kind: string;
+  relation: string;
 }
 
 export interface GraphSessionRow {
@@ -202,6 +204,8 @@ export function mapGraphRowsToDomain(args: {
       source: row.source,
       target: row.target,
       weight: row.weight,
+      kind: row.kind as KnowledgeGraph["edges"][number]["kind"],
+      relation: row.relation,
     })),
     sessions: args.sessions.map((row) => row.session_id),
   };

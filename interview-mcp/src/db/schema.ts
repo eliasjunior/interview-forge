@@ -145,9 +145,16 @@ export const graphEdges = sqliteTable(
     source: text("source").notNull().references(() => graphNodes.id, { onDelete: "cascade" }),
     target: text("target").notNull().references(() => graphNodes.id, { onDelete: "cascade" }),
     weight: integer("weight").notNull(),
+    kind: text("kind").notNull().default("cooccurrence"),
+    relation: text("relation").notNull().default("co-occurs-with"),
   },
   (table) => ({
-    sourceTargetUnique: uniqueIndex("graph_edges_source_target_idx").on(table.source, table.target),
+    sourceTargetUnique: uniqueIndex("graph_edges_source_target_kind_relation_idx").on(
+      table.source,
+      table.target,
+      table.kind,
+      table.relation
+    ),
   })
 );
 

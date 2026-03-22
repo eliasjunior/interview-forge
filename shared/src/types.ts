@@ -78,10 +78,14 @@ export interface GraphNode {
   clusters: string[]
 }
 
+export type GraphEdgeKind = 'cooccurrence' | 'semantic'
+
 export interface GraphEdge {
   source: string
   target: string
   weight: number
+  kind: GraphEdgeKind
+  relation: string
 }
 
 export interface KnowledgeGraph {

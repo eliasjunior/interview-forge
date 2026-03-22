@@ -64,9 +64,21 @@ Use `import type` (not `import`) — these are compile-time types only.
 - `id`, `label`
 - `clusters[]`: all clusters this concept appears in (can be multiple)
 
-**`GraphEdge`** — a weighted co-occurrence edge:
+Node identity is canonical: wording variants should collapse into one node ID before the graph is persisted.
+
+Example: `spring-mvc` and `Spring MVC` should resolve to the same node identity instead of creating two separate nodes.
+
+Automatically handled variation classes include:
+- case differences
+- spaces vs hyphens vs underscores
+- repeated separator cleanup
+- any explicit alias configured in the graph canonicalisation rules
+
+**`GraphEdge`** — a weighted relationship edge:
 - `source`, `target`: node IDs
-- `weight`: incremented each time the pair appears in a session
+- `weight`: incremented each time the same edge is observed again
+- `kind`: `'cooccurrence' | 'semantic'`
+- `relation`: relationship label such as `'co-occurs-with'` or `'used-for'`
 
 **`KnowledgeGraph`** — the full graph persisted in the shared runtime store:
 - `nodes[]`, `edges[]`

@@ -20,11 +20,32 @@ function nodeColor(node: GraphNode): string {
   return '#9db0d0'
 }
 
+function clusterAnchor(cluster: string, width: number, height: number) {
+  const anchors: Record<string, { x: number; y: number }> = {
+    'core concepts':   { x: width * 0.34, y: height * 0.34 },
+    'practical usage': { x: width * 0.66, y: height * 0.34 },
+    'tradeoffs':       { x: width * 0.34, y: height * 0.66 },
+    'best practices':  { x: width * 0.66, y: height * 0.66 },
+  }
+  return anchors[cluster] ?? { x: width * 0.5, y: height * 0.5 }
+}
+
+function averageClusterAnchor(node: GraphNode, width: number, height: number) {
+  if (node.clusters.length === 0) return { x: width * 0.5, y: height * 0.5 }
+
+  const anchors = node.clusters.map(cluster => clusterAnchor(cluster, width, height))
+  const x = anchors.reduce((sum, anchor) => sum + anchor.x, 0) / anchors.length
+  const y = anchors.reduce((sum, anchor) => sum + anchor.y, 0) / anchors.length
+  return { x, y }
+}
+
 // ── D3 simulation types ────────────────────────────────────────────────────
 interface SimNode extends d3.SimulationNodeDatum, GraphNode {}
 
 interface SimLink extends d3.SimulationLinkDatum<SimNode> {
   weight: number
+  kind: GraphEdge['kind']
+  relation: string
 }
 
 export default function GraphPage() {
@@ -70,6 +91,8 @@ export default function GraphPage() {
         source: nodeById.get(e.source as string)!,
         target: nodeById.get(e.target as string)!,
         weight: e.weight,
+        kind: e.kind,
+        relation: e.relation,
       }))
 
     // ── Zoom ──────────────────────────────────────────────────────────────
@@ -87,6 +110,8 @@ export default function GraphPage() {
         .distance(d => Math.max(70, 140 / (d.weight + 1)))
       )
       .force('charge', d3.forceManyBody().strength(-160))
+      .force('cluster-x', d3.forceX<SimNode>(d => averageClusterAnchor(d, W, H).x).strength(0.06))
+      .force('cluster-y', d3.forceY<SimNode>(d => averageClusterAnchor(d, W, H).y).strength(0.06))
       .force('center', d3.forceCenter(W / 2, H / 2))
       .force('collision', d3.forceCollide(26))
 
@@ -96,9 +121,10 @@ export default function GraphPage() {
       .selectAll<SVGLineElement, SimLink>('line')
       .data(links)
       .join('line')
-      .attr('stroke', '#2a3957')
-      .attr('stroke-opacity', 0.7)
-      .attr('stroke-width', d => 0.5 + (d.weight / maxWeight) * 2.5)
+      .attr('stroke', d => d.kind === 'semantic' ? '#e7c66a' : '#2a3957')
+      .attr('stroke-opacity', d => d.kind === 'semantic' ? 0.9 : 0.7)
+      .attr('stroke-width', d => d.kind === 'semantic' ? 1.6 + (d.weight / maxWeight) * 1.4 : 0.5 + (d.weight / maxWeight) * 2.5)
+      .attr('stroke-dasharray', d => d.kind === 'semantic' ? '6 4' : null)
 
     linkSelRef.current = linkSel as unknown as d3.Selection<SVGLineElement, SimLink, SVGGElement, unknown>
 
@@ -204,12 +230,16 @@ export default function GraphPage() {
           const s = d.source as SimNode
           const t = d.target as SimNode
           const both = s.clusters.includes(activeFilter) && t.clusters.includes(activeFilter)
-          return both ? 0.75 : 0.07
+          if (!both) return d.kind === 'semantic' ? 0.12 : 0.07
+          return d.kind === 'semantic' ? 0.95 : 0.75
         })
         .attr('stroke', d => {
           const s = d.source as SimNode
           const t = d.target as SimNode
           const both = s.clusters.includes(activeFilter) && t.clusters.includes(activeFilter)
+          if (d.kind === 'semantic') {
+            return both ? '#e7c66a' : '#5b4d24'
+          }
           return both ? CLUSTER_COLOR[activeFilter] : '#2a3957'
         })
     }

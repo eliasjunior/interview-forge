@@ -43,7 +43,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 
 1. **Conducts interviews** — Claude picks questions from curated knowledge files (or generates them with AI), asks them one at a time, follows up, and enforces a strict state machine so the session never gets out of sync.
 2. **Evaluates answers** — after each answer, the server scores it (1–5), writes detailed feedback, and surfaces a stronger model answer. Scoring can be done by a background worker LLM or by the orchestrator Claude itself (no API key needed).
-3. **Builds a knowledge graph** — every completed session extracts concepts and merges them into a growing graph. Topics, strengths, and gaps accumulate across sessions. The full-screen D3 canvas supports zoom, drag, and one-click cluster filtering to highlight only *core concepts*, *tradeoffs*, etc.
+3. **Builds a knowledge graph** — every completed session extracts concepts and merges them into a growing graph. Concepts are canonicalised before merge, so alias variants such as `thread dump`, `thread dumps`, and `thread-dump` collapse into one node. The graph now stores both weighted co-occurrence edges and semantic relationship edges, while clusters remain categorisation only — not identity. The full-screen D3 canvas supports zoom, drag, and one-click cluster filtering to highlight only *core concepts*, *tradeoffs*, etc.
 4. **Generates flashcards** — questions you scored below 4 are automatically turned into spaced-repetition flashcards (SM-2 algorithm). Due cards surface daily.
 5. **Produces reports** — a Markdown report and an interactive HTML viewer are generated per session, showing scores, feedback, and model answers side-by-side.
 6. **Visualises everything** — a React dashboard shows session history, the knowledge graph (D3), report viewer, and a flashcard review UI.
@@ -571,6 +571,30 @@ npm run dev:ui
 
 Open **http://localhost:5173** to browse sessions and reports.
 Open **http://localhost:5173/graph** to explore the knowledge graph.
+
+The graph model now works like this:
+
+- **Canonical nodes** — concepts are normalised before merge, so wording variants map to one stable node ID.
+- **Cluster membership** — a concept can belong to multiple clusters (`core concepts`, `practical usage`, `tradeoffs`, `best practices`) without becoming multiple nodes.
+- **Co-occurrence edges** — concepts that appear together in a session are linked with weighted co-occurrence edges.
+- **Semantic edges** — curated graph rules can also add explicit semantic relationships, for example tool-to-diagnosis links such as thread-dump -> lock-contention.
+
+Example: if the graph already contains `spring-mvc` and a new completed interview extracts `Spring MVC`, the new concept is normalised before merge and updates the existing `spring-mvc` node instead of creating a second node.
+
+Variations handled automatically today:
+
+- case differences: `Spring MVC` -> `spring-mvc`
+- spaces vs hyphens vs underscores: `thread dump`, `thread-dump`, `thread_dump`
+- repeated separators and punctuation cleanup
+- explicitly configured aliases such as `thread dump` / `thread dumps` / `thread-dump`
+
+Variations that still need an explicit alias rule:
+
+- true synonyms that are not just formatting variants
+- domain-specific renames such as `thread contention` -> `lock-contention`
+- concept families where plural/singular should collapse but the wording is not predictable from formatting alone
+
+Because the graph is derived from saved session concepts, changes to canonicalisation or semantic-edge rules may require a graph rebuild to backfill historical data.
 Open **http://localhost:5173/flashcards** for flashcard review.
 
 ### Connecting the MCP servers to Claude

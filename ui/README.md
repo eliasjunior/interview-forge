@@ -11,7 +11,7 @@ A **React + Vite** dashboard for browsing interview sessions, reading full repor
 
 - **Sessions page** — card grid of all interview sessions, split into in-progress and completed, sorted newest first.
 - **Report page** — full report viewer for a completed session with three tabs: Overview (summary + concepts by cluster), Questions (collapsible Q/A cards with score bars, feedback, and deeper dives), and Transcript (chat-style message bubbles).
-- **Graph page** — interactive D3 v7 force-directed graph of the cumulative knowledge graph: zoom, pan, drag nodes, hover tooltips, color-coded clusters, and a legend.
+- **Graph page** — interactive D3 v7 force-directed graph of the cumulative knowledge graph: zoom, pan, drag nodes, hover tooltips, color-coded clusters, and distinct rendering for semantic vs co-occurrence edges.
 
 ---
 
@@ -56,11 +56,14 @@ Fetches `GET /api/sessions` (filtered by ID) and renders three tabs:
 
 Fetches `GET /api/graph` and renders a D3 v7 force-directed simulation:
 
-- **Nodes** — one per extracted concept; size scales with the number of clusters the concept belongs to.
-- **Edges** — co-occurrence within a cluster session; width scales with edge weight.
+- **Nodes** — one per canonicalised concept; size scales with the number of clusters the concept belongs to.
+- **Edges** — two edge families are rendered from the same graph payload:
+  - co-occurrence edges for concepts observed together
+  - semantic edges for explicit concept relationships
+- **Edge styling** — semantic edges are rendered differently from co-occurrence edges so tool/diagnostic relationships stand out visually.
 - **Colours** — four fixed cluster colours (`core concepts`, `practical usage`, `tradeoffs`, `best practices`); a node takes the colour of its first cluster.
 - **Interactions** — zoom/pan via `d3.zoom`, node drag via `d3.drag`, hover tooltip showing concept label and cluster list.
-- **Legend** — shows all four cluster colours; each entry is a static label.
+- **Cluster filters** — clickable cluster pills dim unrelated nodes and edges without changing node identity.
 
 ---
 

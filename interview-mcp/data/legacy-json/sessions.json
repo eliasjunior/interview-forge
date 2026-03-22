@@ -419,11 +419,11 @@
         "cluster": "core concepts"
       },
       {
-        "word": "thread dump",
+        "word": "thread-dump",
         "cluster": "practical usage"
       },
       {
-        "word": "heap dump",
+        "word": "heap-dump",
         "cluster": "practical usage"
       },
       {
@@ -1059,11 +1059,11 @@
     "summary": "Seeded session from `algorithm/threads/Lab.java`. Basic info only for now: this Java program is a hands-on concurrency lab for thread contention, JVM diagnostics, metrics, and production-style thread-dump analysis.",
     "concepts": [
       {
-        "word": "thread contention",
+        "word": "lock-contention",
         "cluster": "core concepts"
       },
       {
-        "word": "thread dumps",
+        "word": "thread-dump",
         "cluster": "practical usage"
       },
       {

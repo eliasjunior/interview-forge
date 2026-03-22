@@ -98,7 +98,7 @@ export class SQLiteReportDataStore implements ReportDataStore {
     return mapGraphRowsToDomain({
       nodes: this.sqlite.prepare("select id, label from graph_nodes").all() as any[],
       nodeClusters: this.sqlite.prepare("select node_id, cluster from graph_node_clusters").all() as any[],
-      edges: this.sqlite.prepare("select source, target, weight from graph_edges").all() as any[],
+      edges: this.sqlite.prepare("select source, target, weight, kind, relation from graph_edges").all() as any[],
       sessions: this.sqlite.prepare("select session_id from graph_sessions").all() as any[],
     });
   }

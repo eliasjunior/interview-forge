@@ -56,7 +56,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     ],
     concepts: [
       { word: "thread pool", cluster: "core concepts" },
-      { word: "contention", cluster: "tradeoffs" },
+      { word: "Lock Contention", cluster: "tradeoffs" },
     ],
     summary: "Session summary",
     createdAt: "2026-03-01T09:59:00.000Z",
@@ -95,7 +95,13 @@ function makeGraph(): KnowledgeGraph {
       { id: "contention", label: "contention", clusters: ["tradeoffs"] },
     ],
     edges: [
-      { source: "thread-pool", target: "contention", weight: 2 },
+      {
+        source: "thread-pool",
+        target: "contention",
+        weight: 2,
+        kind: "cooccurrence",
+        relation: "co-occurs-with",
+      },
     ],
     sessions: ["session-1"],
   };

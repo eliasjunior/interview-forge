@@ -23,6 +23,7 @@ import {
   sessionQuestions,
   sessions,
 } from "../db/schema.js";
+import { normalizeConcepts } from "../graph/concepts.js";
 
 type SessionRow = InferSelectModel<typeof sessions>;
 type SessionQuestionRow = InferSelectModel<typeof sessionQuestions>;
@@ -82,6 +83,8 @@ export interface NormalizedGraphRecord {
 }
 
 export function mapSessionToNormalizedRecord(session: Session): NormalizedSessionRecord {
+  const normalizedConcepts = normalizeConcepts(session.concepts ?? []);
+
   return {
     session: {
       id: session.id,
@@ -126,7 +129,7 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       followUpQuestion: evaluation.followUpQuestion,
       deeperDive: evaluation.deeperDive,
     })),
-    concepts: (session.concepts ?? []).map((concept) => ({
+    concepts: normalizedConcepts.map((concept) => ({
       sessionId: session.id,
       word: concept.word,
       cluster: concept.cluster,
@@ -258,6 +261,8 @@ export function mapGraphToNormalizedRecord(graph: KnowledgeGraph): NormalizedGra
       source: edge.source,
       target: edge.target,
       weight: edge.weight,
+      kind: edge.kind,
+      relation: edge.relation,
     })),
     sessions: graph.sessions.map((sessionId) => ({
       sessionId,
@@ -283,6 +288,8 @@ export function mapGraphAggregateToDomain(rows: GraphAggregateRows): KnowledgeGr
     source: row.source,
     target: row.target,
     weight: row.weight,
+    kind: row.kind as GraphEdge["kind"],
+    relation: row.relation,
   }));
 
   return {

@@ -26,6 +26,7 @@ import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
+import { normalizeConcepts } from "./graph/concepts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -138,7 +139,10 @@ async function extractConcepts(session: Session): Promise<Concept[]> {
 }
 
 async function finalizeSession(session: Session, sessions: Record<string, Session>) {
-  const concepts = await extractConcepts(session);
+  const concepts = normalizeConcepts(await extractConcepts(session)).map(({ word, cluster }) => ({
+    word,
+    cluster,
+  }));
 
   const summary = buildSummary(session);
   const avgScore = calcAvgScore(session.evaluations);

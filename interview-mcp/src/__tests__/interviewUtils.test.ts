@@ -152,6 +152,8 @@ describe("mergeConceptsIntoGraph", () => {
     assert.equal(graph.edges[0].source, "alpha");
     assert.equal(graph.edges[0].target, "beta");
     assert.equal(graph.edges[0].weight, 1);
+    assert.equal(graph.edges[0].kind, "cooccurrence");
+    assert.equal(graph.edges[0].relation, "co-occurs-with");
   });
 
   test("increments edge weight when the same pair appears again", () => {
@@ -174,6 +176,7 @@ describe("mergeConceptsIntoGraph", () => {
     assert.equal(graph.edges[0].source, "alpha");
     assert.equal(graph.edges[0].target, "beta");
     assert.equal(graph.edges[0].weight, 1);
+    assert.equal(graph.edges[0].kind, "cooccurrence");
   });
 
   test("adds cross-cluster bridges without removing same-cluster relationships", () => {
@@ -193,6 +196,70 @@ describe("mergeConceptsIntoGraph", () => {
     assert.equal(alphaBeta.weight, 1);
     assert.equal(alphaGamma.weight, 1);
     assert.equal(betaGamma.weight, 1);
+    assert.equal(alphaBeta.kind, "cooccurrence");
+    assert.equal(alphaGamma.kind, "cooccurrence");
+    assert.equal(betaGamma.kind, "cooccurrence");
+  });
+
+  test("merges known aliases into a single canonical node", () => {
+    const concepts: Concept[] = [
+      { word: "thread dump", cluster: "practical usage" },
+      { word: "thread-dump", cluster: "best practices" },
+      { word: "thread dumps", cluster: "tradeoffs" },
+    ];
+    const graph = mergeConceptsIntoGraph(emptyGraph(), concepts, "s1");
+    assert.equal(graph.nodes.length, 1);
+    assert.equal(graph.nodes[0].id, "thread-dump");
+    assert.equal(graph.nodes[0].label, "Thread Dump");
+    assert.deepEqual(
+      [...graph.nodes[0].clusters].sort((a, b) => a.localeCompare(b)),
+      ["best practices", "practical usage", "tradeoffs"]
+    );
+  });
+
+  test("adds semantic edges for best-practice concept phrases", () => {
+    const concepts: Concept[] = [
+      { word: "use-thread-dump-for-contention", cluster: "best practices" },
+      { word: "thread-dump", cluster: "practical usage" },
+      { word: "lock-contention", cluster: "core concepts" },
+    ];
+    const graph = mergeConceptsIntoGraph(emptyGraph(), concepts, "s1");
+    const semantic = graph.edges.find(
+      (edge) =>
+        edge.source === "lock-contention" &&
+        edge.target === "thread-dump" &&
+        edge.kind === "semantic" &&
+        edge.relation === "used-for"
+    );
+
+    assert.ok(semantic);
+    assert.equal(semantic.weight, 1);
+    assert.ok(!graph.nodes.find((node) => node.id === "use-thread-dump-for-contention"));
+  });
+
+  test("does not create standalone nodes for semantic-only instruction phrases", () => {
+    const concepts: Concept[] = [
+      { word: "classify-jvm-vs-app-threads", cluster: "best practices" },
+      { word: "move-io-outside-lock", cluster: "best practices" },
+      { word: "never-async-then-block", cluster: "best practices" },
+      { word: "return-async-from-controller", cluster: "best practices" },
+      { word: "thread-dump", cluster: "practical usage" },
+      { word: "heap-dump", cluster: "practical usage" },
+      { word: "heap", cluster: "core concepts" },
+      { word: "lock-contention", cluster: "tradeoffs" },
+      { word: "thread-state", cluster: "core concepts" },
+    ];
+    const graph = mergeConceptsIntoGraph(emptyGraph(), concepts, "s1");
+
+    assert.ok(graph.nodes.find((node) => node.id === "thread-dump"));
+    assert.ok(graph.nodes.find((node) => node.id === "heap-dump"));
+    assert.ok(graph.nodes.find((node) => node.id === "heap"));
+    assert.ok(graph.nodes.find((node) => node.id === "lock-contention"));
+    assert.ok(graph.nodes.find((node) => node.id === "thread-state"));
+    assert.ok(!graph.nodes.find((node) => node.id === "classify-jvm-vs-app-threads"));
+    assert.ok(!graph.nodes.find((node) => node.id === "move-io-outside-lock"));
+    assert.ok(!graph.nodes.find((node) => node.id === "never-async-then-block"));
+    assert.ok(!graph.nodes.find((node) => node.id === "return-async-from-controller"));
   });
 
   test("adds sessionId and does not duplicate it on second merge", () => {
