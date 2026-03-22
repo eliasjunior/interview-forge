@@ -6,6 +6,39 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 
 ---
 
+## Table of Contents
+
+**Getting started**
+- [Quick start](#quick-start)
+- [Connecting MCP servers to Claude](#connecting-the-mcp-servers-to-claude)
+- [Modes](#modes)
+
+**How to use it**
+- [1. Full interview](#1-full-interview)
+- [2. Targeted drill on weak spots](#2-targeted-drill-on-weak-spots)
+- [3. Scoped interview on custom content](#3-scoped-interview-on-custom-content)
+- [4. Flashcard review](#4-flashcard-review)
+- [5. Micro-skill practice](#5-micro-skill-practice)
+- [6. Coding exercises](#6-coding-exercises)
+- [7. Reports and knowledge graph](#7-reports-and-knowledge-graph)
+- [Full deliberate practice loop](#full-deliberate-practice-loop)
+
+**Reference**
+- [MCP tools — interview-mcp (26 tools)](#interview-mcp--26-tools)
+- [MCP tools — report-mcp (7 tools)](#report-mcp--7-tools)
+- [REST API](#rest-api-interview-mcp-port-3001)
+- [Monorepo scripts](#monorepo-scripts)
+- [Knowledge topics](#knowledge-topics)
+- [Flashcard system](#flashcard-system)
+
+**Project internals**
+- [What it does](#what-it-does)
+- [Monorepo structure](#monorepo-structure)
+- [Architecture](#architecture)
+- [Extra information](#extra-information)
+
+---
+
 ## What it does
 
 1. **Conducts interviews** — Claude picks questions from curated knowledge files (or generates them with AI), asks them one at a time, follows up, and enforces a strict state machine so the session never gets out of sync.
@@ -14,6 +47,8 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 4. **Generates flashcards** — questions you scored below 4 are automatically turned into spaced-repetition flashcards (SM-2 algorithm). Due cards surface daily.
 5. **Produces reports** — a Markdown report and an interactive HTML viewer are generated per session, showing scores, feedback, and model answers side-by-side.
 6. **Visualises everything** — a React dashboard shows session history, the knowledge graph (D3), report viewer, and a flashcard review UI.
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -35,6 +70,8 @@ mock-interview-mcp/
 | `report-mcp` | **Read-mostly analytics.** Reads the shared SQLite database owned by `interview-mcp`, regenerates reports, queries weak subjects, produces the interactive HTML report viewer. |
 | `ui` | **Frontend only.** No local data — fetches everything from `interview-mcp`'s REST API via a Vite proxy. |
 | `shared` | **Types only.** No runtime code. TypeScript interfaces imported at compile time by the other three packages. |
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -96,7 +133,13 @@ start_drill { topic: "JWT authentication" }
 
 ### 3. Scoped interview on custom content
 
-Start an interview from any spec, README, or architecture doc you paste in. Claude extracts questions from the content itself — no knowledge file needed.
+Start an interview from any content you supply — a spec, README, architecture doc, or just a topic you want to study. There are two ways to do this.
+
+---
+
+#### Option A — paste content directly
+
+You already have the material and just want to run it as an interview.
 
 **You say:**
 ```
@@ -114,6 +157,80 @@ start_scoped_interview {
 }
   → ask_question → submit_answer → evaluate_answer → ... → end_interview
 ```
+
+---
+
+#### Option B — build a focused scope interactively
+
+You have a broad topic but want the LLM to ask clarifying questions first so the interview stays focused and doesn't drift. This is the recommended approach when you know what you want to study but haven't written the content yet.
+
+**You say:**
+```
+I want to study how JavaScript works — help me narrow this down into a focused scoped interview
+```
+
+**Claude asks clarifying questions one at a time:**
+```
+Which areas do you want to focus on?
+  1. Event loop + task/microtask queues
+  2. Call stack and execution context
+  3. Async/await and Promise resolution
+  4. Something else?
+
+What depth do you want — conceptual explanation, trace through code, or mixed?
+
+Where do you usually struggle?
+```
+
+**After your answers, Claude calls:**
+```
+build_scope {
+  topic: "JavaScript Runtime — Event Loop",
+  focusAreas: ["event loop", "microtask vs macrotask queue", "Promise vs setTimeout order"],
+  weakSpots: ["Promise.then vs setTimeout execution order"],
+  depth: "trace-through-code",
+  outOfScope: ["JS syntax", "DOM APIs", "Node.js internals"],
+  saveAs: "js-event-loop"   ← optional: saves for reuse next time
+}
+  → start_scoped_interview { topic, content, focus }
+  → ask_question → submit_answer → evaluate_answer → ... → end_interview
+```
+
+The tool builds a content block with explicit **Focus Areas**, **Evaluation Criteria**, **Known Weak Spots**, and **Out of Scope** sections that anchor the LLM during evaluation and prevent it from going in an unwanted direction.
+
+**Reusing a saved scope:** if you passed `saveAs`, the scope is written to `data/knowledge/scopes/<slug>.md`. Next time, skip the Q&A and call `start_scoped_interview` directly with that file's content.
+
+---
+
+#### Content template (for writing your own)
+
+When writing `content` manually for `start_scoped_interview`, this structure gives the LLM the most to work with:
+
+```markdown
+# Study Scope: <topic>
+
+## Focus Areas
+- <specific area 1>
+- <specific area 2>
+
+## Depth: mixed
+Verbal explanation + code tracing expected.
+
+## Evaluation Criteria
+- **<area 1>**: What a strong answer includes. Probe if vague.
+- **<area 2>**: ...
+
+## Known Weak Spots (probe these specifically)
+- <thing you always get wrong>
+
+## Out of Scope
+- <topic to exclude so the LLM doesn't drift>
+
+## Session Goal
+Candidate can explain X and Y without prompting. No drifting into Z.
+```
+
+The `Out of Scope` section is the most important when drift is a concern — the LLM will redirect the candidate if they wander into excluded territory.
 
 ---
 
@@ -297,6 +414,8 @@ The recommended cycle for deep learning on any topic:
    → practice_micro_skill             ← focused drill on the weakest sub-skill
 ```
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Architecture
@@ -332,11 +451,13 @@ The recommended cycle for deep learning on any topic:
 
 **Data ownership:** `interview-mcp` is the single source of truth for runtime data in `interview-mcp/data/app.db`. `report-mcp` reads from that database and writes reports back to `interview-mcp/data/` — its path is configurable via `DATA_DIR`.
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## MCP tools reference
 
-### interview-mcp — 24 tools
+### interview-mcp — 26 tools
 
 This server drives the interview session from start to finish.
 
@@ -349,6 +470,7 @@ This server drives the interview session from start to finish.
 | `list_topics` | Lists all knowledge topics available for interviews. |
 | `start_interview` | Creates a new session, loads questions from a knowledge file (or generates via AI). Returns `sessionId`. |
 | `start_scoped_interview` | Starts an interview from user-provided content (spec, README, architecture doc). Questions are generated locally by parsing the content — no AI call needed. |
+| `build_scope` | Builds a focused content block for `start_scoped_interview` from structured inputs (topic, focusAreas, weakSpots, depth, outOfScope). Optionally saves the result to `data/knowledge/scopes/<slug>.md` for reuse. Use after a clarifying Q&A conversation to anchor the LLM and prevent evaluation drift. |
 | `start_drill` | Starts a targeted drill on weak spots from a past interview. Requires at least one completed session for the topic. |
 | `ask_question` | Returns the current question for a session in `ASK_QUESTION` state. |
 | `submit_answer` | Records the candidate's answer and advances state to `EVALUATE_ANSWER`. |
@@ -365,6 +487,7 @@ This server drives the interview session from start to finish.
 |---|---|
 | `get_due_flashcards` | Returns flashcards due for review today, sorted most-overdue first. Supports optional topic filter. |
 | `review_flashcard` | Submits a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy); applies SM-2 and schedules the next review. |
+| `create_flashcard` | Creates a flashcard directly from supplied front/back content, without needing an interview session. Useful for capturing insights or concepts on the fly. Cards are due immediately and follow the same SM-2 schedule. |
 
 **Mistake log**
 
@@ -405,6 +528,8 @@ This server is focused on analysing and presenting completed sessions.
 | `generate_report_ui` | Writes a per-session JSON dataset and returns a viewer URL (`/generated/report-ui.html?sessionId=…`). |
 | `get_graph` | Returns the full cumulative knowledge graph from the shared SQLite store. |
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## REST API (interview-mcp, port 3001)
@@ -420,6 +545,8 @@ The UI and `report-mcp` both consume this API.
 | `GET /api/flashcards` | All flashcards |
 | `POST /api/flashcards/:id/review` | Submit a review rating `{ rating: 1\|2\|3\|4 }`, applies SM-2, returns updated card |
 | `GET /generated/report-ui.html` | Interactive HTML report viewer |
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -475,6 +602,8 @@ npm run build:interview
 
 After the host reconnects, always run `server_status` first. Only start an interview after that preflight succeeds.
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Monorepo scripts
@@ -491,6 +620,8 @@ Run these from the repo root.
 | `npm run build:interview` | Build `interview-mcp` only |
 | `npm run build:report` | Build `report-mcp` only |
 | `npm run build:ui` | Build `ui` only |
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -511,6 +642,8 @@ Knowledge files live in `interview-mcp/data/knowledge/*.md`. Current topics:
 
 Set `AI_ENABLED=true` to let the server generate questions for any topic not in the knowledge base.
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Flashcard system
@@ -528,6 +661,8 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM** and p
 | 3 | Good | Normal advance: 1 → 6 → interval × ease factor days |
 | 4 | Easy | Full advance with ease factor bonus |
 
+[↑ Back to top](#table-of-contents)
+
 ---
 
 ## Modes
@@ -536,6 +671,8 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM** and p
 |---|---|---|
 | `AI_ENABLED=false` (default) | Questions from knowledge files; orchestrator Claude evaluates using the rubric | Free |
 | `AI_ENABLED=true` | Worker LLM (haiku model) generates questions, scores answers, extracts concepts, writes deeper dives | Anthropic API credits |
+
+[↑ Back to top](#table-of-contents)
 
 ---
 
@@ -564,3 +701,5 @@ All domain types live in `shared/src/types.ts` and are imported as `@mock-interv
 ### Storage
 
 Runtime state lives in SQLite (`interview-mcp/data/app.db`). Knowledge source files and generated report artifacts remain in `interview-mcp/data/` and `interview-mcp/public/generated/`.
+
+[↑ Back to top](#table-of-contents)

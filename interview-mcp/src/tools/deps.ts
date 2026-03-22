@@ -19,6 +19,7 @@ export interface ToolDeps {
   saveGraph(graph: KnowledgeGraph): void;
   saveReport(session: Session): string;
   loadFlashcards(): Flashcard[];
+  saveFlashcard(card: Flashcard): void;
   saveFlashcards(cards: Flashcard[]): void;
   loadMistakes(topic?: string): Mistake[];
   saveMistake(mistake: Mistake): void;
@@ -31,6 +32,7 @@ export interface ToolDeps {
   findExerciseByName(name: string): Exercise | null;
   saveExercise(exercise: Exercise): void;
   exercisesDir: string;
+  scopesDir: string;
 
   generateId(): string;
   assertState(session: Session, toolName: string): { ok: true } | { ok: false; error: string };

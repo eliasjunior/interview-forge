@@ -21,6 +21,7 @@ import {
   mergeConceptsIntoGraph,
   generateFlashcards,
 } from "./interviewUtils.js";
+import { persistFlashcard } from "./tools/createFlashcard.js";
 import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
 import { createDb } from "./db/client.js";
@@ -40,6 +41,7 @@ function stateError(msg: string) {
 const DATA_DIR = path.resolve(__dirname, "../data");
 const REPORTS_DIR      = path.join(DATA_DIR, "reports");
 const EXERCISES_DIR    = path.join(DATA_DIR, "knowledge", "exercises");
+const SCOPES_DIR       = path.join(DATA_DIR, "knowledge", "scopes");
 const UI_PORT = process.env.PORT ?? "3001";
 const db = createDb();
 const repositories = createSqliteRepositories(db);
@@ -69,6 +71,10 @@ function saveGraph(graph: KnowledgeGraph) {
 
 function loadFlashcards(): Flashcard[] {
   return repositories.flashcards.list();
+}
+
+function saveFlashcard(card: Flashcard) {
+  repositories.flashcards.save(card);
 }
 
 function saveFlashcards(cards: Flashcard[]) {
@@ -147,15 +153,16 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   saveGraph(mergeConceptsIntoGraph(graph, concepts, session.id));
   const reportFile = saveReport(session);
 
-  // Generate flashcards for any question scored below the threshold
+  // Generate flashcards for any question scored below the threshold.
+  // Delegates to persistFlashcard (create_flashcard tool) — single place that
+  // knows how to save a card idempotently.
   const newCards = generateFlashcards(session);
-  if (newCards.length > 0) {
-    const existing = loadFlashcards();
-    // Merge: skip cards whose id already exists (idempotent re-runs)
-    const existingIds = new Set(existing.map((c) => c.id));
-    const merged = [...existing, ...newCards.filter((c) => !existingIds.has(c.id))];
-    saveFlashcards(merged);
-    console.error(`[flashcards] added ${newCards.length} card(s) for session ${session.id}`);
+  let savedCount = 0;
+  for (const card of newCards) {
+    if (persistFlashcard(deps, card)) savedCount++;
+  }
+  if (savedCount > 0) {
+    console.error(`[flashcards] added ${savedCount} card(s) for session ${session.id}`);
   }
 
   return { summary, avgScore, concepts, reportFile, flashcardsGenerated: newCards.length };
@@ -177,6 +184,7 @@ const deps: ToolDeps = {
   saveGraph,
   saveReport,
   loadFlashcards,
+  saveFlashcard,
   saveFlashcards,
   loadMistakes,
   saveMistake,
@@ -188,6 +196,7 @@ const deps: ToolDeps = {
   findExerciseByName,
   saveExercise,
   exercisesDir: EXERCISES_DIR,
+  scopesDir: SCOPES_DIR,
   generateId,
   assertState,
   findLast,

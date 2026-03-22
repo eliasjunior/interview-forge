@@ -15,40 +15,47 @@
       "when": 1773741733142,
       "tag": "0001_broad_rawhide_kid",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 2,
       "version": "6",
       "when": 1773865963866,
       "tag": "0002_mistake_log",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 3,
       "version": "6",
       "when": 1773866800000,
       "tag": "0003_skill_backlog",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 4,
       "version": "6",
       "when": 1773950400000,
       "tag": "0004_exercises",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 5,
       "version": "6",
       "when": 1773954000000,
       "tag": "0005_exercise_scenario",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 6,
       "version": "6",
       "when": 1774000000000,
       "tag": "0006_exercise_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1774189331138,
+      "tag": "0007_flashcard_optional_source",
       "breakpoints": true
     }
   ]

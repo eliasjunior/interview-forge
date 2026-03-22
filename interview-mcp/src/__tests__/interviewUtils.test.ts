@@ -5,6 +5,7 @@ import {
   buildSummary,
   buildTranscript,
   calcAvgScore,
+  generateFlashcards,
   mergeConceptsIntoGraph,
 } from "../interviewUtils.js";
 import type { Session, Evaluation, KnowledgeGraph, Concept } from "@mock-interview/shared";
@@ -299,5 +300,111 @@ describe("calcAvgScore", () => {
   test("handles all same scores", () => {
     const evals = [makeEvaluation(3), makeEvaluation(3), makeEvaluation(3)];
     assert.equal(calcAvgScore(evals), "3.0");
+  });
+});
+
+// ─────────────────────────────────────────────
+// generateFlashcards
+// ─────────────────────────────────────────────
+
+function makeEval(score: number, questionIndex = 0, overrides: Partial<Evaluation> = {}): Evaluation {
+  return {
+    questionIndex,
+    question: "What is useEffect?",
+    answer: "It handles side effects.",
+    score,
+    feedback: "Good answer.",
+    needsFollowUp: score <= 3,
+    ...overrides,
+  };
+}
+
+describe("generateFlashcards", () => {
+  test("returns empty array when there are no evaluations", () => {
+    assert.deepEqual(generateFlashcards(makeSession({ evaluations: [] })), []);
+  });
+
+  test("returns empty array when all scores are >= 4", () => {
+    const session = makeSession({ evaluations: [makeEval(4), makeEval(5, 1)] });
+    assert.deepEqual(generateFlashcards(session), []);
+  });
+
+  test("generates one card for a single weak evaluation", () => {
+    const session = makeSession({ evaluations: [makeEval(3)] });
+    const cards = generateFlashcards(session);
+    assert.equal(cards.length, 1);
+    assert.equal(cards[0].front, "What is useEffect?");
+    assert.equal(cards[0].topic, session.topic);
+  });
+
+  test("card id is deterministic: fc-{sessionId}-q{questionIndex}", () => {
+    const session = makeSession({ id: "sess-abc", evaluations: [makeEval(2, 1)] });
+    assert.equal(generateFlashcards(session)[0].id, "fc-sess-abc-q1");
+  });
+
+  test("maps score <= 2 to hard difficulty", () => {
+    assert.equal(generateFlashcards(makeSession({ evaluations: [makeEval(1)] }))[0].difficulty, "hard");
+    assert.equal(generateFlashcards(makeSession({ evaluations: [makeEval(2)] }))[0].difficulty, "hard");
+  });
+
+  test("maps score == 3 to medium difficulty", () => {
+    assert.equal(generateFlashcards(makeSession({ evaluations: [makeEval(3)] }))[0].difficulty, "medium");
+  });
+
+  test("score == 4 is not weak and produces no card", () => {
+    const session = makeSession({
+      evaluations: [makeEval(4, 0), makeEval(3, 1)],
+    });
+    const cards = generateFlashcards(session);
+    assert.equal(cards.length, 1);
+    assert.equal(cards[0].id, `fc-${session.id}-q1`);
+  });
+
+  test("deduplicates by questionIndex, keeping the evaluation with the lowest score", () => {
+    const session = makeSession({
+      evaluations: [makeEval(3, 0), makeEval(1, 0)],
+    });
+    const cards = generateFlashcards(session);
+    assert.equal(cards.length, 1);
+    assert.equal(cards[0].difficulty, "hard"); // score 1 → hard
+  });
+
+  test("generates one card per unique weak questionIndex", () => {
+    const session = makeSession({
+      evaluations: [makeEval(2, 0), makeEval(3, 1)],
+    });
+    assert.equal(generateFlashcards(session).length, 2);
+  });
+
+  test("card back includes the candidate answer and feedback", () => {
+    const session = makeSession({ evaluations: [makeEval(2, 0, { feedback: "Missing edge cases." })] });
+    const back = generateFlashcards(session)[0].back;
+    assert.ok(back.includes("It handles side effects."));
+    assert.ok(back.includes("Missing edge cases."));
+  });
+
+  test("card back includes deeperDive when present", () => {
+    const session = makeSession({
+      evaluations: [makeEval(2, 0, { deeperDive: "- Study invariant conditions" })],
+    });
+    assert.ok(generateFlashcards(session)[0].back.includes("Study invariant conditions"));
+  });
+
+  test("card has correct SM-2 initial values and is due immediately", () => {
+    const session = makeSession({ evaluations: [makeEval(3)] });
+    const card = generateFlashcards(session)[0];
+    assert.equal(card.interval, 1);
+    assert.equal(card.easeFactor, 2.5);
+    assert.equal(card.repetitions, 0);
+    assert.equal(card.dueDate, card.createdAt);
+  });
+
+  test("card source links back to session and question", () => {
+    const session = makeSession({ id: "sess-xyz", evaluations: [makeEval(2, 2)] });
+    assert.deepEqual(generateFlashcards(session)[0].source, {
+      sessionId: "sess-xyz",
+      questionIndex: 2,
+      originalScore: 2,
+    });
   });
 });

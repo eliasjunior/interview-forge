@@ -113,8 +113,8 @@ export interface Flashcard {
   topic: string
   tags: string[]
   difficulty: FlashcardDifficulty
-  /** Where the card came from */
-  source: {
+  /** Where the card came from — absent for manually created cards */
+  source?: {
     sessionId: string
     questionIndex: number
     originalScore: number   // the score that triggered creation (< 4)

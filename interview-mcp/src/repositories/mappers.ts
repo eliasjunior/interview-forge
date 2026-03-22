@@ -203,9 +203,9 @@ export function mapFlashcardToNormalizedRecord(flashcard: Flashcard): Normalized
       easeFactor: flashcard.easeFactor,
       repetitions: flashcard.repetitions,
       lastReviewedAt: flashcard.lastReviewedAt,
-      sourceSessionId: flashcard.source.sessionId,
-      sourceQuestionIndex: flashcard.source.questionIndex,
-      sourceOriginalScore: flashcard.source.originalScore,
+      sourceSessionId: flashcard.source?.sessionId ?? null,
+      sourceQuestionIndex: flashcard.source?.questionIndex ?? null,
+      sourceOriginalScore: flashcard.source?.originalScore ?? null,
       title: null,
       focusItem: null,
       studyNotes: null,
@@ -226,11 +226,13 @@ export function mapFlashcardAggregateToDomain(rows: FlashcardAggregateRows): Fla
     topic: rows.flashcard.topic,
     tags: rows.tags.slice().sort((a, b) => a.tag.localeCompare(b.tag)).map((row) => row.tag),
     difficulty: rows.flashcard.difficulty as Flashcard["difficulty"],
-    source: {
-      sessionId: rows.flashcard.sourceSessionId,
-      questionIndex: rows.flashcard.sourceQuestionIndex,
-      originalScore: rows.flashcard.sourceOriginalScore,
-    },
+    source: rows.flashcard.sourceSessionId != null
+      ? {
+          sessionId: rows.flashcard.sourceSessionId,
+          questionIndex: rows.flashcard.sourceQuestionIndex!,
+          originalScore: rows.flashcard.sourceOriginalScore!,
+        }
+      : undefined,
     createdAt: rows.flashcard.createdAt,
     dueDate: rows.flashcard.dueDate,
     interval: rows.flashcard.interval,
