@@ -164,13 +164,35 @@ describe("mergeConceptsIntoGraph", () => {
     assert.equal(graph.edges[0].weight, 2);
   });
 
-  test("nodes in different clusters do not produce edges between clusters", () => {
+  test("nodes in different clusters produce session-level bridge edges", () => {
     const concepts: Concept[] = [
       { word: "Alpha", cluster: "core concepts" },
       { word: "Beta", cluster: "tradeoffs" },
     ];
     const graph = mergeConceptsIntoGraph(emptyGraph(), concepts, "s1");
-    assert.equal(graph.edges.length, 0);
+    assert.equal(graph.edges.length, 1);
+    assert.equal(graph.edges[0].source, "alpha");
+    assert.equal(graph.edges[0].target, "beta");
+    assert.equal(graph.edges[0].weight, 1);
+  });
+
+  test("adds cross-cluster bridges without removing same-cluster relationships", () => {
+    const concepts: Concept[] = [
+      { word: "Alpha", cluster: "core concepts" },
+      { word: "Beta", cluster: "core concepts" },
+      { word: "Gamma", cluster: "tradeoffs" },
+    ];
+    const graph = mergeConceptsIntoGraph(emptyGraph(), concepts, "s1");
+    const alphaBeta = graph.edges.find((edge) => edge.source === "alpha" && edge.target === "beta");
+    const alphaGamma = graph.edges.find((edge) => edge.source === "alpha" && edge.target === "gamma");
+    const betaGamma = graph.edges.find((edge) => edge.source === "beta" && edge.target === "gamma");
+
+    assert.ok(alphaBeta);
+    assert.ok(alphaGamma);
+    assert.ok(betaGamma);
+    assert.equal(alphaBeta.weight, 1);
+    assert.equal(alphaGamma.weight, 1);
+    assert.equal(betaGamma.weight, 1);
   });
 
   test("adds sessionId and does not duplicate it on second merge", () => {

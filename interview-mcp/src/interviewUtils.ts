@@ -275,6 +275,15 @@ export function mergeConceptsIntoGraph(
   concepts: Concept[],
   sessionId: string
 ): KnowledgeGraph {
+  const incrementEdge = (sourceId: string, targetId: string) => {
+    const [source, target] = [sourceId, targetId].sort();
+    const existing = graph.edges.find(
+      (edge) => edge.source === source && edge.target === target
+    );
+    if (existing) existing.weight++;
+    else graph.edges.push({ source, target, weight: 1 });
+  };
+
   for (const concept of concepts) {
     const id = concept.word.toLowerCase();
     const existing = graph.nodes.find((n) => n.id === id);
@@ -298,12 +307,34 @@ export function mergeConceptsIntoGraph(
   for (const words of Object.values(clusterMap)) {
     for (let i = 0; i < words.length; i++) {
       for (let j = i + 1; j < words.length; j++) {
-        const [src, tgt] = [words[i], words[j]].sort();
-        const existing = graph.edges.find(
-          (e) => e.source === src && e.target === tgt
-        );
-        if (existing) existing.weight++;
-        else graph.edges.push({ source: src, target: tgt, weight: 1 });
+        incrementEdge(words[i], words[j]);
+      }
+    }
+  }
+
+  const clustersByWord = new Map<string, Set<string>>();
+  for (const concept of concepts) {
+    const id = concept.word.toLowerCase();
+    const clusters = clustersByWord.get(id) ?? new Set<string>();
+    clusters.add(concept.cluster);
+    clustersByWord.set(id, clusters);
+  }
+
+  const uniqueWords = Array.from(clustersByWord.keys()).sort();
+  for (let i = 0; i < uniqueWords.length; i++) {
+    for (let j = i + 1; j < uniqueWords.length; j++) {
+      const source = uniqueWords[i];
+      const target = uniqueWords[j];
+      const sourceClusters = clustersByWord.get(source)!;
+      const targetClusters = clustersByWord.get(target)!;
+      const sharesCluster = Array.from(sourceClusters).some((cluster) =>
+        targetClusters.has(cluster)
+      );
+
+      // Add a weaker bridge whenever concepts co-occur in the same session
+      // but never share a cluster. This keeps related areas connected.
+      if (!sharesCluster) {
+        incrementEdge(source, target);
       }
     }
   }
