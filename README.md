@@ -670,18 +670,64 @@ Run these from the repo root.
 
 ## Knowledge topics
 
-Knowledge files live in `interview-mcp/data/knowledge/*.md`. Current topics:
+Knowledge files live in `interview-mcp/data/knowledge/*.md`. Each file follows a fixed structure: `## Summary`, `## Questions`, `## Difficulty`, `## Evaluation Criteria`, and `## Concepts`. The `## Difficulty` section tags every question as `foundation`, `intermediate`, or `advanced`.
 
-| File | Topic |
+### How questions are selected per interview
+
+`start_interview` picks **5 questions by default** (configurable up to 10 via `maxQuestions`) using a difficulty-progressive selection:
+
+| Slot | Tier |
 |---|---|
-| `jwt.md` | JWT — JSON Web Token |
-| `rest-spring-jpa.md` | REST API Design, Spring Boot & JPA |
-| `payment-api-design.md` | Payment API Design |
-| `url-shortener.md` | URL Shortener System Design |
-| `mtls-tls.md` | mTLS / TLS |
-| `java-concurrency.md` | Java Concurrency |
-| `java-os-jvm.md` | Java, OS & JVM internals |
-| `rotate-matrix-algorithm.md` | Rotate Matrix (algorithm) |
+| Q1, Q2 | foundation |
+| Q3, Q4 | intermediate |
+| Q5 | advanced |
+
+Within each tier, questions you have been asked least often across past sessions are prioritised first — so repeated interviews gradually cycle through the full question pool rather than repeating the same 5 questions. When a question has been seen before, the `selectionRationale` field in the `start_interview` response signals Claude to probe deeper instead of accepting a surface-level recall answer.
+
+### Current topics
+
+| File | Topic | Questions |
+|---|---|---|
+| `jwt.md` | JWT — JSON Web Token | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `rest-spring-jpa.md` | REST API Design, Spring Boot & JPA | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `payment-api-design.md` | Payment API Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `url-shortener.md` | URL Shortener System Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `mtls-tls.md` | mTLS / TLS | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `java-concurrency.md` | Java Concurrency | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `java-os-jvm.md` | Java OS & JVM Internals | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `rotate-matrix-algorithm.md` | Rotate Matrix (algorithm) | 14 (5 foundation, 7 intermediate, 2 advanced) |
+| `mortgage-rest-design.md` | Mortgage REST API Design | 20 (5 foundation, 10 intermediate, 5 advanced) |
+
+### Knowledge file format
+
+```markdown
+# <Topic Title>
+
+## Summary
+<One-paragraph context — what the topic covers and what a strong candidate knows>
+
+## Questions
+1. <Question>
+2. ...
+
+## Difficulty
+- Question 1: foundation
+- Question 2: intermediate
+- Question 3: advanced
+...
+
+## Evaluation Criteria
+- Question 1: <What a strong answer includes. What a weak answer misses. Bonus points.>
+- Question 2: ...
+
+## Concepts
+- core concepts: word1, word2
+- practical usage: word3, word4
+- tradeoffs: word5, word6
+- best practices: word7, word8
+```
+
+Cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
 
 Set `AI_ENABLED=true` to let the server generate questions for any topic not in the knowledge base.
 

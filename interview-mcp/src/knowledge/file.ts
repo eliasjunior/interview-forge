@@ -47,6 +47,16 @@ function parseCriteria(section: string): string[] {
     .filter(Boolean);
 }
 
+function parseDifficulties(section: string): string[] {
+  // Each line: "- Question N: foundation|intermediate|advanced"
+  return section
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^-\s*(Question\s*\d+|Q\d+)\s*:/i.test(l))
+    .map((l) => l.replace(/^-\s*(Question\s*\d+|Q\d+)\s*:\s*/i, "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
 function parseConcepts(section: string): Concept[] {
   // Each line: "- <cluster>: word1, word2, word3"
   const VALID_CLUSTERS = ["core concepts", "practical usage", "tradeoffs", "best practices"];
@@ -82,21 +92,23 @@ function parseFile(filePath: string): KnowledgeTopic | null {
     const titleMatch = md.match(/^#\s+(.+)/m);
     const topic = titleMatch ? titleMatch[1].trim() : path.basename(filePath, ".md");
 
-    const summary           = extractSection(md, "Summary");
-    const questionsSection  = extractSection(md, "Questions");
-    const criteriaSection   = extractSection(md, "Evaluation Criteria");
-    const conceptsSection   = extractSection(md, "Concepts");
+    const summary              = extractSection(md, "Summary");
+    const questionsSection     = extractSection(md, "Questions");
+    const criteriaSection      = extractSection(md, "Evaluation Criteria");
+    const conceptsSection      = extractSection(md, "Concepts");
+    const difficultySection    = extractSection(md, "Difficulty");
 
-    const questions         = parseQuestions(questionsSection);
-    const evaluationCriteria = parseCriteria(criteriaSection);
-    const concepts          = parseConcepts(conceptsSection);
+    const questions            = parseQuestions(questionsSection);
+    const evaluationCriteria   = parseCriteria(criteriaSection);
+    const concepts             = parseConcepts(conceptsSection);
+    const questionDifficulties = parseDifficulties(difficultySection);
 
     if (questions.length === 0) {
       console.error(`[knowledge] ${path.basename(filePath)}: no questions found — skipping`);
       return null;
     }
 
-    return { topic, summary, questions, evaluationCriteria, concepts };
+    return { topic, summary, questions, evaluationCriteria, concepts, questionDifficulties };
   } catch (err) {
     console.error(`[knowledge] failed to parse ${filePath}:`, err);
     return null;

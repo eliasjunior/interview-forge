@@ -15,8 +15,12 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
       if (!guard.ok) return deps.stateError(guard.error);
 
       const question = session.questions[session.currentQuestionIndex];
-      const entry = deps.knowledge.findByTopic(session.topic);
-      const evaluationCriteria = entry?.evaluationCriteria[session.currentQuestionIndex];
+      // Prefer pre-selected criteria stored on the session (populated when questions are
+      // sampled from a knowledge file — avoids mismatched indices after shuffling).
+      // Fall back to positional lookup from the knowledge file for legacy sessions.
+      const evaluationCriteria =
+        session.questionCriteria?.[session.currentQuestionIndex] ??
+        deps.knowledge.findByTopic(session.topic)?.evaluationCriteria[session.currentQuestionIndex];
 
       session.messages.push({
         role: "interviewer",

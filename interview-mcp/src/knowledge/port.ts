@@ -32,6 +32,13 @@ export interface KnowledgeTopic {
    */
   evaluationCriteria: string[];
 
+  /**
+   * Difficulty tier per question, parallel to `questions`.
+   * Values: "foundation" | "intermediate" | "advanced".
+   * Missing entries default to "intermediate".
+   */
+  questionDifficulties: string[];
+
   /** Pre-defined concepts — replaces ai.extractConcepts */
   concepts: Concept[];
 }

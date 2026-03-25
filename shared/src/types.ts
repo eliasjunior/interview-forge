@@ -60,6 +60,12 @@ export interface Session {
   state: InterviewState
   currentQuestionIndex: number
   questions: string[]
+  /**
+   * Evaluation criteria parallel to `questions` — populated when questions are
+   * selected from a knowledge file with difficulty-based sampling. Avoids
+   * re-indexing into the original file when questions are shuffled.
+   */
+  questionCriteria?: string[]
   messages: Message[]
   evaluations: Evaluation[]
   summary?: string

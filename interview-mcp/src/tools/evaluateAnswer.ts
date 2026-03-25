@@ -42,7 +42,11 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
 
       if (deps.ai) {
         const entry = deps.knowledge.findByTopic(session.topic);
-        const knowledgeCriteria = entry?.evaluationCriteria[session.currentQuestionIndex];
+        // Prefer pre-selected criteria stored on the session (safe after question shuffling).
+        // Fall back to positional lookup for legacy sessions and AI-generated questions.
+        const knowledgeCriteria =
+          session.questionCriteria?.[session.currentQuestionIndex] ??
+          entry?.evaluationCriteria[session.currentQuestionIndex];
 
         // For scoped sessions (started via start_scoped_interview), use the project spec
         // and focus angle as rubric context so the AI evaluates against the original content.
@@ -64,7 +68,9 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
       }
 
       const resolvedStrongAnswer = buildStrongAnswer({
-        criteria: deps.knowledge.findByTopic(session.topic)?.evaluationCriteria[session.currentQuestionIndex],
+        criteria:
+          session.questionCriteria?.[session.currentQuestionIndex] ??
+          deps.knowledge.findByTopic(session.topic)?.evaluationCriteria[session.currentQuestionIndex],
         feedback: result.feedback,
         answer: result.strongAnswer ?? lastAnswer.content,
       });
