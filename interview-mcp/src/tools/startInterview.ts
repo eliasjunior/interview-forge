@@ -4,13 +4,15 @@ import type { Session } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 
 export function registerStartInterviewTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "start_interview",
-    "Start a new mock interview session. Returns a session ID and sets state to ASK_QUESTION.",
     {
-      topic: z.string().describe("Technical topic for the interview (e.g. 'URL shortener', 'JWT authentication', 'REST API design')"),
-      interviewType: z.enum(["design"]).optional()
-        .describe("Interview type. Currently only 'design' is supported (default). 'code' is reserved for future use."),
+      description: "Start a new mock interview session. Returns a session ID and sets state to ASK_QUESTION.",
+      inputSchema: {
+        topic: z.string().describe("Technical topic for the interview (e.g. 'URL shortener', 'JWT authentication', 'REST API design')"),
+        interviewType: z.enum(["design"]).optional()
+          .describe("Interview type. Currently only 'design' is supported (default). 'code' is reserved for future use."),
+      },
     },
     async ({ topic, interviewType = "design" }) => {
       const sessions = deps.loadSessions();

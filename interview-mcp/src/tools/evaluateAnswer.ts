@@ -2,23 +2,28 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Evaluation } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
+import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
 export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "evaluate_answer",
-    "Score the last answer (1–5) and decide if a follow-up is needed. Valid in state: EVALUATE_ANSWER. When AI is enabled call with sessionId only. When AI is disabled also provide score, feedback, and needsFollowUp.",
     {
-      sessionId: z.string(),
-      score: z.number().int().min(1).max(5).optional()
-        .describe("Score 1–5 (required when AI is disabled)"),
-      feedback: z.string().optional()
-        .describe("Detailed feedback (required when AI is disabled)"),
-      needsFollowUp: z.boolean().optional()
-        .describe("Whether a follow-up question would help (required when AI is disabled)"),
-      followUpQuestion: z.string().optional()
-        .describe("The follow-up question to ask (provide when needsFollowUp is true)"),
+      description: "Score the last answer (1–5) and decide if a follow-up is needed. Valid in state: EVALUATE_ANSWER. When AI is enabled call with sessionId only. When AI is disabled also provide score, feedback, and needsFollowUp.",
+      inputSchema: {
+        sessionId: z.string(),
+        score: z.number().int().min(1).max(5).optional()
+          .describe("Score 1–5 (required when AI is disabled)"),
+        feedback: z.string().optional()
+          .describe("Detailed feedback (required when AI is disabled)"),
+        needsFollowUp: z.boolean().optional()
+          .describe("Whether a follow-up question would help (required when AI is disabled)"),
+        followUpQuestion: z.string().optional()
+          .describe("The follow-up question to ask (provide when needsFollowUp is true)"),
+        strongAnswer: z.string().optional()
+          .describe("A concise corrected or stronger answer (optional when AI is disabled)"),
+      },
     },
-    async ({ sessionId, score, feedback, needsFollowUp, followUpQuestion }) => {
+    async ({ sessionId, score, feedback, needsFollowUp, followUpQuestion, strongAnswer }) => {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];
       if (!session) return deps.stateError(`Session '${sessionId}' not found.`);
@@ -33,7 +38,7 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         return deps.stateError("No question/answer pair found to evaluate.");
       }
 
-      let result: { score: number; feedback: string; needsFollowUp: boolean; followUpQuestion?: string | null; deeperDive?: string };
+      let result: { score: number; feedback: string; strongAnswer?: string; needsFollowUp: boolean; followUpQuestion?: string | null; deeperDive?: string };
 
       if (deps.ai) {
         const entry = deps.knowledge.findByTopic(session.topic);
@@ -55,13 +60,20 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             "Evaluate the answer against the evaluationCriteria returned by ask_question."
           );
         }
-        result = { score, feedback, needsFollowUp, followUpQuestion };
+        result = { score, feedback, strongAnswer, needsFollowUp, followUpQuestion };
       }
+
+      const resolvedStrongAnswer = buildStrongAnswer({
+        criteria: deps.knowledge.findByTopic(session.topic)?.evaluationCriteria[session.currentQuestionIndex],
+        feedback: result.feedback,
+        answer: result.strongAnswer ?? lastAnswer.content,
+      });
 
       const evaluation: Evaluation = {
         questionIndex: session.currentQuestionIndex,
         question: lastQuestion.content,
         answer: lastAnswer.content,
+        strongAnswer: resolvedStrongAnswer,
         score: result.score,
         feedback: result.feedback,
         needsFollowUp: result.needsFollowUp,
@@ -81,6 +93,7 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             state: session.state,
             score: result.score,
             feedback: result.feedback,
+            strongAnswer: resolvedStrongAnswer ?? null,
             needsFollowUp: result.needsFollowUp,
             followUpQuestion: result.followUpQuestion ?? null,
             nextTool: result.needsFollowUp

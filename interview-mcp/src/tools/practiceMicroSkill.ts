@@ -18,15 +18,17 @@ import type { ToolDeps } from "./deps.js";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function registerPracticeMicroSkillTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "practice_micro_skill",
-    "Start a focused micro-skill drill on a specific sub-skill. " +
-    "Runs the 5-step deliberate practice loop: recall → targeted question → evaluate → flashcard → update confidence. " +
-    "The skill must exist in the backlog (use add_skill first). " +
-    "If no subSkill is provided, picks the lowest confidence sub-skill automatically.",
     {
-      skill: z.string().min(1).describe("Skill name from the backlog, e.g. '2D index transformations'"),
-      subSkill: z.string().optional().describe("Specific sub-skill to drill. If omitted, auto-picks the lowest confidence sub-skill."),
+      description: "Start a focused micro-skill drill on a specific sub-skill. " +
+      "Runs the 5-step deliberate practice loop: recall → targeted question → evaluate → flashcard → update confidence. " +
+      "The skill must exist in the backlog (use add_skill first). " +
+      "If no subSkill is provided, picks the lowest confidence sub-skill automatically.",
+      inputSchema: {
+        skill: z.string().min(1).describe("Skill name from the backlog, e.g. '2D index transformations'"),
+        subSkill: z.string().optional().describe("Specific sub-skill to drill. If omitted, auto-picks the lowest confidence sub-skill."),
+      },
     },
     async ({ skill: skillName, subSkill: subSkillName }) => {
       // ── 1. Load skill ───────────────────────────────────────────────────────

@@ -20,22 +20,24 @@ export function persistFlashcard(deps: ToolDeps, card: Flashcard): boolean {
 }
 
 export function registerCreateFlashcardTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "create_flashcard",
-    "Create a flashcard directly from supplied front/back content. " +
-    "Useful for capturing insights, concepts, or mistakes outside of an interview session. " +
-    "Cards are immediately due for review and follow the same SM-2 schedule as auto-generated cards.",
     {
-      front: z.string().min(5)
-        .describe("The question or concept prompt shown during review."),
-      back: z.string().min(5)
-        .describe("The answer, explanation, or key points revealed after the prompt. Markdown is supported."),
-      topic: z.string().min(1)
-        .describe("Topic label, e.g. 'Zero Matrix', 'JWT authentication'."),
-      difficulty: z.enum(["easy", "medium", "hard"]).default("medium")
-        .describe("How hard this card is: easy | medium | hard."),
-      tags: z.array(z.string()).optional()
-        .describe("Optional tags for filtering, e.g. ['arrays', 'in-place']."),
+      description: "Create a flashcard directly from supplied front/back content. " +
+      "Useful for capturing insights, concepts, or mistakes outside of an interview session. " +
+      "Cards are immediately due for review and follow the same SM-2 schedule as auto-generated cards.",
+      inputSchema: {
+        front: z.string().min(5)
+          .describe("The question or concept prompt shown during review."),
+        back: z.string().min(5)
+          .describe("The answer, explanation, or key points revealed after the prompt. Markdown is supported."),
+        topic: z.string().min(1)
+          .describe("Topic label, e.g. 'Zero Matrix', 'JWT authentication'."),
+        difficulty: z.enum(["easy", "medium", "hard"]).default("medium")
+          .describe("How hard this card is: easy | medium | hard."),
+        tags: z.array(z.string()).optional()
+          .describe("Optional tags for filtering, e.g. ['arrays', 'in-place']."),
+      },
     },
     async ({ front, back, topic, difficulty, tags }) => {
       const now = new Date().toISOString();

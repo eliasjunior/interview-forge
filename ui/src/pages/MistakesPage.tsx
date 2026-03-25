@@ -31,18 +31,20 @@ export default function MistakesPage() {
       </div>
 
       {topics.length > 1 && (
-        <div className="fc-tabs">
+        <div className="mistakes-filters">
           <button
-            className={`fc-tab${activeTopic === null ? ' active' : ''}`}
+            className={`mistakes-filter${activeTopic === null ? ' active' : ''}`}
             onClick={() => setActiveTopic(null)}
+            type="button"
           >
             All
           </button>
           {topics.map(t => (
             <button
               key={t}
-              className={`fc-tab${activeTopic === t ? ' active' : ''}`}
+              className={`mistakes-filter${activeTopic === t ? ' active' : ''}`}
               onClick={() => setActiveTopic(t)}
+              type="button"
             >
               {t}
             </button>

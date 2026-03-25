@@ -77,6 +77,7 @@ function createSpyRepositories() {
       getById: () => null,
       save: () => undefined,
       saveMany: () => undefined,
+      deleteById: () => false,
       replaceAll: (sessions) => {
         calls.sessions = sessions;
       },
@@ -86,6 +87,7 @@ function createSpyRepositories() {
       getById: () => null,
       save: () => undefined,
       saveMany: () => undefined,
+      deleteBySourceSessionId: () => 0,
       replaceAll: (flashcards) => {
         calls.flashcards = flashcards;
       },

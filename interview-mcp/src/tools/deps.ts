@@ -1,6 +1,7 @@
 import type { AIProvider } from "../ai/index.js";
 import type { KnowledgeStore } from "../knowledge/index.js";
 import type { Concept, Evaluation, Exercise, Flashcard, KnowledgeGraph, Mistake, Skill, Session } from "@mock-interview/shared";
+import type { SessionDeletionPreview } from "../sessions/deleteFlow.js";
 
 export type StateError = ReturnType<ToolDeps["stateError"]>;
 
@@ -18,6 +19,13 @@ export interface ToolDeps {
   loadGraph(): KnowledgeGraph;
   saveGraph(graph: KnowledgeGraph): void;
   saveReport(session: Session): string;
+  inspectSessionDeletion(sessionId: string): SessionDeletionPreview | null;
+  deleteSessionById(sessionId: string): {
+    preview: SessionDeletionPreview;
+    deletedFlashcards: number;
+    deletedArtifacts: string[];
+    graph: { nodes: number; edges: number; sessions: number };
+  } | null;
   loadFlashcards(): Flashcard[];
   saveFlashcard(card: Flashcard): void;
   saveFlashcards(cards: Flashcard[]): void;

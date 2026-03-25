@@ -3,10 +3,9 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerAskFollowupTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "ask_followup",
-    "Ask the follow-up question generated during evaluation. Valid in state: FOLLOW_UP.",
-    { sessionId: z.string() },
+    { description: "Ask the follow-up question generated during evaluation. Valid in state: FOLLOW_UP.", inputSchema: { sessionId: z.string() } },
     async ({ sessionId }) => {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];

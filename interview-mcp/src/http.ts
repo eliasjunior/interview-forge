@@ -7,9 +7,17 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
 import { applySM2 } from "./srsUtils.js";
-import type { ReviewRating, Flashcard, Session } from "@mock-interview/shared";
+import type {
+  ReviewRating,
+  Flashcard,
+  Session,
+  GraphInspectionResult,
+  GraphInspectionSession,
+} from "@mock-interview/shared";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
+import { canonicalizeConceptWord } from "./graph/concepts.js";
+import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sessions/admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -42,14 +50,143 @@ function saveFlashcards(cards: Flashcard[]) {
   repositories.flashcards.replaceAll(cards);
 }
 
+function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult {
+  const graph = repositories.graph.get();
+  const sessions = repositories.sessions.list();
+  const selectedSet = new Set(selectedNodeIds);
+  const selectedNodes = graph.nodes.filter((node) => selectedSet.has(node.id));
+  const directEdges = graph.edges.filter(
+    (edge) => selectedSet.has(edge.source) && selectedSet.has(edge.target)
+  );
+
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+
+  const toInspectionSession = (session: Session): GraphInspectionSession => {
+    const selectedConcepts = [...new Map(
+      (session.concepts ?? [])
+        .map((concept) => canonicalizeConceptWord(concept.word).id)
+        .filter((id) => selectedSet.has(id))
+        .map((id) => {
+          const node = nodeById.get(id);
+          return [id, {
+            id,
+            label: node?.label ?? id,
+            clusters: node?.clusters ?? [],
+          }];
+        })
+    ).values()];
+
+    const prioritizedEvaluations = [...session.evaluations].sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score;
+      const strongA = a.strongAnswer?.trim() ? 0 : 1;
+      const strongB = b.strongAnswer?.trim() ? 0 : 1;
+      if (strongA !== strongB) return strongA - strongB;
+      return a.questionIndex - b.questionIndex;
+    });
+
+    const questionEvidence = session.evaluations.length > 0
+      ? prioritizedEvaluations.slice(0, 3).map((evaluation) => ({
+          questionIndex: evaluation.questionIndex,
+          question: evaluation.question,
+          answer: evaluation.answer,
+          score: evaluation.score,
+          feedback: evaluation.feedback,
+          strongAnswer: evaluation.strongAnswer,
+        }))
+      : session.questions.slice(0, 3).map((question, index) => ({
+          questionIndex: index,
+          question,
+        }));
+
+    return {
+      sessionId: session.id,
+      topic: session.topic,
+      createdAt: session.createdAt,
+      selectedConcepts,
+      questions: questionEvidence,
+      summary: session.summary,
+    };
+  };
+
+  const matchingSessions = sessions
+    .map((session) => {
+      const conceptIds = new Set((session.concepts ?? []).map((concept) => canonicalizeConceptWord(concept.word).id));
+      const matchedIds = selectedNodeIds.filter((id) => conceptIds.has(id));
+      return { session, matchedIds };
+    })
+    .filter(({ matchedIds }) => matchedIds.length > 0);
+
+  const sessionsMatchingAll = matchingSessions
+    .filter(({ matchedIds }) => matchedIds.length === selectedNodeIds.length)
+    .map(({ session }) => toInspectionSession(session))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  const sessionsMatchingAny = matchingSessions
+    .filter(({ matchedIds }) => matchedIds.length < selectedNodeIds.length)
+    .sort((a, b) => b.matchedIds.length - a.matchedIds.length || b.session.createdAt.localeCompare(a.session.createdAt))
+    .map(({ session }) => toInspectionSession(session));
+
+  return {
+    selectedNodes,
+    directEdges,
+    sessionsMatchingAll,
+    sessionsMatchingAny,
+  };
+}
+
 // API: Get the full knowledge graph
 app.get("/api/graph", (_req, res) => {
   res.json(repositories.graph.get());
 });
 
+app.post("/api/graph/inspect", (req, res) => {
+  const selectedNodeIds = Array.isArray(req.body?.nodeIds)
+    ? req.body.nodeIds.filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+
+  if (selectedNodeIds.length === 0) {
+    res.status(400).json({ error: "nodeIds must contain at least one node id" });
+    return;
+  }
+
+  res.json(buildGraphInspection(Array.from(new Set(selectedNodeIds))));
+});
+
 // API: List all sessions
 app.get("/api/sessions", (_req, res) => {
   res.json(repositories.sessions.list());
+});
+
+app.get("/api/sessions/:id/delete-preview", (req, res) => {
+  const preview = inspectSessionDeletionImpact(repositories, req.params.id, {
+    reportsDir: REPORTS_DIR,
+    generatedUiDir: GENERATED_UI_DIR,
+  });
+
+  if (!preview) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  res.json(preview);
+});
+
+app.delete("/api/sessions/:id", (req, res) => {
+  const result = deleteSessionWithArtifacts(repositories, req.params.id, {
+    reportsDir: REPORTS_DIR,
+    generatedUiDir: GENERATED_UI_DIR,
+  });
+
+  if (!result) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  res.json({
+    deleted: true,
+    sessionId: req.params.id,
+    ...result,
+  });
 });
 
 // API: List all reports (id + topic + date)

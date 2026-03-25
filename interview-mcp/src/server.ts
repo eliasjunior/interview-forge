@@ -27,6 +27,7 @@ import type { ToolDeps } from "./tools/deps.js";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 import { normalizeConcepts } from "./graph/concepts.js";
+import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sessions/admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -43,6 +44,8 @@ const DATA_DIR = path.resolve(__dirname, "../data");
 const REPORTS_DIR      = path.join(DATA_DIR, "reports");
 const EXERCISES_DIR    = path.join(DATA_DIR, "knowledge", "exercises");
 const SCOPES_DIR       = path.join(DATA_DIR, "knowledge", "scopes");
+const PUBLIC_DIR       = path.resolve(__dirname, "../public");
+const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
 const UI_PORT = process.env.PORT ?? "3001";
 const db = createDb();
 const repositories = createSqliteRepositories(db);
@@ -125,6 +128,21 @@ function saveReport(session: Session) {
   return filename;
 }
 
+function sessionArtifactPaths() {
+  return {
+    reportsDir: REPORTS_DIR,
+    generatedUiDir: GENERATED_UI_DIR,
+  };
+}
+
+function inspectSessionDeletion(sessionId: string) {
+  return inspectSessionDeletionImpact(repositories, sessionId, sessionArtifactPaths());
+}
+
+function deleteSessionById(sessionId: string) {
+  return deleteSessionWithArtifacts(repositories, sessionId, sessionArtifactPaths());
+}
+
 async function extractConcepts(session: Session): Promise<Concept[]> {
   const entry = knowledge.findByTopic(session.topic);
   if (entry && entry.concepts.length > 0) {
@@ -187,6 +205,8 @@ const deps: ToolDeps = {
   loadGraph,
   saveGraph,
   saveReport,
+  inspectSessionDeletion,
+  deleteSessionById,
   loadFlashcards,
   saveFlashcard,
   saveFlashcards,

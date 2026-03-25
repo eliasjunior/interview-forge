@@ -3,15 +3,17 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolDeps } from "./deps.js";
 
 export function registerUpdateSkillTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "update_skill",
-    "Update confidence on a skill or one of its sub-skills after a drill. " +
-    "If subSkill is provided, updates that sub-skill's confidence and recalculates the overall skill confidence as the average. " +
-    "If only confidence is provided, updates the overall skill confidence directly.",
     {
-      name: z.string().min(1).describe("Skill name, e.g. '2D index transformations'"),
-      confidence: z.number().int().min(1).max(5).describe("New confidence rating 1–5"),
-      subSkill: z.string().optional().describe("Sub-skill name to update. If omitted, updates the overall skill confidence."),
+      description: "Update confidence on a skill or one of its sub-skills after a drill. " +
+      "If subSkill is provided, updates that sub-skill's confidence and recalculates the overall skill confidence as the average. " +
+      "If only confidence is provided, updates the overall skill confidence directly.",
+      inputSchema: {
+        name: z.string().min(1).describe("Skill name, e.g. '2D index transformations'"),
+        confidence: z.number().int().min(1).max(5).describe("New confidence rating 1–5"),
+        subSkill: z.string().optional().describe("Sub-skill name to update. If omitted, updates the overall skill confidence."),
+      },
     },
     async ({ name, confidence, subSkill }) => {
       const skill = deps.findSkillByName(name);

@@ -4,15 +4,17 @@ import type { ToolDeps } from "./deps.js";
 import { isDue } from "../srsUtils.js";
 
 export function registerGetDueFlashcardsTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "get_due_flashcards",
-    "Returns flashcards that are due for review today (dueDate <= now). " +
-    "Optionally filter by topic. Cards are sorted most-overdue first. " +
-    "Use review_flashcard to submit a rating after reviewing each card.",
     {
-      topic: z.string().optional().describe(
-        "Filter to a specific topic (e.g. 'JWT authentication'). Omit to get all due cards."
-      ),
+      description: "Returns flashcards that are due for review today (dueDate <= now). " +
+      "Optionally filter by topic. Cards are sorted most-overdue first. " +
+      "Use review_flashcard to submit a rating after reviewing each card.",
+      inputSchema: {
+        topic: z.string().optional().describe(
+          "Filter to a specific topic (e.g. 'JWT authentication'). Omit to get all due cards."
+        ),
+      },
     },
     async ({ topic }) => {
       const now = new Date();

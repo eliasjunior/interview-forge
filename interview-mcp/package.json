@@ -14,6 +14,9 @@
     "db:migrate": "node --import tsx ./src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "db:import-json": "node --import tsx ./src/db/importJsonData.ts",
+    "db:backfill-strong-answers": "node --import tsx ./src/db/backfillStrongAnswers.ts",
+    "db:backfill-flashcards": "node --import tsx ./src/db/backfillFlashcards.ts",
+    "db:reschedule-flashcards": "node --import tsx ./src/db/rescheduleFlashcards.ts",
     "db:rebuild-graph": "node --import tsx ./src/db/rebuildGraph.ts",
     "smoke:runtime": "node --import tsx ./src/scripts/runtimeSmokeTest.ts"
   },

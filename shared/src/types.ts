@@ -94,11 +94,41 @@ export interface KnowledgeGraph {
   sessions: string[]
 }
 
+export interface GraphInspectionQuestion {
+  questionIndex: number
+  question: string
+  answer?: string
+  score?: number
+  feedback?: string
+  strongAnswer?: string
+}
+
+export interface GraphInspectionSession {
+  sessionId: string
+  topic: string
+  createdAt: string
+  selectedConcepts: Array<{
+    id: string
+    label: string
+    clusters: string[]
+  }>
+  questions: GraphInspectionQuestion[]
+  summary?: string
+}
+
+export interface GraphInspectionResult {
+  selectedNodes: GraphNode[]
+  directEdges: GraphEdge[]
+  sessionsMatchingAll: GraphInspectionSession[]
+  sessionsMatchingAny: GraphInspectionSession[]
+}
+
 // ── AI provider ───────────────────────────────────────────────────────────────
 
 export interface EvaluationResult {
   score: number           // 1–5
   feedback: string        // one sentence, specific and actionable
+  strongAnswer?: string
   needsFollowUp: boolean
   followUpQuestion?: string
   deeperDive?: string
@@ -229,4 +259,48 @@ export interface ReportMeta {
   avgScore: string
   date: string | null
   file: string
+}
+
+export interface SessionDeletionPreview {
+  session: {
+    id: string
+    topic: string
+    state: string
+    createdAt: string
+    endedAt: string | null
+    questionCount: number
+    messageCount: number
+    evaluationCount: number
+    conceptCount: number
+    hasSummary: boolean
+  }
+  flashcards: {
+    count: number
+    ids: string[]
+  }
+  graph: {
+    includedInGraphSessions: boolean
+    rebuildRequired: boolean
+    currentNodeCount: number
+    currentEdgeCount: number
+  }
+  artifacts: {
+    markdownReport: boolean
+    reportUiDataset: boolean
+    weakSubjectsHtml: boolean
+  }
+  warnings: string[]
+}
+
+export interface SessionDeleteResult {
+  deleted: true
+  sessionId: string
+  preview: SessionDeletionPreview
+  deletedFlashcards: number
+  deletedArtifacts: string[]
+  graph: {
+    nodes: number
+    edges: number
+    sessions: number
+  }
 }

@@ -6,4 +6,5 @@ export interface SessionRepository {
   save(session: Session): void;
   saveMany(sessions: Session[]): void;
   replaceAll(sessions: Record<string, Session>): void;
+  deleteById(id: string): boolean;
 }

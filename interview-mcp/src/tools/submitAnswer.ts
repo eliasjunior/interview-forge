@@ -3,12 +3,14 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerSubmitAnswerTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "submit_answer",
-    "Submit the candidate's answer to the current question. Valid in state: WAIT_FOR_ANSWER.",
     {
-      sessionId: z.string(),
-      answer: z.string().describe("The candidate's full answer"),
+      description: "Submit the candidate's answer to the current question. Valid in state: WAIT_FOR_ANSWER.",
+      inputSchema: {
+        sessionId: z.string(),
+        answer: z.string().describe("The candidate's full answer"),
+      },
     },
     async ({ sessionId, answer }) => {
       const sessions = deps.loadSessions();

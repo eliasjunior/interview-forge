@@ -1,140 +1,277 @@
-# Thread Contention Lab (`Lab.java`)
+# Thread Dump Lab (`Lab.java`)
 
-A self-contained Java teaching tool that manufactures **lock contention**, **memory pressure**, and **live JVM metrics** — designed for hands-on practice with thread analysis tools.
+A self-contained Java lab for practicing `jstack` and `jcmd` against a JVM with intentional contention and clearly separated thread states.
 
----
+## Getting Started
 
-## What It Does
+### 1. Compile And Run
 
-### 1. Intentional Lock Contention
+From the `threads/` directory:
 
-The core behavior is deliberately broken by design.
+```bash
+javac Lab.java
+java Lab
+```
 
-- At startup, **4 worker threads** (`lab-worker-*`) are created immediately.
-- A `ScheduledExecutorService` then **adds one more thread every 5 seconds** for the duration of the run.
-- Each worker runs this loop forever:
-  1. Acquire `LOCK` (a plain `Object` monitor)
-  2. **Do 30 ms of CPU-busy work while holding the lock** — this is intentionally bad
-  3. Release `LOCK`
-  4. Sleep 20 ms
-  5. Repeat
+The app prints its PID and tells you which thread names to inspect.
 
-As threads accumulate, the majority are in `BLOCKED` state waiting for `LOCK` while one thread burns CPU inside it. This is classic **monitor contention** — exactly what you'd diagnose in a real performance incident.
+### 2. Capture A Thread Dump
 
-### 2. Memory Pressure / GC Trigger
+In another terminal, use either tool:
 
-The main thread allocates **200 × 256 KB ≈ 50 MB** of short-lived byte arrays in a tight loop (10 ms apart). This is enough to stress the Young generation and trigger GC events, making heap metrics observable.
+```bash
+jcmd <pid> Thread.print
+```
 
-### 3. Metrics HTTP Server (port 8080)
+or:
 
-A lightweight `com.sun.net.httpserver.HttpServer` serves `GET /metrics` as JSON. The payload includes:
+```bash
+jstack <pid>
+```
 
-| Field | Description |
-|---|---|
-| `heapUsed` / `heapMax` | Current heap consumption |
-| `liveThreads` / `daemonThreads` | JVM thread counts from `ThreadMXBean` |
-| `totalStartedThreads` | Cumulative threads started since JVM boot |
-| `submittedTasks` | How many contention threads have been added |
-| `appThreadNames` | Threads explicitly registered by this app |
-| `jvmThreadNames` | All other threads (GC, JIT compiler, finalizer, etc.) |
-| `stdout` | Last 2000 lines of program output (live log buffer) |
+If you want to save the dump for annotation:
 
-CORS header `Access-Control-Allow-Origin: *` is set so a browser page can poll it directly.
+```bash
+jcmd <pid> Thread.print > dump.txt
+```
 
-### 4. stdout Capture (Tee Stream)
+### 3. Scenario: `BLOCKED` On A Synchronized Counter
 
-`installOutCapture()` replaces `System.out` with a custom `OutputStream` that:
-- **Still writes to the real stdout** (terminal output is unaffected)
-- **Buffers every completed line** into `OUT_LINES` (capped at 2000 entries, guarded by `OUT_LOCK`)
+Goal: practice identifying monitor contention and the `waiting to lock` wording.
 
-This allows the `/metrics` endpoint to serve live log output to the D3 dashboard without any separate logging framework.
+Steps:
 
-### 5. App vs JVM Thread Distinction
+```bash
+jcmd <pid> Thread.print | grep -A 12 'counter-worker-'
+```
 
-Every thread created by the application is registered in `APP_THREAD_IDS` (a `ConcurrentHashMap`-backed set). The metrics handler uses this to split the live thread list into:
-- **App threads** — worker threads, the scheduler, the HTTP thread, main
-- **JVM internal threads** — GC threads, JIT compiler threads, reference handler, finalizer, signal dispatcher, etc.
+What to look for:
 
-Stale IDs are pruned on each metrics request (`APP_THREAD_IDS.retainAll(liveIds)`).
+- one `counter-worker-*` thread in `RUNNABLE`
+- several `counter-worker-*` threads in `BLOCKED`
+- monitor lines containing `waiting to lock <...>`
+- one thread holding the monitor with `locked <...>`
+- stack frames showing the hot path inside the synchronized section
 
-### 6. Lifecycle
+What this means:
 
-The program runs for **10 minutes** then performs a clean shutdown:
-- Stops the HTTP server
-- Shuts down the scheduler
-- Interrupts all contention threads
+- threads are competing to enter `synchronized (COUNTER_LOCK)`
+- the fix direction is reducing lock hold time or changing the locking design
 
----
+### 4. Scenario: `WAITING` On A Monitor
 
-## What It's Useful For
+Goal: practice identifying `waiting on` and separating it from lock-entry contention.
 
-This lab is a practical sandbox for learning the tools and techniques used to diagnose real JVM performance problems.
+Steps:
 
-### Thread Dump Analysis
-Run `jcmd <pid> Thread.print` or `jstack <pid>` from another terminal while the lab is running. You will see:
-- Most `lab-worker-*` threads in state `BLOCKED` waiting on `LOCK`
-- One thread in `RUNNABLE` doing CPU work inside `busyWork()`
-- All JVM internal threads (GC, JIT, etc.) visible alongside app threads
+```bash
+jcmd <pid> Thread.print | grep -A 12 'waiter-'
+```
 
-This is the canonical pattern for **lock contention** in a thread dump.
+What to look for:
 
-### Profiler / Async-profiler / JFR
-Attach a profiler to observe:
-- CPU time concentrated on the one thread holding `LOCK`
-- Wall-clock time showing all workers spending most time blocked
-- Growing thread count over time as the scheduler adds threads
+- `waiter-*` threads in `WAITING`
+- monitor lines containing `waiting on <...>`
+- stack frames showing `Object.wait`
 
-### Understanding Thread States
-The lab deliberately creates all three common thread states simultaneously:
-- `RUNNABLE` — the thread holding the lock doing `busyWork()`
-- `BLOCKED` — all other workers waiting to acquire `LOCK`
-- `TIMED_WAITING` — workers in `Thread.sleep(20)` after releasing the lock
+What this means:
 
-### GC Observation
-The allocation loop (50 MB of short-lived byte arrays) gives you GC events to observe via:
-- `jcmd <pid> GC.run` to force a collection
-- `-verbose:gc` JVM flag to see GC logs
-- JFR / VisualVM heap timeline
+- these threads are not blocked trying to enter the monitor
+- they already called `wait()` and are suspended until some other thread notifies them
+- the fix direction is coordination logic, missing notifications, or lifecycle problems
 
-### App vs JVM Thread Identification
-The metrics endpoint separates app-owned threads from JVM internal threads. This helps build intuition for what threads are "yours" vs. what the JVM itself creates (GC, JIT, reference handler, finalizer, signal dispatcher, etc.).
+### 5. Scenario: `TIMED_WAITING` After Work
 
-### D3 Live Dashboard
-The companion file `d3-demo/index.html` polls `http://localhost:8080/metrics` and renders:
-- Live heap usage
-- Thread count over time (total, app, JVM internal)
-- stdout log tail
+Goal: avoid confusing normal sleeping with contention.
 
-Open it in a browser while the lab runs to see metrics update in real time.
+Steps:
 
----
+```bash
+jcmd <pid> Thread.print | grep -A 12 'counter-worker-'
+```
 
-## Running the Lab
+What to look for:
+
+- some `counter-worker-*` threads in `TIMED_WAITING`
+- stack frames showing `Thread.sleep`
+
+What this means:
+
+- the thread is pausing after leaving the critical section
+- this is not the same as `BLOCKED` and usually is not a lock problem
+
+### 6. Scenario: Observe Metrics While Dumping Threads
+
+Goal: correlate what you see in the dump with live JVM metrics.
+
+Steps:
+
+```bash
+curl http://localhost:8080/metrics
+```
+
+For a cleaner view:
+
+```bash
+curl http://localhost:8080/metrics | jq .
+```
+
+What to look for:
+
+- `submittedTasks` increasing over time
+- `counterValue` increasing as workers acquire the lock
+- `appThreadNames` containing `counter-worker-*` and `waiter-*`
+- `liveThreads` growing as more counter workers are added
+
+### 7. Scenario: Read The Dump Format
+
+Goal: build fluency with the thread dump structure itself.
+
+For each thread entry, identify:
+
+- thread name
+- `tid`
+- `nid`
+- Java thread state
+- top stack frames
+- monitor lines: `locked`, `waiting to lock`, `waiting on`
+
+Use one `counter-worker-*` and one `waiter-*` as your reference pair:
+
+- `counter-worker-*` teaches monitor-entry contention
+- `waiter-*` teaches wait-set suspension
+
+### 8. Fast Comparison Checklist
+
+Use this when reviewing a dump quickly:
+
+- `BLOCKED` + `waiting to lock` = thread wants a monitor that another thread still owns
+- `WAITING` + `waiting on` = thread called a wait-style primitive and is awaiting a signal
+- `TIMED_WAITING` + `sleep` = thread is paused on purpose for a duration
+- `RUNNABLE` + `locked` = likely current owner of the hot monitor
+
+## Practice Goals
+
+- Practice with `jstack` and `jcmd Thread.print` on a sample app with known contention
+- Learn how to read a thread dump: thread name, `tid`, `nid`, state, stack frames, and monitor lines
+- Distinguish `BLOCKED` (`waiting to lock`) from `WAITING` (`waiting on`) and connect each state to the right cause
+
+## What The Lab Creates
+
+### 1. Contended Synchronized Counter
+
+The main contention path uses a shared monitor named `COUNTER_LOCK`.
+
+- Four `counter-worker-*` threads start immediately
+- One more `counter-worker-*` thread is added every 5 seconds
+- Each worker loops forever:
+  1. Enter `synchronized (COUNTER_LOCK)`
+  2. Increment a shared `counter`
+  3. Burn CPU for 30 ms while still holding the monitor
+  4. Exit the monitor
+  5. Sleep 20 ms
+
+This intentionally creates a bad pattern: one worker is inside the critical section while the others are `BLOCKED` trying to enter it.
+
+In a thread dump, this is the `waiting to lock` case.
+
+### 2. Explicit `WAITING` Threads
+
+The lab also creates three `waiter-*` threads.
+
+- Each thread enters `synchronized (WAIT_MONITOR)`
+- It then calls `WAIT_MONITOR.wait()`
+- No notifier wakes it up during normal execution
+
+These threads are not trying to acquire a busy lock. They already entered the monitor and then moved into the wait set. In a thread dump, this is the `waiting on` case and should show up as `WAITING`.
+
+### 3. Memory Pressure / GC Trigger
+
+The main thread allocates about 50 MB of short-lived byte arrays. This gives you heap movement and possible GC activity while you inspect the process.
+
+### 4. Metrics HTTP Server
+
+`GET http://localhost:8080/metrics` returns JSON with:
+
+- `heapUsed` / `heapMax`
+- `liveThreads` / `daemonThreads`
+- `totalStartedThreads`
+- `submittedTasks`
+- `counterValue`
+- `appThreadNames`
+- `jvmThreadNames`
+- `stdout`
+
+## What To Look For In A Dump
+
+Run one of these from another terminal:
+
+```bash
+jcmd <pid> Thread.print
+jstack <pid>
+```
+
+Then inspect:
+
+- `counter-worker-*`
+  These should usually be split between `RUNNABLE`, `BLOCKED`, and sometimes `TIMED_WAITING`
+- `waiter-*`
+  These should be `WAITING` on `WAIT_MONITOR`
+
+### Reading The Dump
+
+For each thread, identify:
+
+- Thread name
+- `tid`: JVM thread identifier in the dump
+- `nid`: native thread identifier
+- Java thread state
+- Top stack frames
+- Monitor lines such as:
+  - `waiting to lock <...>` for monitor entry contention
+  - `waiting on <...>` for `wait()` / parked style waiting
+  - `locked <...>` for currently owned monitors
+
+## State Mapping
+
+| State | Typical thread in this lab | Meaning | Likely fix in real systems |
+|---|---|---|---|
+| `RUNNABLE` | one `counter-worker-*` | Currently executing inside the synchronized block | reduce work in critical section |
+| `BLOCKED` | most `counter-worker-*` | Waiting to acquire `COUNTER_LOCK` | shorten lock hold time, reduce contention, redesign locking |
+| `WAITING` | all `waiter-*` | Waiting on `WAIT_MONITOR.wait()` after releasing the monitor | investigate missing signal / coordination flow |
+| `TIMED_WAITING` | some `counter-worker-*` | Sleeping for 20 ms after the critical section | usually intentional pause, not lock contention |
+
+## Why `BLOCKED` And `WAITING` Are Different
+
+`BLOCKED` means a thread is stuck at monitor entry. Another thread still owns the monitor it wants.
+
+`WAITING` means a thread voluntarily suspended itself with a wait-style primitive and is now waiting for another thread to signal or unpark it.
+
+Those lead to different fixes:
+
+- `BLOCKED`: focus on lock ownership, critical section duration, and contention hot spots
+- `WAITING`: focus on coordination logic, missing notifications, lifecycle bugs, and producer/consumer flow
+
+## Running The Lab
 
 ```bash
 # Compile
 javac Lab.java
 
-# Run (from the threads/ directory)
+# Run from the threads/ directory
 java Lab
 
-# In another terminal — take a thread dump
+# In another terminal
 jcmd $(jcmd | grep Lab | awk '{print $1}') Thread.print
-
-# Or check metrics directly
-curl http://localhost:8080/metrics | jq .
 ```
 
-Then open `d3-demo/index.html` in a browser for the live dashboard.
+The app also prints the PID and the expected thread names on startup.
 
----
-
-## Key Intentional Anti-Patterns
+## Intentional Anti-Patterns
 
 | Anti-pattern | Location | Why it's there |
 |---|---|---|
-| CPU work inside a synchronized block | `addContentionThread` → `busyWork(30)` | Maximises lock hold time, causing maximum contention |
-| Growing unbounded thread pool | `adder.scheduleAtFixedRate(...)` | Demonstrates thread count growth and its cost |
-| Short-lived large allocations | `trash.add(new byte[256KB])` | Triggers GC — makes heap metrics interesting |
-
-These are deliberate — the point is to observe and diagnose them, not to fix them.
+| CPU work inside a synchronized block | `counter-worker-*` loop | forces visible contention and `BLOCKED` threads |
+| Growing thread count | scheduled thread adder | makes contention worsen over time |
+| Waiters with no notifier | `waiter-*` loop | gives a stable `WAITING` example |
+| Short-lived large allocations | startup allocation loop | makes heap and GC behavior visible |

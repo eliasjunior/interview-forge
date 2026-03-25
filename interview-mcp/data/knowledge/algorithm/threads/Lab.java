@@ -11,12 +11,14 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class Lab {
-  static final Object LOCK = new Object();
+  static final Object COUNTER_LOCK = new Object();
+  static final Object WAIT_MONITOR = new Object();
   static final Object OUT_LOCK = new Object();
   static final Deque<String> OUT_LINES = new ArrayDeque<>();
   static final Set<Long> APP_THREAD_IDS = ConcurrentHashMap.newKeySet();
   static final int MAX_OUT_LINES = 2000;
   static volatile int submittedTasks = 0;
+  static volatile long counter = 0;
 
   public static void main(String[] args) throws Exception {
     installOutCapture();
@@ -24,8 +26,8 @@ public class Lab {
     printBasics();
     HttpServer metricsServer = startMetricsServer();
 
-    // Start with a few workers, then keep adding one thread every 5 seconds.
     List<Thread> contentionThreads = Collections.synchronizedList(new ArrayList<>());
+    List<Thread> waitingThreads = Collections.synchronizedList(new ArrayList<>());
     ScheduledExecutorService adder = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "thread-adder");
       t.setDaemon(true);
@@ -35,9 +37,11 @@ public class Lab {
     for (int i = 0; i < 4; i++) {
       addContentionThread(contentionThreads);
     }
+    for (int i = 0; i < 3; i++) {
+      addWaitingThread(waitingThreads);
+    }
     adder.scheduleAtFixedRate(() -> addContentionThread(contentionThreads), 5, 5, TimeUnit.SECONDS);
 
-    // 2) Allocate memory to trigger GC
     List<byte[]> trash = new ArrayList<>();
     for (int i = 0; i < 200; i++) {
       trash.add(new byte[1024 * 256]); // 256KB
@@ -46,18 +50,18 @@ public class Lab {
 
     print("\nApp running. PID=" + ProcessHandle.current().pid());
     print("Metrics endpoint: http://localhost:8080/metrics");
-    print("D3 page file: java/threads/d3-demo/index.html");
-    print("Adding one contention thread every 5 seconds.");
-    print("Now take thread dumps / strace/jcmd from another terminal.");
+    print("Adding one counter contention thread every 5 seconds.");
+    print("Take a dump with: jcmd " + ProcessHandle.current().pid() + " Thread.print");
+    print("Or: jstack " + ProcessHandle.current().pid());
+    print("Look for counter-worker-* threads in BLOCKED or RUNNABLE.");
+    print("Look for waiter-* threads in WAITING on WAIT_MONITOR.");
+    print("Read dump fields: thread name, tid, nid, state, stack frames, and monitor lines.");
     Thread.sleep(Duration.ofMinutes(10).toMillis());
 
     metricsServer.stop(0);
     adder.shutdownNow();
-    synchronized (contentionThreads) {
-      for (Thread t : contentionThreads) {
-        t.interrupt();
-      }
-    }
+    interruptThreads(contentionThreads);
+    interruptThreads(waitingThreads);
   }
 
   static void printBasics() {
@@ -91,7 +95,8 @@ public class Lab {
   static void addContentionThread(List<Thread> threads) {
     Thread worker = new Thread(() -> {
       while (!Thread.currentThread().isInterrupted()) {
-        synchronized (LOCK) {
+        synchronized (COUNTER_LOCK) {
+          counter++;
           busyWork(30); // CPU work while holding lock (bad on purpose)
         }
         try {
@@ -100,12 +105,30 @@ public class Lab {
           Thread.currentThread().interrupt();
         }
       }
-    }, "lab-worker-" + System.nanoTime());
+    }, "counter-worker-" + System.nanoTime());
     registerAppThread(worker);
     worker.start();
     threads.add(worker);
     submittedTasks++;
     print("Added thread: " + worker.getName() + " (total added: " + submittedTasks + ")");
+  }
+
+  static void addWaitingThread(List<Thread> threads) {
+    Thread waiter = new Thread(() -> {
+      while (!Thread.currentThread().isInterrupted()) {
+        synchronized (WAIT_MONITOR) {
+          try {
+            WAIT_MONITOR.wait();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+      }
+    }, "waiter-" + System.nanoTime());
+    registerAppThread(waiter);
+    waiter.start();
+    threads.add(waiter);
+    print("Added waiting thread: " + waiter.getName() + " (waiting on WAIT_MONITOR)");
   }
 
   static HttpServer startMetricsServer() throws Exception {
@@ -159,6 +182,7 @@ public class Lab {
         .append(",\"daemonThreads\":").append(daemonThreads)
         .append(",\"totalStartedThreads\":").append(totalStartedThreads)
         .append(",\"submittedTasks\":").append(submittedTasks)
+        .append(",\"counterValue\":").append(counter)
         .append(",\"appThreadCount\":").append(appThreadNames.size())
         .append(",\"jvmThreadCount\":").append(jvmThreadNames.size());
     json.append(",\"appThreadNames\":");
@@ -217,6 +241,14 @@ public class Lab {
 
   static void registerAppThread(Thread t) {
     APP_THREAD_IDS.add(t.threadId());
+  }
+
+  static void interruptThreads(List<Thread> threads) {
+    synchronized (threads) {
+      for (Thread t : threads) {
+        t.interrupt();
+      }
+    }
   }
 
   static void appendJsonStringArray(StringBuilder json, List<String> values) {

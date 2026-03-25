@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AIProvider } from "./port.js";
 import type { Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
+import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AnthropicAIProvider — adapter
@@ -61,6 +62,10 @@ function fallbackEvaluate(answer: string): EvaluationResult {
   return {
     score,
     feedback: feedbacks[score],
+    strongAnswer: buildStrongAnswer({
+      feedback: feedbacks[score],
+      answer,
+    }),
     needsFollowUp: score <= 3,
     followUpQuestion: score <= 3 ? "Can you elaborate further and give a concrete example?" : undefined,
     deeperDive: undefined, // fallback — no AI available to generate deeper dive
@@ -152,6 +157,7 @@ Evaluate this answer and return a JSON object with exactly these fields:
 {
   "score": <integer 1-5>,
   "feedback": "<one specific, actionable sentence>",
+  "strongAnswer": "<a concise corrected or stronger answer the candidate should study>",
   "needsFollowUp": <true if score is 3 or below>,
   "followUpQuestion": "<a probing follow-up question, or null if not needed>",
   "deeperDive": "<3–5 bullet points on what to study deeper, format: - **concept** → one-sentence explanation, separated by \\n>"
@@ -163,6 +169,11 @@ Evaluate this answer and return a JSON object with exactly these fields:
       const result = parseJSON<EvaluationResult>(text);
       result.score = Math.max(1, Math.min(5, Math.round(result.score)));
       result.needsFollowUp = result.score <= 3;
+      result.strongAnswer = buildStrongAnswer({
+        criteria: context,
+        feedback: result.feedback,
+        answer: result.strongAnswer ?? answer,
+      });
       return result;
     } catch (err) {
       console.error("[AnthropicAIProvider] evaluateAnswer failed, using fallback:", err);

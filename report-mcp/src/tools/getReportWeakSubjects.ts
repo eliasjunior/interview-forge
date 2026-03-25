@@ -3,16 +3,18 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerGetReportWeakSubjectsTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "get_report_weak_subjects",
-    "Get weak-question context from a completed interview report. Use this to write strong answers (max 3 lines each), then call generate_report_ui.",
     {
-      sessionId: z.string().optional().describe("Completed session ID (preferred when known)"),
-      topic: z.string().optional().describe("Topic name; when provided, uses the most recent ended session for this topic"),
-      weakScoreThreshold: z.number().int().min(1).max(5).default(3)
-        .describe("Treat scores <= this threshold as weak"),
-      maxSubjects: z.number().int().min(1).max(10).default(5)
-        .describe("Maximum number of weak subjects to return"),
+      description: "Get weak-question context from a completed interview report. Use this to write strong answers (max 3 lines each), then call generate_report_ui.",
+      inputSchema: {
+        sessionId: z.string().optional().describe("Completed session ID (preferred when known)"),
+        topic: z.string().optional().describe("Topic name; when provided, uses the most recent ended session for this topic"),
+        weakScoreThreshold: z.number().int().min(1).max(5).default(3)
+          .describe("Treat scores <= this threshold as weak"),
+        maxSubjects: z.number().int().min(1).max(10).default(5)
+          .describe("Maximum number of weak subjects to return"),
+      },
     },
     async ({ sessionId, topic, weakScoreThreshold, maxSubjects }) => {
       if (!sessionId && !topic) {

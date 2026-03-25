@@ -2,10 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolDeps } from "./deps.js";
 
 export function registerListTopicsTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "list_topics",
-    "List topics that have curated knowledge files. These topics use pre-built questions and concepts — no AI API call needed.",
-    {},
+    { description: "List topics that have curated knowledge files. These topics use pre-built questions and concepts — no AI API call needed." },
     async () => {
       const topics = deps.knowledge.listTopics();
       return {

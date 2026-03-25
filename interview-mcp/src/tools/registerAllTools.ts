@@ -26,6 +26,8 @@ import { registerPracticeMicroSkillTool } from "./practiceMicroSkill.js";
 import { registerCreateExerciseTool } from "./createExercise.js";
 import { registerListExercisesTool } from "./listExercises.js";
 import { registerBuildScopeTool } from "./buildScope.js";
+import { registerDeleteSessionTool } from "./deleteSession.js";
+import { registerGenerateFlashcardVariationTool } from "./generateFlashcardVariation.js";
 
 export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerServerStatusTool(server, deps);
@@ -54,4 +56,6 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerCreateExerciseTool(server, deps);
   registerListExercisesTool(server, deps);
   registerBuildScopeTool(server, deps);
+  registerDeleteSessionTool(server, deps);
+  registerGenerateFlashcardVariationTool(server, deps);
 }

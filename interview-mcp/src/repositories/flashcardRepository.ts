@@ -6,4 +6,5 @@ export interface FlashcardRepository {
   save(card: Flashcard): void;
   saveMany(cards: Flashcard[]): void;
   replaceAll(cards: Flashcard[]): void;
+  deleteBySourceSessionId(sessionId: string): number;
 }

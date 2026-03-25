@@ -3,15 +3,17 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolDeps } from "./deps.js";
 
 export function registerListExercisesTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "list_exercises",
-    "List practice exercises in the knowledge center. " +
-    "Filter by topic or max difficulty to find what to work on next. " +
-    "Returns exercises sorted by difficulty ascending, with prerequisite chains intact.",
     {
-      topic: z.string().optional().describe("Filter by knowledge topic slug, e.g. 'java-concurrency', 'jwt'"),
-      maxDifficulty: z.number().int().min(1).max(5).optional().describe("Only return exercises with difficulty ≤ this value"),
-      tags: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).optional()).describe("Only return exercises containing all of these tags, e.g. ['matrix', '2d-indexing']"),
+      description: "List practice exercises in the knowledge center. " +
+      "Filter by topic or max difficulty to find what to work on next. " +
+      "Returns exercises sorted by difficulty ascending, with prerequisite chains intact.",
+      inputSchema: {
+        topic: z.string().optional().describe("Filter by knowledge topic slug, e.g. 'java-concurrency', 'jwt'"),
+        maxDifficulty: z.number().int().min(1).max(5).optional().describe("Only return exercises with difficulty ≤ this value"),
+        tags: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).optional()).describe("Only return exercises containing all of these tags, e.g. ['matrix', '2d-indexing']"),
+      },
     },
     async ({ topic, maxDifficulty, tags }) => {
       const list = deps.loadExercises(topic, maxDifficulty, tags);

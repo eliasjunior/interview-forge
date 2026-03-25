@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as d3 from 'd3'
-import { getGraph } from '../api'
-import type { KnowledgeGraph, GraphNode, GraphEdge } from '@mock-interview/shared'
+import { getGraph, inspectGraphNodes } from '../api'
+import type { KnowledgeGraph, GraphNode, GraphEdge, GraphInspectionResult } from '@mock-interview/shared'
 
 // ── Cluster colours ────────────────────────────────────────────────────────
 const CLUSTER_COLOR: Record<string, string> = {
@@ -60,6 +60,27 @@ export default function GraphPage() {
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([])
+  const [inspection, setInspection] = useState<GraphInspectionResult | null>(null)
+  const [inspectionLoading, setInspectionLoading] = useState(false)
+  const [inspectionError, setInspectionError] = useState<string | null>(null)
+
+  const selectedNodeById = useMemo(
+    () => new Map((inspection?.selectedNodes ?? []).map(node => [node.id, node])),
+    [inspection]
+  )
+  const semanticEdges = useMemo(
+    () => inspection?.directEdges.filter(edge => edge.kind === 'semantic') ?? [],
+    [inspection]
+  )
+  const strongCooccurrenceEdges = useMemo(
+    () => inspection?.directEdges.filter(edge => edge.kind === 'cooccurrence' && edge.weight > 1) ?? [],
+    [inspection]
+  )
+  const lowSignalCooccurrenceCount = useMemo(
+    () => inspection?.directEdges.filter(edge => edge.kind === 'cooccurrence' && edge.weight <= 1).length ?? 0,
+    [inspection]
+  )
 
   useEffect(() => {
     getGraph()
@@ -185,6 +206,13 @@ export default function GraphPage() {
           .style('left', `${event.clientX - containerRect.left + 14}px`)
           .style('top',  `${event.clientY - containerRect.top  - 12}px`)
       })
+      .on('click', (_, d) => {
+        setSelectedNodeIds(prev =>
+          prev.includes(d.id)
+            ? prev.filter(id => id !== d.id)
+            : [...prev, d.id]
+        )
+      })
       .on('mouseleave', () => tooltip.style('display', 'none'))
 
     // ── Tick ──────────────────────────────────────────────────────────────
@@ -245,6 +273,47 @@ export default function GraphPage() {
     }
   }, [activeFilter])
 
+  // ── Apply selected-node highlight ──────────────────────────────────────
+  useEffect(() => {
+    const nodeSel = nodeSelRef.current
+    if (!nodeSel) return
+
+    const hasSelection = selectedNodeIds.length > 0
+
+    nodeSel.select('circle')
+      .attr('stroke', d => selectedNodeIds.includes(d.id) ? '#fff4b3' : nodeColor(d))
+      .attr('stroke-width', d => selectedNodeIds.includes(d.id) ? 4 : 2)
+      .attr('stroke-opacity', d => selectedNodeIds.includes(d.id) ? 1 : 0.4)
+      .attr('fill-opacity', d => {
+        if (!hasSelection) return d.clusters.includes(activeFilter ?? '') || activeFilter === null ? 0.85 : 0.12
+        return selectedNodeIds.includes(d.id) ? 1 : 0.22
+      })
+
+    nodeSel.select('text')
+      .attr('font-weight', d => selectedNodeIds.includes(d.id) ? 700 : 400)
+      .attr('fill-opacity', d => {
+        if (!hasSelection) return d.clusters.includes(activeFilter ?? '') || activeFilter === null ? 1 : 0.18
+        return selectedNodeIds.includes(d.id) ? 1 : 0.32
+      })
+  }, [selectedNodeIds, activeFilter])
+
+  const selectedNodes = graph
+    ? graph.nodes.filter(node => selectedNodeIds.includes(node.id))
+    : []
+
+  async function openInspection() {
+    if (selectedNodeIds.length === 0) return
+    setInspectionLoading(true)
+    setInspectionError(null)
+    try {
+      setInspection(await inspectGraphNodes(selectedNodeIds))
+    } catch (e) {
+      setInspectionError(String(e))
+    } finally {
+      setInspectionLoading(false)
+    }
+  }
+
   return (
     <div className="graph-page">
       {/* ── Header ──────────────────────────────────────────────────── */}
@@ -280,6 +349,29 @@ export default function GraphPage() {
             )}
           </div>
         )}
+
+        {selectedNodes.length > 0 && (
+          <div className="graph-filter-row">
+            <span className="graph-filter-label">Selected</span>
+            {selectedNodes.map(node => (
+              <button
+                key={node.id}
+                className="legend-filter-btn active"
+                style={{ '--cluster-color': nodeColor(node) } as React.CSSProperties}
+                onClick={() => setSelectedNodeIds(prev => prev.filter(id => id !== node.id))}
+              >
+                <span className="legend-dot" style={{ background: nodeColor(node) }} />
+                {node.label}
+              </button>
+            ))}
+            <button className="legend-filter-clear" onClick={() => setSelectedNodeIds([])}>
+              ✕ clear selected
+            </button>
+            <button className="graph-action-btn" onClick={openInspection}>
+              Inspect selected
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── States ──────────────────────────────────────────────────── */}
@@ -307,6 +399,241 @@ export default function GraphPage() {
           </div>
         </div>
       )}
+
+      {(inspectionLoading || inspection || inspectionError) && (
+        <div className="graph-modal-backdrop" onClick={() => {
+          if (inspectionLoading) return
+          setInspection(null)
+          setInspectionError(null)
+        }}>
+          <div className="graph-modal" onClick={e => e.stopPropagation()}>
+            <div className="graph-modal-header">
+              <div>
+                <h2 className="page-title">Selected Concept Evidence</h2>
+                <p className="page-subtitle">
+                  {selectedNodeIds.length} selected concepts
+                </p>
+              </div>
+              <button
+                className="legend-filter-clear"
+                onClick={() => {
+                  setInspection(null)
+                  setInspectionError(null)
+                }}
+              >
+                ✕ close
+              </button>
+            </div>
+
+            {inspectionLoading && <div className="loading">Loading selected-node evidence…</div>}
+            {inspectionError && <div className="error-msg">Failed to inspect selected nodes: {inspectionError}</div>}
+
+            {!inspectionLoading && inspection && (
+              <div className="graph-modal-body">
+                <section className="graph-modal-section">
+                  <div className="fc-section-label">Relationship Summary</div>
+                  <div className="graph-chip-row">
+                    {inspection.selectedNodes.map(node => (
+                      <span key={node.id} className="legend-filter-btn active" style={{ '--cluster-color': nodeColor(node) } as React.CSSProperties}>
+                        <span className="legend-dot" style={{ background: nodeColor(node) }} />
+                        {node.label}
+                      </span>
+                    ))}
+                  </div>
+
+                  {inspection.directEdges.length > 0 ? (
+                    <div className="graph-inspection-list">
+                      {semanticEdges.map(edge => (
+                        <RelationshipCard
+                          key={`${edge.source}-${edge.target}-${edge.kind}-${edge.relation}`}
+                          edge={edge}
+                          sourceLabel={selectedNodeById.get(edge.source)?.label ?? edge.source}
+                          targetLabel={selectedNodeById.get(edge.target)?.label ?? edge.target}
+                        />
+                      ))}
+                      {strongCooccurrenceEdges.map(edge => (
+                        <RelationshipCard
+                          key={`${edge.source}-${edge.target}-${edge.kind}-${edge.relation}`}
+                          edge={edge}
+                          sourceLabel={selectedNodeById.get(edge.source)?.label ?? edge.source}
+                          targetLabel={selectedNodeById.get(edge.target)?.label ?? edge.target}
+                        />
+                      ))}
+                      {semanticEdges.length === 0 && strongCooccurrenceEdges.length === 0 && (
+                        <div className="summary-box graph-inspection-card">
+                          These concepts only show up together in one-off interview evidence, so the raw graph links are hidden here.
+                        </div>
+                      )}
+                      {lowSignalCooccurrenceCount > 0 && (
+                        <div className="legend-hint">
+                          Hidden {lowSignalCooccurrenceCount} low-signal graph link{lowSignalCooccurrenceCount === 1 ? '' : 's'}.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="summary-box">No direct relationship is stored yet between these selected concepts.</div>
+                  )}
+                </section>
+
+                <section className="graph-modal-section">
+                  <div className="fc-section-label">Shared Interview Evidence</div>
+                  {inspection.sessionsMatchingAll.length > 0 ? (
+                    <div className="graph-inspection-list">
+                      {inspection.sessionsMatchingAll.map(session => (
+                        <div key={session.sessionId} className="summary-box graph-inspection-card">
+                          <strong>{session.topic}</strong>
+                          <div className="legend-hint">{new Date(session.createdAt).toLocaleString()}</div>
+                          <div className="graph-chip-row">
+                            {session.selectedConcepts.map(concept => (
+                              <span key={concept.id} className="legend-filter-btn active" style={{ '--cluster-color': nodeColor(concept as GraphNode) } as React.CSSProperties}>
+                                <span className="legend-dot" style={{ background: nodeColor(concept as GraphNode) }} />
+                                {concept.label}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="graph-inspection-question-list">
+                            {session.questions.map(question => (
+                              <InspectionQuestionCard
+                                key={`${session.sessionId}-${question.questionIndex}`}
+                                question={question}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="summary-box">No single completed interview session includes all of these concepts together yet.</div>
+                  )}
+                </section>
+
+                <section className="graph-modal-section">
+                  <div className="fc-section-label">Related Interview Evidence</div>
+                  {inspection.sessionsMatchingAny.length > 0 ? (
+                    <div className="graph-inspection-list">
+                      {inspection.sessionsMatchingAny.map(session => (
+                        <div key={session.sessionId} className="summary-box graph-inspection-card">
+                          <strong>{session.topic}</strong>
+                          <div className="legend-hint">{new Date(session.createdAt).toLocaleString()}</div>
+                          <div className="graph-chip-row">
+                            {session.selectedConcepts.map(concept => (
+                              <span key={concept.id} className="legend-filter-btn active" style={{ '--cluster-color': nodeColor(concept as GraphNode) } as React.CSSProperties}>
+                                <span className="legend-dot" style={{ background: nodeColor(concept as GraphNode) }} />
+                                {concept.label}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="graph-inspection-question-list">
+                            {session.questions.map(question => (
+                              <InspectionQuestionCard
+                                key={`${session.sessionId}-${question.questionIndex}`}
+                                question={question}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="summary-box">No additional related interview evidence was found beyond the shared sessions above.</div>
+                  )}
+                </section>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function RelationshipCard({
+  edge,
+  sourceLabel,
+  targetLabel,
+}: {
+  edge: GraphEdge
+  sourceLabel: string
+  targetLabel: string
+}) {
+  if (edge.kind === 'semantic') {
+    return (
+      <div className="summary-box graph-inspection-card graph-relationship-card semantic">
+        <div className="graph-relationship-title">
+          <strong>{sourceLabel}</strong> {humanizeRelation(edge.relation)} <strong>{targetLabel}</strong>
+        </div>
+        <div className="legend-hint">Semantic relationship</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="summary-box graph-inspection-card graph-relationship-card cooccurrence">
+      <div className="graph-relationship-title">
+        <strong>{sourceLabel}</strong> and <strong>{targetLabel}</strong> appeared together in {edge.weight} session{edge.weight === 1 ? '' : 's'}.
+      </div>
+      <div className="legend-hint">Repeated co-occurrence</div>
+    </div>
+  )
+}
+
+function humanizeRelation(relation: string): string {
+  switch (relation) {
+    case 'diagnoses':
+      return 'helps diagnose'
+    case 'inspects':
+      return 'helps inspect'
+    case 'applies-to':
+      return 'applies to'
+    default:
+      return relation.replace(/-/g, ' ')
+  }
+}
+
+function InspectionQuestionCard({
+  question,
+}: {
+  question: GraphInspectionResult['sessionsMatchingAll'][number]['questions'][number]
+}) {
+  return (
+    <div className="graph-inspection-question-card">
+      <div className="graph-inspection-question-header">
+        <div className="graph-inspection-question-title">
+          <span className="graph-inspection-question-index">Q{question.questionIndex + 1}</span>
+          <span>{question.question}</span>
+        </div>
+        {question.score != null && (
+          <span className={`graph-inspection-score-badge score-${scoreTone(question.score)}`}>
+            {question.score}/5
+          </span>
+        )}
+      </div>
+
+      {question.answer && (
+        <div className="graph-inspection-answer">
+          <div className="graph-inspection-label">Your answer</div>
+          <div>{question.answer}</div>
+        </div>
+      )}
+
+      {question.strongAnswer && (
+        <div className="graph-inspection-strong-answer">
+          <div className="graph-inspection-label">Stronger answer</div>
+          <div>{question.strongAnswer}</div>
+        </div>
+      )}
+
+      {!question.strongAnswer && question.score != null && question.score < 4 && (
+        <div className="graph-inspection-missing-answer">
+          No corrected answer was stored for this interview item.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function scoreTone(score: number) {
+  if (score <= 2) return 'weak'
+  if (score === 3) return 'mid'
+  return 'strong'
 }

@@ -3,10 +3,9 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "ask_question",
-    "Present the current interview question to the candidate. Valid in state: ASK_QUESTION.",
-    { sessionId: z.string() },
+    { description: "Present the current interview question to the candidate. Valid in state: ASK_QUESTION.", inputSchema: { sessionId: z.string() } },
     async ({ sessionId }) => {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];

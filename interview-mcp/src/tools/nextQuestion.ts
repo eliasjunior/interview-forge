@@ -3,10 +3,9 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "next_question",
-    "Advance to the next question, or end the interview if all questions are done. Valid in state: FOLLOW_UP.",
-    { sessionId: z.string() },
+    { description: "Advance to the next question, or end the interview if all questions are done. Valid in state: FOLLOW_UP.", inputSchema: { sessionId: z.string() } },
     async ({ sessionId }) => {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];

@@ -2,7 +2,9 @@ import { z } from "zod";
 import fs from "fs";
 import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Exercise, ExercisePrerequisite } from "@mock-interview/shared";
+import type { Exercise } from "@mock-interview/shared";
+import { assessComplexity } from "../exercises/assessment.js";
+import { buildExerciseMarkdown, DIFFICULTY_LABELS } from "../exercises/markdown.js";
 import type { ToolDeps } from "./deps.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,14 +18,6 @@ import type { ToolDeps } from "./deps.js";
 // OCP: entirely additive — zero changes to existing tools.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DIFFICULTY_LABELS: Record<number, string> = {
-  1: "Trivial",
-  2: "Easy",
-  3: "Medium",
-  4: "Hard",
-  5: "Very Hard",
-};
-
 function toSlug(name: string): string {
   return name
     .toLowerCase()
@@ -31,129 +25,35 @@ function toSlug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function buildExerciseMarkdown(exercise: Exercise, opts: {
-  learningGoal: string;
-  problemStatement: string;
-  steps: string[];
-  evaluationCriteria: string[];
-  hints: string[];
-  relatedConcepts: string[];
-}): string {
-  const diffLabel = DIFFICULTY_LABELS[exercise.difficulty] ?? "Medium";
-  const tagSection = exercise.tags.length > 0 ? exercise.tags.join(", ") : "_None_";
-  const prereqSection = exercise.prerequisites.length > 0
-    ? exercise.prerequisites.map((p) => `- **${p.name}** — ${p.reason}`).join("\n")
-    : "_None — this is a self-contained exercise._";
-
-  const stepsSection = opts.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  const evalSection = opts.evaluationCriteria.map((c) => `- ${c}`).join("\n");
-  const hintsSection = opts.hints.length > 0
-    ? opts.hints.map((h) => `- ${h}`).join("\n")
-    : "_No hints — try to work through it first._";
-  const conceptsSection = opts.relatedConcepts.map((c) => `- ${c}`).join("\n");
-  const meaningSection = exercise.problemMeaning.map((m) => `- ${m}`).join("\n");
-
-  return `# Exercise: ${exercise.name}
-
-## Topic / Language / Difficulty
-**Topic:** ${exercise.topic}
-**Language:** ${exercise.language}
-**Difficulty:** ${exercise.difficulty}/5 — ${diffLabel}
-**Tags:** ${tagSection}
-
-## Real-World Context
-**Scenario:** ${exercise.scenario}
-
-### Why this matters in production
-${meaningSection}
-
-## Learning Goal
-${opts.learningGoal}
-
-## Prerequisites
-${prereqSection}
-
-## Problem Statement
-${opts.problemStatement}
-
-## Implementation Steps
-${stepsSection}
-
-## What a Good Solution Looks Like
-${evalSection}
-
-## Hints
-${hintsSection}
-
-## Related Concepts
-${conceptsSection}
-`;
-}
-
-function assessComplexity(
-  difficulty: number,
-  prerequisites: ExercisePrerequisite[],
-  existingExercises: Exercise[]
-): {
-  tooHard: boolean;
-  reason: string | null;
-  unmetPrerequisites: string[];
-  roadmap: Array<{ order: number; name: string; difficulty: number; reason: string }>;
-} {
-  const existingNames = new Set(existingExercises.map((e) => e.name));
-  const unmetPrerequisites = prerequisites
-    .map((p) => p.name)
-    .filter((name) => !existingNames.has(name));
-
-  // Build roadmap: resolved prereqs (ordered by difficulty) + this exercise at end
-  const resolvedPrereqs = prerequisites
-    .map((p) => {
-      const found = existingExercises.find((e) => e.name === p.name);
-      return { name: p.name, difficulty: found?.difficulty ?? 0, reason: p.reason };
-    })
-    .sort((a, b) => a.difficulty - b.difficulty);
-
-  const roadmap = [
-    ...resolvedPrereqs.map((p, i) => ({ order: i + 1, name: p.name, difficulty: p.difficulty, reason: p.reason })),
-  ];
-
-  const tooHard = difficulty >= 4 || unmetPrerequisites.length > 0;
-  const reason = tooHard
-    ? unmetPrerequisites.length > 0
-      ? `Prerequisites not yet created: ${unmetPrerequisites.join(", ")}`
-      : `Difficulty ${difficulty}/5 — recommend completing prerequisites first`
-    : null;
-
-  return { tooHard, reason, unmetPrerequisites, roadmap };
-}
-
 export function registerCreateExerciseTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "create_exercise",
-    "Create a structured practice exercise in the knowledge center. " +
-    "The tool writes a rich .md file under data/knowledge/exercises/<topic>/, persists metadata, " +
-    "and returns complexity signals + a progression roadmap so you can reason about whether to " +
-    "start this exercise directly or propose simpler prerequisite exercises first. " +
-    "If the exercise is too hard (difficulty ≥ 4 or unmet prerequisites), show the roadmap to the candidate.",
     {
-      name: z.string().min(1).describe("Exercise name, e.g. 'RaceConditionLab'"),
-      topic: z.string().min(1).describe("Knowledge topic slug, e.g. 'java-concurrency', 'jwt'"),
-      language: z.string().default("java").describe("Programming language: 'java' | 'typescript' | 'python' | 'any'"),
-      difficulty: z.preprocess((v) => typeof v === "string" ? parseInt(v, 10) : v, z.number().int().min(1).max(5)).describe("1=Trivial, 2=Easy, 3=Medium, 4=Hard, 5=Very Hard"),
-      description: z.string().min(1).describe("One-line summary of what the exercise practices"),
-      scenario: z.string().min(1).describe("Real-world system this exercise is drawn from, e.g. 'Background email/job processing system'"),
-      problemMeaning: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("Why this matters in production — 2-4 bullet points explaining the real problem it solves"),
-      tags: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Optional grouping labels, e.g. ['matrix', '2d-indexing', 'array-traversal']"),
-      learningGoal: z.string().min(1).describe("What the candidate will understand after completing this exercise"),
-      problemStatement: z.string().min(1).describe("What to build — the concrete problem to solve"),
-      steps: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("Incremental implementation steps from simplest to complete"),
-      evaluationCriteria: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("What a good solution must demonstrate"),
-      hints: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Optional hints — shown only when stuck"),
-      relatedConcepts: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Concept links back to the knowledge file, e.g. 'java-concurrency.md: race condition, atomicity'"),
-      prerequisites: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.object({
-        name: z.string().describe("Exercise name that must be done first"),
-        reason: z.string().describe("Why this is a prerequisite"),
-      })).default([])).describe("Simpler exercises that should be completed before this one"),
+      description: "Create a structured practice exercise in the knowledge center. " +
+      "The tool writes a rich .md file under data/knowledge/exercises/<topic>/, persists metadata, " +
+      "and returns complexity signals + a progression roadmap so you can reason about whether to " +
+      "start this exercise directly or propose simpler prerequisite exercises first. " +
+      "If the exercise is too hard (difficulty ≥ 4 or unmet prerequisites), show the roadmap to the candidate.",
+      inputSchema: {
+        name: z.string().min(1).describe("Exercise name, e.g. 'RaceConditionLab'"),
+        topic: z.string().min(1).describe("Knowledge topic slug, e.g. 'java-concurrency', 'jwt'"),
+        language: z.string().default("java").describe("Programming language: 'java' | 'typescript' | 'python' | 'any'"),
+        difficulty: z.preprocess((v) => typeof v === "string" ? parseInt(v, 10) : v, z.number().int().min(1).max(5)).describe("1=Trivial, 2=Easy, 3=Medium, 4=Hard, 5=Very Hard"),
+        description: z.string().min(1).describe("One-line summary of what the exercise practices"),
+        scenario: z.string().min(1).describe("Real-world system this exercise is drawn from, e.g. 'Background email/job processing system'"),
+        problemMeaning: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("Why this matters in production — 2-4 bullet points explaining the real problem it solves"),
+        tags: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Optional grouping labels, e.g. ['matrix', '2d-indexing', 'array-traversal']"),
+        learningGoal: z.string().min(1).describe("What the candidate will understand after completing this exercise"),
+        problemStatement: z.string().min(1).describe("What to build — the concrete problem to solve"),
+        steps: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("Incremental implementation steps from simplest to complete"),
+        evaluationCriteria: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("What a good solution must demonstrate"),
+        hints: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Optional hints — shown only when stuck"),
+        relatedConcepts: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Concept links back to the knowledge file, e.g. 'java-concurrency.md: race condition, atomicity'"),
+        prerequisites: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.object({
+          name: z.string().describe("Exercise name that must be done first"),
+          reason: z.string().describe("Why this is a prerequisite"),
+        })).default([])).describe("Simpler exercises that should be completed before this one"),
+      },
     },
     async ({
       name,

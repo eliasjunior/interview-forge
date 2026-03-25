@@ -212,6 +212,40 @@ html, body, #root {
 }
 .btn-back:hover { color: var(--ink); }
 
+.page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(252, 165, 165, 0.45);
+  background: rgba(127, 29, 29, 0.28);
+  color: var(--danger);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(127, 29, 29, 0.42);
+  border-color: var(--danger);
+  color: #ffe1e1;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ── Tabs ──────────────────────────────────────────────────────────────────── */
 .tabs {
   display: flex;
@@ -553,6 +587,26 @@ html, body, #root {
 }
 .legend-filter-clear:hover { color: var(--ink); border-color: var(--muted); }
 
+.graph-action-btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s, transform .1s;
+  font-family: inherit;
+}
+
+.graph-action-btn:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  border-color: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
 /* ── Graph canvas ─────────────────────────────────────────────────────────── */
 .graph-container {
   flex: 1;
@@ -614,6 +668,184 @@ html, body, #root {
   color: var(--ink);
   max-width: 220px;
   box-shadow: var(--shadow);
+}
+
+.graph-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 14, 24, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 40;
+}
+
+.graph-modal {
+  width: min(980px, 100%);
+  max-height: min(88vh, 920px);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.graph-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.graph-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.graph-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.graph-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.graph-inspection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.graph-inspection-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.graph-relationship-card {
+  gap: 6px;
+}
+
+.graph-relationship-card.semantic {
+  border-left: 4px solid #2f6fed;
+}
+
+.graph-relationship-card.cooccurrence {
+  border-left: 4px solid #c7d2e3;
+}
+
+.graph-relationship-title {
+  line-height: 1.45;
+}
+
+.graph-inspection-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.graph-inspection-question-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card-elev) 85%, white 15%);
+}
+
+.graph-inspection-question-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.graph-inspection-question-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.45;
+}
+
+.graph-inspection-question-index {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.graph-inspection-score-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.graph-inspection-score-badge.score-weak {
+  background: color-mix(in srgb, #f87171 16%, transparent);
+  color: #7f1d1d;
+  border-color: color-mix(in srgb, #f87171 40%, transparent);
+}
+
+.graph-inspection-score-badge.score-mid {
+  background: color-mix(in srgb, #f59e0b 16%, transparent);
+  color: #854d0e;
+  border-color: color-mix(in srgb, #f59e0b 40%, transparent);
+}
+
+.graph-inspection-score-badge.score-strong {
+  background: color-mix(in srgb, #34d399 16%, transparent);
+  color: #065f46;
+  border-color: color-mix(in srgb, #34d399 40%, transparent);
+}
+
+.graph-inspection-label {
+  margin-bottom: 4px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.graph-inspection-answer {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.graph-inspection-strong-answer {
+  color: var(--ink);
+  line-height: 1.6;
+  padding: 10px 12px;
+  border-left: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 0 10px 10px 0;
+}
+
+.graph-inspection-missing-answer {
+  color: var(--muted);
+  font-style: italic;
 }
 
 /* ── Empty state ───────────────────────────────────────────────────────────── */
@@ -969,6 +1201,44 @@ html, body, #root {
   padding: 1px 5px;
   font-size: 0.85em;
   color: #93c5fd;
+}
+
+.mistakes-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.mistakes-filter {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, transform 0.15s;
+}
+
+.mistakes-filter:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  color: var(--fg);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.mistakes-filter.active {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.16);
+  color: #c7d2fe;
+}
+
+.mistakes-filter:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.45);
+  outline-offset: 2px;
 }
 
 .mistakes-list { display: flex; flex-direction: column; gap: 0.5rem; }

@@ -3,10 +3,9 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerEndInterviewTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "end_interview",
-    "Force-end the interview at any point and generate a summary. Valid in any active state.",
-    { sessionId: z.string() },
+    { description: "Force-end the interview at any point and generate a summary. Valid in any active state.", inputSchema: { sessionId: z.string() } },
     async ({ sessionId }) => {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];

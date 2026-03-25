@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getGeneratedReportUi, getSession, type ReportUiDataset } from '../api'
-import type { Session, Evaluation, Concept } from '@mock-interview/shared'
+import { deleteSession, getGeneratedReportUi, getSession, getSessionDeletePreview, type ReportUiDataset } from '../api'
+import type { Session, Evaluation, Concept, SessionDeletionPreview } from '@mock-interview/shared'
 import ScoreBadge, { ScoreBar } from '../components/ScoreBadge'
 
 function calcAvg(evals: Evaluation[]): string {
@@ -45,6 +45,7 @@ export default function ReportPage() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
   const [openQ, setOpenQ] = useState<number | null>(0)
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -66,11 +67,33 @@ export default function ReportPage() {
   const isAlgorithmStudy = isStudy && getStudyCategory(session) === 'algorithm'
   const tabs: Tab[] = isStudy ? ['overview', 'questions'] : ['overview', 'questions', 'transcript']
 
+  async function handleDeleteSession() {
+    if (deleteBusy || !session) return
+    const currentSession = session
+
+    try {
+      setDeleteBusy(true)
+      const preview = await getSessionDeletePreview(currentSession.id)
+      if (!window.confirm(buildDeleteConfirmation(preview))) return
+      await deleteSession(currentSession.id)
+      navigate('/sessions')
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
   return (
     <div>
-      <button className="btn-back" onClick={() => navigate('/sessions')}>
-        ← Back to sessions
-      </button>
+      <div className="page-actions">
+        <button className="btn-back" onClick={() => navigate('/sessions')}>
+          ← Back to sessions
+        </button>
+        <button className="btn-danger" onClick={handleDeleteSession} disabled={deleteBusy}>
+          {deleteBusy ? 'Deleting…' : 'Delete session'}
+        </button>
+      </div>
 
       {/* Header */}
       <div className="report-header">
@@ -240,6 +263,32 @@ export default function ReportPage() {
       )}
     </div>
   )
+}
+
+function buildDeleteConfirmation(preview: SessionDeletionPreview): string {
+  const lines = [
+    `Delete session "${preview.session.topic}"?`,
+    '',
+    `ID: ${preview.session.id}`,
+    `State: ${preview.session.state}`,
+    `Questions: ${preview.session.questionCount}`,
+    `Messages: ${preview.session.messageCount}`,
+    `Evaluations: ${preview.session.evaluationCount}`,
+    `Flashcards to delete: ${preview.flashcards.count}`,
+    `Markdown report: ${preview.artifacts.markdownReport ? 'yes' : 'no'}`,
+    `Report UI dataset: ${preview.artifacts.reportUiDataset ? 'yes' : 'no'}`,
+    `Weak-subjects HTML: ${preview.artifacts.weakSubjectsHtml ? 'yes' : 'no'}`,
+  ]
+
+  if (preview.warnings.length > 0) {
+    lines.push('', 'Warnings:')
+    for (const warning of preview.warnings) {
+      lines.push(`- ${warning}`)
+    }
+  }
+
+  lines.push('', 'This cannot be undone.')
+  return lines.join('\n')
 }
 
 function StudyPromptCard({ idx, question, open, onToggle }: {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import fs from "fs";
 import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { buildScopeContent, deriveSessionGoal } from "../scope/builder.js";
 import type { ToolDeps } from "./deps.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,13 +16,6 @@ import type { ToolDeps } from "./deps.js";
 // be reused without going through the clarification flow again.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEPTH_DESCRIPTION: Record<string, string> = {
-  conceptual:         "Verbal explanation only — no code required. Candidate should explain the mental model.",
-  implementation:     "Candidate writes pseudocode or real code. Correctness and structure matter.",
-  "trace-through-code": "Candidate traces through a provided snippet step by step. Focus on execution order and state.",
-  mixed:              "Mix of verbal explanation and code tracing. Adapt depth per question.",
-};
-
 function toSlug(name: string): string {
   return name
     .toLowerCase()
@@ -29,100 +23,37 @@ function toSlug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function buildCriterion(area: string): string {
-  return `**${area}**: Candidate must explain this clearly and give a concrete example. ` +
-    `Probe if the answer is vague or generic.`;
-}
-
-function buildScopeContent(opts: {
-  topic: string;
-  focusAreas: string[];
-  weakSpots: string[];
-  depth: string;
-  outOfScope: string[];
-  sessionGoal: string;
-}): string {
-  const lines: string[] = [];
-
-  lines.push(`# Study Scope: ${opts.topic}`, ``);
-
-  lines.push(`## Focus Areas`);
-  for (const area of opts.focusAreas) {
-    lines.push(`- ${area}`);
-  }
-  lines.push(``);
-
-  lines.push(`## Depth: ${opts.depth}`);
-  lines.push(DEPTH_DESCRIPTION[opts.depth] ?? DEPTH_DESCRIPTION.mixed);
-  lines.push(``);
-
-  lines.push(`## Evaluation Criteria`);
-  for (const area of opts.focusAreas) {
-    lines.push(`- ${buildCriterion(area)}`);
-  }
-  lines.push(``);
-
-  if (opts.weakSpots.length > 0) {
-    lines.push(`## Known Weak Spots (probe these specifically)`);
-    for (const spot of opts.weakSpots) {
-      lines.push(`- ${spot}`);
-    }
-    lines.push(``);
-  }
-
-  if (opts.outOfScope.length > 0) {
-    lines.push(`## Out of Scope`);
-    for (const item of opts.outOfScope) {
-      lines.push(`- ${item}`);
-    }
-    lines.push(``);
-  }
-
-  lines.push(`## Session Goal`);
-  lines.push(opts.sessionGoal);
-  lines.push(``);
-
-  return lines.join("\n");
-}
-
-function deriveSessionGoal(topic: string, focusAreas: string[], depth: string): string {
-  const areaList = focusAreas.slice(0, 3).join(", ");
-  const extra = focusAreas.length > 3 ? `, and ${focusAreas.length - 3} more` : "";
-  return (
-    `Candidate can explain ${areaList}${extra} without prompting. ` +
-    `Depth: ${depth}. No drifting into unrelated areas.`
-  );
-}
-
 export function registerBuildScopeTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "build_scope",
-    "Build a focused content block for start_scoped_interview from structured inputs. " +
-    "Use this after a clarifying Q&A conversation where the candidate has narrowed down " +
-    "a broad topic into specific focus areas, weak spots, and depth. " +
-    "Optionally saves the result as a reusable .md file so the same scope can be " +
-    "launched again without repeating the clarification flow.",
     {
-      topic: z.string().min(1)
-        .describe("The narrowed-down topic, e.g. 'JavaScript Runtime — Event Loop'"),
-      focusAreas: z.preprocess(
-        (v) => typeof v === "string" ? JSON.parse(v) : v,
-        z.array(z.string()).min(1)
-      ).describe("Specific areas to cover in order of priority, e.g. ['event loop', 'call stack', 'microtask queue']"),
-      weakSpots: z.preprocess(
-        (v) => typeof v === "string" ? JSON.parse(v) : v,
-        z.array(z.string()).default([])
-      ).describe("Areas the candidate has flagged as weak — LLM will probe these harder"),
-      depth: z.enum(["conceptual", "implementation", "trace-through-code", "mixed"]).default("mixed")
-        .describe("Expected answer depth: conceptual | implementation | trace-through-code | mixed"),
-      outOfScope: z.preprocess(
-        (v) => typeof v === "string" ? JSON.parse(v) : v,
-        z.array(z.string()).default([])
-      ).describe("Topics to explicitly exclude so the LLM does not drift, e.g. ['DOM APIs', 'Node.js internals']"),
-      sessionGoal: z.string().optional()
-        .describe("What a successful session looks like. Auto-derived from focusAreas if omitted."),
-      saveAs: z.string().optional()
-        .describe("Slug to save this scope as a reusable file, e.g. 'js-event-loop'. Omit to skip saving."),
+      description: "Build a focused content block for start_scoped_interview from structured inputs. " +
+      "Use this after a clarifying Q&A conversation where the candidate has narrowed down " +
+      "a broad topic into specific focus areas, weak spots, and depth. " +
+      "Optionally saves the result as a reusable .md file so the same scope can be " +
+      "launched again without repeating the clarification flow.",
+      inputSchema: {
+        topic: z.string().min(1)
+          .describe("The narrowed-down topic, e.g. 'JavaScript Runtime — Event Loop'"),
+        focusAreas: z.preprocess(
+          (v) => typeof v === "string" ? JSON.parse(v) : v,
+          z.array(z.string()).min(1)
+        ).describe("Specific areas to cover in order of priority, e.g. ['event loop', 'call stack', 'microtask queue']"),
+        weakSpots: z.preprocess(
+          (v) => typeof v === "string" ? JSON.parse(v) : v,
+          z.array(z.string()).default([])
+        ).describe("Areas the candidate has flagged as weak — LLM will probe these harder"),
+        depth: z.enum(["conceptual", "implementation", "trace-through-code", "mixed"]).default("mixed")
+          .describe("Expected answer depth: conceptual | implementation | trace-through-code | mixed"),
+        outOfScope: z.preprocess(
+          (v) => typeof v === "string" ? JSON.parse(v) : v,
+          z.array(z.string()).default([])
+        ).describe("Topics to explicitly exclude so the LLM does not drift, e.g. ['DOM APIs', 'Node.js internals']"),
+        sessionGoal: z.string().optional()
+          .describe("What a successful session looks like. Auto-derived from focusAreas if omitted."),
+        saveAs: z.string().optional()
+          .describe("Slug to save this scope as a reusable file, e.g. 'js-event-loop'. Omit to skip saving."),
+      },
     },
     async ({ topic, focusAreas, weakSpots, depth, outOfScope, sessionGoal, saveAs }) => {
       const goal = sessionGoal ?? deriveSessionGoal(topic, focusAreas, depth);

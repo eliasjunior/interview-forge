@@ -105,6 +105,27 @@ export class SQLiteFlashcardRepository implements FlashcardRepository {
     });
   }
 
+  deleteBySourceSessionId(sessionId: string): number {
+    const ids = this.db
+      .select({ id: flashcards.id })
+      .from(flashcards)
+      .where(eq(flashcards.sourceSessionId, sessionId))
+      .all()
+      .map((row) => row.id);
+
+    if (ids.length === 0) return 0;
+
+    this.db.transaction((tx) => {
+      for (const id of ids) {
+        tx.delete(flashcardTags).where(eq(flashcardTags.flashcardId, id)).run();
+        tx.delete(flashcardConcepts).where(eq(flashcardConcepts.flashcardId, id)).run();
+        tx.delete(flashcards).where(eq(flashcards.id, id)).run();
+      }
+    });
+
+    return ids.length;
+  }
+
   private hydrate(id: string): Flashcard {
     const flashcardRow = this.db.select().from(flashcards).where(eq(flashcards.id, id)).get();
     if (!flashcardRow) throw new Error(`Flashcard not found: ${id}`);

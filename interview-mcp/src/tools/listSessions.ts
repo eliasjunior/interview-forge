@@ -2,10 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolDeps } from "./deps.js";
 
 export function registerListSessionsTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "list_sessions",
-    "List all sessions with their topic, current state, and progress.",
-    {},
+    { description: "List all sessions with their topic, current state, and progress." },
     async () => {
       const sessions = deps.loadSessions();
       const list = Object.values(sessions).map((s) => ({

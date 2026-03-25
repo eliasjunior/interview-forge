@@ -50,8 +50,8 @@ export function applySM2(
     // Successful recall — advance the schedule
     repetitions += 1;
 
-    if (repetitions === 1)      interval = 1;
-    else if (repetitions === 2) interval = 6;
+    if (repetitions === 1)      interval = 3;
+    else if (repetitions === 2) interval = 8;
     else                        interval = Math.round(interval * easeFactor);
 
     // SM-2 ease-factor update formula
@@ -59,8 +59,10 @@ export function applySM2(
     easeFactor = Math.max(MIN_EASE_FACTOR, easeFactor);
   }
 
+  // Add ±1 day jitter so cards from the same session don't all cluster on the same date
+  const jitter = Math.round((Math.random() - 0.5) * 2); // -1, 0, or +1
   const dueDate = new Date(
-    Date.now() + interval * 24 * 60 * 60 * 1000
+    Date.now() + (interval + jitter) * 24 * 60 * 60 * 1000
   ).toISOString();
 
   return { interval, easeFactor: parseFloat(easeFactor.toFixed(2)), repetitions, dueDate };

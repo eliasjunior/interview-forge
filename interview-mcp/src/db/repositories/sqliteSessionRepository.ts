@@ -121,6 +121,18 @@ export class SQLiteSessionRepository implements SessionRepository {
     });
   }
 
+  deleteById(id: string): boolean {
+    const result = this.db.transaction((tx) => {
+      tx.delete(sessionQuestions).where(eq(sessionQuestions.sessionId, id)).run();
+      tx.delete(sessionMessages).where(eq(sessionMessages.sessionId, id)).run();
+      tx.delete(sessionEvaluations).where(eq(sessionEvaluations.sessionId, id)).run();
+      tx.delete(sessionConcepts).where(eq(sessionConcepts.sessionId, id)).run();
+      return tx.delete(sessions).where(eq(sessions.id, id)).run();
+    });
+
+    return result.changes > 0;
+  }
+
   private hydrate(id: string): Session {
     const sessionRow = this.db.select().from(sessions).where(eq(sessions.id, id)).get();
     if (!sessionRow) throw new Error(`Session not found: ${id}`);

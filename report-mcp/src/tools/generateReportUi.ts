@@ -238,21 +238,23 @@ function buildViewerHtml(): string {
 }
 
 export function registerGenerateReportUiTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "generate_report_ui",
-    "Generate a JSON dataset for report UI and return a reusable viewer URL.",
     {
-      sessionId: z.string(),
-      questions: z.array(z.object({
-        questionNumber: z.number().int().min(1),
-        question: z.string().min(1),
-        candidateAnswer: z.string().min(1),
-        interviewerFeedback: z.string().min(1),
-        strongAnswer: z.string().min(1).describe("Strong answer in max 3 lines"),
-        subject: z.string().min(1).optional(),
-        score: z.number().int().min(1).max(5).optional(),
-      })).min(1).max(50),
-      title: z.string().optional(),
+      description: "Generate a JSON dataset for report UI and return a reusable viewer URL.",
+      inputSchema: {
+        sessionId: z.string(),
+        questions: z.array(z.object({
+          questionNumber: z.number().int().min(1),
+          question: z.string().min(1),
+          candidateAnswer: z.string().min(1),
+          interviewerFeedback: z.string().min(1),
+          strongAnswer: z.string().min(1).describe("Strong answer in max 3 lines"),
+          subject: z.string().min(1).optional(),
+          score: z.number().int().min(1).max(5).optional(),
+        })).min(1).max(50),
+        title: z.string().optional(),
+      },
     },
     async ({ sessionId, questions, title }) => {
       const sessions = deps.loadSessions();

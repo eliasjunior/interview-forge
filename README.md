@@ -24,7 +24,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 - [Full deliberate practice loop](#full-deliberate-practice-loop)
 
 **Reference**
-- [MCP tools — interview-mcp (26 tools)](#interview-mcp--26-tools)
+- [MCP tools — interview-mcp (27 tools)](#interview-mcp--27-tools)
 - [MCP tools — report-mcp (7 tools)](#report-mcp--7-tools)
 - [REST API](#rest-api-interview-mcp-port-3001)
 - [Monorepo scripts](#monorepo-scripts)
@@ -248,9 +248,27 @@ Review my due flashcards for JWT
 get_due_flashcards { topic: "JWT authentication" }
   → [for each card]
      review_flashcard { cardId, rating: 1|2|3|4 }
+       → if the card has been seen before and recall succeeded (rating ≥ 3):
+           response includes nextStep: { tool: "generate_flashcard_variation", cardId }
+         → generate_flashcard_variation { cardId }
+             returns originalQuestion + modelAnswer + a variation angle
+             Claude constructs a varied question, asks it, evaluates the answer
 ```
 
 **Rating guide:** `1` = forgot, `2` = hard, `3` = good, `4` = easy. The next due date is set automatically.
+
+**Variation angles** — on repeated cards, Claude picks a different angle each time instead of repeating the same question verbatim:
+
+| Angle | What Claude asks instead |
+|---|---|
+| `failure-case` | What goes wrong if you ignore or misapply this concept in production? |
+| `why-not-what` | Explain the *reasoning* behind the answer, not just the fact. |
+| `flip-scenario` | Reverse the constraint — what's the edge case that breaks the normal rule? |
+| `trade-offs` | Compare this approach to an alternative and say when each is preferable. |
+| `teach-it` | Explain this concept to a junior developer using a concrete analogy. |
+| `apply-to-context` | How does this apply to a high-traffic service / distributed system / memory-constrained environment? |
+
+The angle rotates deterministically with each review (`repetitions % 6`), so consecutive reviews always use a fresh perspective.
 
 You can also review cards in the browser at **http://localhost:5173/flashcards**.
 
@@ -457,7 +475,7 @@ The recommended cycle for deep learning on any topic:
 
 ## MCP tools reference
 
-### interview-mcp — 26 tools
+### interview-mcp — 27 tools
 
 This server drives the interview session from start to finish.
 
@@ -486,7 +504,8 @@ This server drives the interview session from start to finish.
 | Tool | What it does |
 |---|---|
 | `get_due_flashcards` | Returns flashcards due for review today, sorted most-overdue first. Supports optional topic filter. |
-| `review_flashcard` | Submits a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy); applies SM-2 and schedules the next review. |
+| `review_flashcard` | Submits a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy); applies SM-2 and schedules the next review. When the card has been seen before and recall succeeds, returns `nextStep` pointing to `generate_flashcard_variation`. |
+| `generate_flashcard_variation` | Returns the original card context plus a variation angle (failure-case, why-not-what, flip-scenario, trade-offs, teach-it, apply-to-context). The orchestrator LLM uses this to construct a varied question that tests the same concept from a different perspective. Angle rotates each review so the same question is never asked twice in a row. |
 | `create_flashcard` | Creates a flashcard directly from supplied front/back content, without needing an interview session. Useful for capturing insights or concepts on the fly. Cards are due immediately and follow the same SM-2 schedule. |
 
 **Mistake log**
@@ -676,14 +695,28 @@ After `end_interview`, the server automatically generates flashcards for any que
 
 A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM** and prints a summary of due cards grouped by topic.
 
-**Ratings:**
+**Ratings and intervals:**
 
 | Rating | Label | Effect |
 |---|---|---|
 | 1 | Again | Reset: interval=1 day, ease factor −0.2 |
 | 2 | Hard | Advance with penalty: ease factor −0.14 |
-| 3 | Good | Normal advance: 1 → 6 → interval × ease factor days |
+| 3 | Good | Normal advance: 3 → 8 → interval × ease factor days |
 | 4 | Easy | Full advance with ease factor bonus |
+
+Intervals include ±1 day random jitter so cards from the same session drift apart and don't all surface on the same day.
+
+**Variation flow** — on repeated successful reviews, `review_flashcard` returns a `nextStep` hint:
+
+```
+review_flashcard { cardId, rating: 3 }
+  → nextStep: { tool: "generate_flashcard_variation", cardId }
+generate_flashcard_variation { cardId }
+  → returns variationAngle + originalQuestion + modelAnswer
+  → orchestrator constructs a varied question from the angle and asks it
+```
+
+Six angles rotate deterministically: `failure-case`, `why-not-what`, `flip-scenario`, `trade-offs`, `teach-it`, `apply-to-context`. The variation is ephemeral — not stored in the DB.
 
 [↑ Back to top](#table-of-contents)
 
@@ -727,3 +760,20 @@ All domain types live in `shared/src/types.ts` and are imported as `@mock-interv
 Runtime state lives in SQLite (`interview-mcp/data/app.db`). Knowledge source files and generated report artifacts remain in `interview-mcp/data/` and `interview-mcp/public/generated/`.
 
 [↑ Back to top](#table-of-contents)
+
+---
+
+## Bug List
+
+### MCP tools not available when Claude Code runs as a sub-agent inside Claude Desktop
+
+**Observed:** When Claude Desktop launches Claude Code as a sub-agent (via the Agent SDK), the MCP tools defined in `.mcp.json` (`start_interview`, `end_interview`, etc.) are not available in the Claude Code context. Claude Code fell back to conducting the interview manually as a conversation, then inserted the session data directly into SQLite via a one-off Node.js script.
+
+**Root cause (to investigate):** Claude Desktop loads `.mcp.json` and has the MCP tools available in its own context, but when it spawns Claude Code as a sub-agent, those tools are not passed through or re-initialised in the sub-agent's tool context. Claude Code runs with its own isolated tool set and does not inherit the parent session's MCP servers.
+
+**Impact:** The full interview flow (state machine, auto flashcard generation via `end_interview`, graph merging) was bypassed. Session data was reconstructed manually.
+
+**To investigate:**
+- Confirm whether Claude Desktop is expected to forward MCP tools to Claude Code sub-agents, or if this is a known architectural boundary
+- Check if there is a way to configure Claude Code (via `.claude/settings.json` or similar) to load the same MCP servers independently, so it can call them directly
+- Test calling interview tools directly from the Claude Desktop conversation (not via Claude Code) to confirm they work there

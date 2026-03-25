@@ -3,14 +3,16 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerGetReportFullContextTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "get_report_full_context",
-    "Get full report context (all evaluated questions, candidate answers, interviewer feedback, and weak markers). Use this only when a full report UI is needed.",
     {
-      sessionId: z.string().optional().describe("Completed session ID (preferred when known)"),
-      topic: z.string().optional().describe("Topic name; when provided, uses the most recent ended session for this topic"),
-      weakScoreThreshold: z.number().int().min(1).max(5).default(3)
-        .describe("Mark questions with score <= threshold as weak"),
+      description: "Get full report context (all evaluated questions, candidate answers, interviewer feedback, and weak markers). Use this only when a full report UI is needed.",
+      inputSchema: {
+        sessionId: z.string().optional().describe("Completed session ID (preferred when known)"),
+        topic: z.string().optional().describe("Topic name; when provided, uses the most recent ended session for this topic"),
+        weakScoreThreshold: z.number().int().min(1).max(5).default(3)
+          .describe("Mark questions with score <= threshold as weak"),
+      },
     },
     async ({ sessionId, topic, weakScoreThreshold }) => {
       if (!sessionId && !topic) {

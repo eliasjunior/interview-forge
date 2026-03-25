@@ -3,11 +3,13 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerHelpTools(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "help_tools",
-    "List all MCP tools with short descriptions and example input payloads.",
     {
-      toolName: z.string().optional().describe("Optional exact tool name to filter output to one tool"),
+      description: "List all MCP tools with short descriptions and example input payloads.",
+      inputSchema: {
+        toolName: z.string().optional().describe("Optional exact tool name to filter output to one tool"),
+      },
     },
     async ({ toolName }) => {
       const tools = [
@@ -30,6 +32,7 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
         { name: "end_interview", how: "Force-end session and build report", example: { sessionId: "..." } },
         { name: "get_session", how: "Get full session data", example: { sessionId: "..." } },
         { name: "list_sessions", how: "List sessions", example: {} },
+        { name: "delete_session", how: "Dry-run or delete a session and its derived artifacts", example: { sessionId: "...", dryRun: true } },
         { name: "list_topics", how: "List curated knowledge topics", example: {} },
         { name: "get_due_flashcards", how: "Get flashcards due for spaced-repetition review today", example: { topic: "JWT authentication" } },
         { name: "review_flashcard", how: "Submit a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy) — applies SM-2 and schedules next review", example: { cardId: "...", rating: 3 } },

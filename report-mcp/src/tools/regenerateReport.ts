@@ -3,10 +3,9 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerRegenerateReportTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "regenerate_report",
-    "Re-generate the deeper-dive feedback and report file for a completed session.",
-    { sessionId: z.string() },
+    { description: "Re-generate the deeper-dive feedback and report file for a completed session.", inputSchema: { sessionId: z.string() } },
     async ({ sessionId }) => {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];

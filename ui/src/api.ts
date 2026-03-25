@@ -1,4 +1,14 @@
-import type { Session, KnowledgeGraph, ReportMeta, Flashcard, ReviewRating, Mistake } from '@mock-interview/shared'
+import type {
+  Session,
+  KnowledgeGraph,
+  ReportMeta,
+  Flashcard,
+  ReviewRating,
+  Mistake,
+  GraphInspectionResult,
+  SessionDeletionPreview,
+  SessionDeleteResult,
+} from '@mock-interview/shared'
 
 const BASE = '/api'
 
@@ -18,6 +28,12 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function del<T>(url: string): Promise<T> {
+  const res = await fetch(url, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Request failed: ${res.status} ${url}`)
+  return res.json() as Promise<T>
+}
+
 export const getSessions = (): Promise<Session[]> => req(`${BASE}/sessions`)
 
 export const getSession = async (id: string): Promise<Session | null> => {
@@ -25,9 +41,17 @@ export const getSession = async (id: string): Promise<Session | null> => {
   return sessions.find(s => s.id === id) ?? null
 }
 
+export const getSessionDeletePreview = (id: string): Promise<SessionDeletionPreview> =>
+  req(`${BASE}/sessions/${encodeURIComponent(id)}/delete-preview`)
+
+export const deleteSession = (id: string): Promise<SessionDeleteResult> =>
+  del(`${BASE}/sessions/${encodeURIComponent(id)}`)
+
 export const getReports = (): Promise<ReportMeta[]> => req(`${BASE}/reports`)
 
 export const getGraph = (): Promise<KnowledgeGraph> => req(`${BASE}/graph`)
+export const inspectGraphNodes = (nodeIds: string[]): Promise<GraphInspectionResult> =>
+  post(`${BASE}/graph/inspect`, { nodeIds })
 
 export const getFlashcards = (): Promise<Flashcard[]> => req(`${BASE}/flashcards`)
 

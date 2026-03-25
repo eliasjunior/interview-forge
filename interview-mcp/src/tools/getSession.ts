@@ -3,10 +3,9 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "get_session",
-    "Retrieve a session by ID — transcript, state, evaluations, and summary.",
-    { sessionId: z.string() },
+    { description: "Retrieve a session by ID — transcript, state, evaluations, and summary.", inputSchema: { sessionId: z.string() } },
     async ({ sessionId }) => {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];

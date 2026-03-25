@@ -3,16 +3,18 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolDeps } from "./deps.js";
 
 export function registerAddSkillTool(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "add_skill",
-    "Add a transferable micro-skill to the skill backlog. " +
-    "Skills are atomic, reusable abilities (e.g. '2D index transformations') that appear across multiple problems. " +
-    "Breaks the skill into sub-skills, each with its own confidence rating.",
     {
-      name: z.string().min(1).describe("Transferable skill name, e.g. '2D index transformations'"),
-      subSkills: z.array(z.string()).min(1).describe("Atomic sub-skills, e.g. ['layer boundaries', 'coordinate mapping', 'offset reasoning']"),
-      relatedProblems: z.array(z.string()).default([]).describe("Problems where this skill appears, e.g. ['rotate matrix', 'spiral matrix']"),
-      confidence: z.number().int().min(1).max(5).default(1).describe("Overall confidence 1–5 (default 1 = just identified)"),
+      description: "Add a transferable micro-skill to the skill backlog. " +
+      "Skills are atomic, reusable abilities (e.g. '2D index transformations') that appear across multiple problems. " +
+      "Breaks the skill into sub-skills, each with its own confidence rating.",
+      inputSchema: {
+        name: z.string().min(1).describe("Transferable skill name, e.g. '2D index transformations'"),
+        subSkills: z.array(z.string()).min(1).describe("Atomic sub-skills, e.g. ['layer boundaries', 'coordinate mapping', 'offset reasoning']"),
+        relatedProblems: z.array(z.string()).default([]).describe("Problems where this skill appears, e.g. ['rotate matrix', 'spiral matrix']"),
+        confidence: z.number().int().min(1).max(5).default(1).describe("Overall confidence 1–5 (default 1 = just identified)"),
+      },
     },
     async ({ name, subSkills, relatedProblems, confidence }) => {
       const existing = deps.findSkillByName(name);

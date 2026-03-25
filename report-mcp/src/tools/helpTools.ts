@@ -3,11 +3,13 @@ import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 
 export function registerHelpTools(server: McpServer, deps: ToolDeps) {
-  server.tool(
+  server.registerTool(
     "help_tools",
-    "List all report-mcp tools with short descriptions and example input payloads.",
     {
-      toolName: z.string().optional().describe("Optional exact tool name to filter output to one tool"),
+      description: "List all report-mcp tools with short descriptions and example input payloads.",
+      inputSchema: {
+        toolName: z.string().optional().describe("Optional exact tool name to filter output to one tool"),
+      },
     },
     async ({ toolName }) => {
       const tools = [
