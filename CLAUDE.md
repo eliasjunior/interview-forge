@@ -1,5 +1,14 @@
 # Mock Interview MCP — Project Context
 
+## Highest Priority Rule
+
+In every new Desktop app thread in this project, the first response must be an MCP connection check.
+
+Before answering the user's request, first state whether `interview-mcp` is connected in the current Desktop session.
+
+- If it is not connected, say: `Before I continue, I should check whether interview-mcp is connected in this Desktop session. It is not connected, so I have to stop here.`
+- Do not answer the user's actual request until this check has been reported.
+
 ## Overview
 
 A study project for learning **Model Context Protocol (MCP)** server development. It runs mock technical interviews through Claude, evaluates answers with AI, and builds a growing knowledge graph across sessions — all visualised in a React dashboard.

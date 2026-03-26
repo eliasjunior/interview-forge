@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
-if (!process.env.ANTHROPIC_API_KEY) dotenv.config({ override: true });
-else dotenv.config();
+if (!process.env.ANTHROPIC_API_KEY) dotenv.config({ override: true, quiet: true });
+else dotenv.config({ quiet: true });
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

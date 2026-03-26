@@ -32,6 +32,11 @@ Common pitfalls: race conditions, deadlocks (circular lock dependency), livelock
 14. What are Java virtual threads (Project Loom, Java 21)? How do they change the mental model for concurrent programming compared to platform threads?
 15. What is a lock-free algorithm? Give an example using `compareAndSet` and explain the ABA problem.
 16. How would you diagnose and fix thread starvation in a production application? What metrics and tools would you use?
+17. Why does `volatile` work for a shared boolean flag, and what happens at the Java Memory Model and CPU level when one thread writes and another thread reads it?
+18. Why is `volatile int count; count++;` still broken, even though `volatile` guarantees visibility?
+19. Compare `AtomicInteger` and `LongAdder`. How do they differ internally, and when would you choose one over the other?
+20. In a high-traffic backend service, if you need a shared counter for metrics or rate limiting, how would you choose between `synchronized`, `AtomicInteger`, and `LongAdder`?
+21. Explain Java concurrency from the perspective of a multi-core CPU: registers, CPU caches, main memory, compiler reordering, happens-before, and memory barriers. How do `volatile`, CAS, and locks restore correctness?
 
 ---
 
@@ -53,6 +58,11 @@ Common pitfalls: race conditions, deadlocks (circular lock dependency), livelock
 - Question 14: advanced
 - Question 15: advanced
 - Question 16: advanced
+- Question 17: intermediate
+- Question 18: intermediate
+- Question 19: advanced
+- Question 20: advanced
+- Question 21: advanced
 
 ---
 
@@ -74,10 +84,15 @@ Common pitfalls: race conditions, deadlocks (circular lock dependency), livelock
 - Question 14: Must explain virtual threads are JVM-managed, lightweight threads that do not map 1:1 to OS threads. When a virtual thread blocks on I/O, the JVM unmounts it from the carrier (platform) thread and parks it — the carrier thread is freed for another virtual thread. Mental model shift: can create millions of virtual threads where you'd be limited to thousands of platform threads. Use cases: high-concurrency I/O (HTTP servers, DB calls). Caveat: CPU-bound work and `synchronized` blocks still pin the carrier thread. Bonus: `Thread.ofVirtual().start(...)` and `Executors.newVirtualThreadPerTaskExecutor()`.
 - Question 15: Must explain CAS (compare-and-set): atomically set value to new only if current equals expected — if another thread changed it, retry. ABA problem: value changes A→B→A between read and CAS — CAS succeeds despite a logical change. Fix: `AtomicStampedReference` adds a version stamp. Lock-free vs wait-free distinction: lock-free guarantees at least one thread makes progress; wait-free guarantees all threads make progress in bounded steps. Weak: describes CAS but cannot explain why ABA matters in linked-list or reference-based structures.
 - Question 16: Must define starvation: threads never get scheduled because higher-priority or luckier threads always win. Symptoms: low-priority tasks queue forever, unfair lock policy, executor queue unbounded and always full. Diagnosis: thread dump showing WAITING threads on the same resource for extended periods, executor metrics (queue depth, rejected tasks). Fix: fair ReentrantLock, bounded executor queue with rejection policy, separate thread pools for different priority work, priority queue. Bonus: `jcmd <pid> Thread.print`, `ThreadMXBean.getThreadCpuTime` to find starved threads.
+- Question 17: Must explain that `volatile` guarantees visibility and ordering, not mutual exclusion. Strong answer ties this to the JMM: a volatile write happens-before a subsequent volatile read of the same variable, so prior writes by thread A become visible to thread B. Should mention memory barriers / fence semantics and that the practical goal is preventing stale cached reads and unsafe reordering. Weak answer: says only "volatile stores in main memory" without explaining happens-before or ordering.
+- Question 18: Must explain that `count++` is a read-modify-write sequence: read current value, add one, write back. `volatile` makes each individual read/write visible, but does not make the compound operation atomic, so two threads can both read 5 and both write 6. Strong answer explicitly calls this a race condition / lost update. Weak answer: blames "timing" vaguely without naming the non-atomic sequence.
+- Question 19: Must explain that `AtomicInteger` uses a single CAS-protected value, which is precise and efficient under low to moderate contention, while `LongAdder` spreads updates across multiple internal cells to reduce contention under high write concurrency. Must mention tradeoff: `LongAdder.sum()` is an aggregate across cells and is preferred for throughput-oriented counters such as metrics, not for cases needing a single exact instant-by-instant value. Weak answer: only says "LongAdder is faster" without explaining striping and precision tradeoff.
+- Question 20: Must compare the three choices in context. `synchronized`: correct when compound state changes or strong mutual exclusion is needed, but can serialize access under contention. `AtomicInteger`: best for exact single-value counters / IDs / low-contention increments. `LongAdder`: best for high-throughput counters like metrics where throughput matters more than exact per-nanosecond precision. Strong answer should note that a strict rate limiter often needs exactness and additional coordination, so `LongAdder` may suit metrics better than enforcement. Weak answer: picks one tool universally without discussing contention, accuracy, or semantics.
+- Question 21: Must explain that on multi-core CPUs each core may use registers and local caches, so without coordination two threads can observe different values and the compiler/CPU may legally reorder operations. Must define happens-before as the visibility/ordering guarantee that one action's effects are seen by another. Strong answer explains that `volatile` introduces visibility and ordering guarantees via memory-barrier semantics, locks provide both mutual exclusion and visibility, and CAS-based atomics rely on hardware atomic instructions plus memory-ordering guarantees. Bonus: names load/store fences or explains that the conceptual model is more important than pretending Java directly "reads RAM every time." Weak answer: only says "volatile flushes to main memory" without tying it to reordering, happens-before, and cache coherence.
 
 ## Concepts
 
-- core concepts: thread, process, concurrency, parallelism, race condition, deadlock, livelock, starvation, atomicity, visibility, java memory model, happens-before
-- practical usage: synchronized, volatile, reentrantlock, readwritelock, executorservice, threadpoolexecutor, future, completablefuture, countdownlatch, cyclicbarrier, semaphore, blockingqueue, concurrenthashmap, copyonwritearraylist, forkjoinpool, atomic-variables, cas
-- tradeoffs: context switching, lock contention, throughput vs latency, lock granularity, optimistic vs pessimistic locking, bounded vs unbounded queue, heap sharing, platform vs virtual threads
-- best practices: thread confinement, immutability, lock ordering, avoid shared mutable state, prefer concurrent collections over synchronized wrappers, use executorservice over raw threads, shutdown executor on exit, bounded queues with rejection policy
+- core concepts: thread, process, concurrency, parallelism, race condition, deadlock, livelock, starvation, atomicity, visibility, java memory model, happens-before, memory-barrier, cache-coherence, cpu-cache, compiler-reordering
+- practical usage: synchronized, volatile, reentrantlock, readwritelock, executorservice, threadpoolexecutor, future, completablefuture, countdownlatch, cyclicbarrier, semaphore, blockingqueue, concurrenthashmap, copyonwritearraylist, forkjoinpool, atomic-variables, cas, atomicinteger, longadder
+- tradeoffs: context switching, lock contention, throughput vs latency, lock granularity, optimistic vs pessimistic locking, bounded vs unbounded queue, heap sharing, platform vs virtual threads, precision-vs-throughput
+- best practices: thread confinement, immutability, lock ordering, avoid shared mutable state, prefer concurrent collections over synchronized wrappers, use executorservice over raw threads, shutdown executor on exit, bounded queues with rejection policy, use-volatile-only-for-visibility-not-compound-updates

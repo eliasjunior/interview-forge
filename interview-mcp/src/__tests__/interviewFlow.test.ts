@@ -84,7 +84,7 @@ function makeDeps(
     uiPort: "5173",
     stateError: (msg: string) => ({ content: [{ type: "text" as const, text: msg }] }),
     loadSessions: () => sessionStore.load(),
-    saveSessions: (s) => sessionStore.save(s),
+    saveSessions: (s: Record<string, Session>) => sessionStore.save(s),
     loadGraph: () => ({ nodes: [], edges: [], sessions: [] } as KnowledgeGraph),
     saveGraph: () => {},
     saveReport: (session: Session) => `reports/${session.id}.md`,
@@ -110,7 +110,7 @@ function makeDeps(
     buildSummary,
     inspectSessionDeletion: () => null,
     deleteSessionById: () => null,
-    finalizeSession: async (session, sessions) => {
+    finalizeSession: async (session: Session, sessions: Record<string, Session>) => {
       session.state = "ENDED";
       session.endedAt = new Date().toISOString();
       sessions[session.id] = session;

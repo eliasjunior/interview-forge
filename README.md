@@ -620,7 +620,7 @@ Open **http://localhost:5173/flashcards** for flashcard review.
 
 Add both servers to your `.mcp.json` (Claude Desktop) or project `.mcp.json` (Claude Code). See `interview-mcp/README.md` and `report-mcp/README.md` for the exact config blocks.
 
-For `interview-mcp`, prefer the compiled server entrypoint instead of `tsx`:
+Prefer compiled entrypoints instead of `tsx` or `npm run build && ...` in the MCP config. Running a TypeScript build during the MCP handshake makes the host connection fragile: a test-only type error can make the server appear disconnected even when the runtime code itself is fine.
 
 ```json
 {
@@ -629,19 +629,44 @@ For `interview-mcp`, prefer the compiled server entrypoint instead of `tsx`:
       "command": "/usr/bin/env",
       "args": [
         "node",
-        "/Users/eliasjunior/Projects/first-mcp/interview-mcp/dist/server.js"
+        "/Users/eliasjunior/Projects/ai-projects/first-mcp/interview-mcp/dist/server.js"
       ],
-      "cwd": "/Users/eliasjunior/Projects/first-mcp/interview-mcp"
+      "cwd": "/Users/eliasjunior/Projects/ai-projects/first-mcp/interview-mcp"
+    },
+    "report-mcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "node",
+        "/Users/eliasjunior/Projects/ai-projects/first-mcp/report-mcp/dist/server.js"
+      ],
+      "cwd": "/Users/eliasjunior/Projects/ai-projects/first-mcp/report-mcp",
+      "env": {
+        "AI_ENABLED": "false"
+      }
     }
   }
 }
 ```
 
-Build the package before reloading Codex/Desktop:
+Build the packages before reloading the host app:
 
 ```bash
 npm run build:interview
+npm run build:report
 ```
+
+Set `AI_ENABLED=false` for `report-mcp` unless you explicitly want Anthropic-backed deeper dives and have `ANTHROPIC_API_KEY` available in that host environment. Otherwise the server can fail during startup and make the overall MCP setup look broken.
+
+### MCP troubleshooting
+
+If Claude Desktop can use the tools but Codex Desktop or an agent thread cannot, treat that as a host-context issue first, not a server-runtime issue.
+
+- Symptom: Claude Desktop sees `interview-mcp`, but another app or thread reports no MCP resources or tools.
+- Likely cause: the other host context did not load or inherit the workspace `.mcp.json`, even though the server itself starts cleanly.
+- Verify the server directly: `cd interview-mcp && node dist/server.js`
+- Verify the sibling server directly: `cd report-mcp && AI_ENABLED=false node dist/server.js`
+- If those commands start and log `running on stdio`, the repo-side config is probably fine.
+- Then reconnect or restart the host app so it reloads [`.mcp.json`](/Users/eliasjunior/Projects/ai-projects/first-mcp/.mcp.json).
 
 After the host reconnects, always run `server_status` first. Only start an interview after that preflight succeeds.
 
@@ -693,8 +718,10 @@ Within each tier, questions you have been asked least often across past sessions
 | `payment-api-design.md` | Payment API Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `url-shortener.md` | URL Shortener System Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `mtls-tls.md` | mTLS / TLS | 16 (5 foundation, 7 intermediate, 4 advanced) |
-| `java-concurrency.md` | Java Concurrency | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `java-concurrency.md` | Java Concurrency | 21 (5 foundation, 9 intermediate, 7 advanced) |
 | `java-os-jvm.md` | Java OS & JVM Internals | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `js-fundamentals.md` | JavaScript Fundamentals: DOM, Callbacks, Promises, XHR, Event Loop & Web APIs | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `cicd-release-flow.md` | CI/CD Release Flow for Backend Engineers | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `rotate-matrix-algorithm.md` | Rotate Matrix (algorithm) | 14 (5 foundation, 7 intermediate, 2 advanced) |
 | `mortgage-rest-design.md` | Mortgage REST API Design | 20 (5 foundation, 10 intermediate, 5 advanced) |
 

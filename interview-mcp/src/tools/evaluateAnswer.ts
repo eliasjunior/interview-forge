@@ -11,11 +11,17 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
       description: "Score the last answer (1–5) and decide if a follow-up is needed. Valid in state: EVALUATE_ANSWER. When AI is enabled call with sessionId only. When AI is disabled also provide score, feedback, and needsFollowUp.",
       inputSchema: {
         sessionId: z.string(),
-        score: z.number().int().min(1).max(5).optional()
+        score: z.union([z.number(), z.string()])
+          .transform(v => Number(v))
+          .pipe(z.number().int().min(1).max(5))
+          .optional()
           .describe("Score 1–5 (required when AI is disabled)"),
         feedback: z.string().optional()
           .describe("Detailed feedback (required when AI is disabled)"),
-        needsFollowUp: z.boolean().optional()
+        needsFollowUp: z.union([z.boolean(), z.string()])
+          .transform(v => v === "true" ? true : v === "false" ? false : v)
+          .pipe(z.boolean())
+          .optional()
           .describe("Whether a follow-up question would help (required when AI is disabled)"),
         followUpQuestion: z.string().optional()
           .describe("The follow-up question to ask (provide when needsFollowUp is true)"),
