@@ -1,4 +1,4 @@
-# mock-interview-mcp
+# interview-forge
 
 A study project that runs **mock technical interviews through Claude**, evaluates your answers with AI, and builds a cumulative knowledge graph across sessions — all visualised in a React dashboard.
 
@@ -55,7 +55,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 ## Monorepo structure
 
 ```
-mock-interview-mcp/
+interview-forge/
 ├── interview-mcp/   MCP server — interview state machine, data owner, REST API
 ├── report-mcp/      MCP server — analytics, report generation, knowledge graph queries
 ├── ui/              React + Vite dashboard (sessions, graph, reports, flashcards)
@@ -621,8 +621,8 @@ The UI and `report-mcp` both consume this API.
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/eliasjunior/interview-mcp.git
-cd interview-mcp
+git clone https://github.com/eliasjunior/interview-forge.git
+cd interview-forge
 npm install
 
 # 2. Configure interview-mcp
@@ -653,17 +653,17 @@ Prefer compiled entrypoints instead of `tsx` or `npm run build && ...` in the MC
       "command": "/usr/bin/env",
       "args": [
         "node",
-        "/Users/eliasjunior/Projects/ai-projects/first-mcp/interview-mcp/dist/server.js"
+        "/Users/eliasjunior/Projects/ai-projects/interview-forge/interview-mcp/dist/server.js"
       ],
-      "cwd": "/Users/eliasjunior/Projects/ai-projects/first-mcp/interview-mcp"
+      "cwd": "/Users/eliasjunior/Projects/ai-projects/interview-forge/interview-mcp"
     },
     "report-mcp": {
       "command": "/usr/bin/env",
       "args": [
         "node",
-        "/Users/eliasjunior/Projects/ai-projects/first-mcp/report-mcp/dist/server.js"
+        "/Users/eliasjunior/Projects/ai-projects/interview-forge/report-mcp/dist/server.js"
       ],
-      "cwd": "/Users/eliasjunior/Projects/ai-projects/first-mcp/report-mcp",
+      "cwd": "/Users/eliasjunior/Projects/ai-projects/interview-forge/report-mcp",
       "env": {
         "AI_ENABLED": "false"
       }
@@ -690,7 +690,7 @@ If Claude Desktop can use the tools but Codex Desktop or an agent thread cannot,
 - Verify the server directly: `cd interview-mcp && node dist/server.js`
 - Verify the sibling server directly: `cd report-mcp && AI_ENABLED=false node dist/server.js`
 - If those commands start and log `running on stdio`, the repo-side config is probably fine.
-- Then reconnect or restart the host app so it reloads [`.mcp.json`](/Users/eliasjunior/Projects/ai-projects/first-mcp/.mcp.json).
+- Then reconnect or restart the host app so it reloads [`.mcp.json`](/Users/eliasjunior/Projects/ai-projects/interview-forge/.mcp.json).
 
 After the host reconnects, always run `server_status` first. Only start an interview after that preflight succeeds.
 
