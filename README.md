@@ -110,7 +110,19 @@ server_status
 
 ### 2. Targeted drill on weak spots
 
-After a full interview, drill back on questions where you scored below 4. Claude loads your previous feedback as the rubric and runs a focused session.
+This workflow starts from a completed interview and turns weak feedback into deliberate practice.
+
+The current flow is:
+
+1. Run a full interview.
+2. End the interview with `end_interview`.
+3. `end_interview` finalizes the session, writes the report, merges concepts into the graph, and auto-generates flashcards for weak answers.
+4. Review the completed session feedback and identify recurring mistakes or weak areas.
+5. Optionally persist those patterns with `log_mistake`.
+6. Optionally create a follow-up implementation exercise with `create_exercise` based on the weak area.
+7. Run `start_drill` to revisit the weak answers verbally, using prior weak evaluations plus any logged mistakes as recall context.
+
+So `start_drill` is not the whole learning loop by itself. It is the targeted verbal-recall step that comes after at least one completed interview and can be combined with flashcards, mistake logging, and exercises.
 
 **You say:**
 ```
@@ -119,12 +131,24 @@ Drill me on my weak spots from the last JWT interview
 
 **Claude runs:**
 ```
+start_interview { topic: "JWT authentication" }
+  → ask_question
+  → [you answer]
+  → submit_answer
+  → evaluate_answer
+  → next_question
+  → [repeat per question]
+  → end_interview                  ← report + graph merge + flashcards for weak answers
+  → log_mistake { ... }            ← optional, for recurring patterns found in feedback
+  → create_exercise { ... }        ← optional, for hands-on follow-up practice
 start_drill { topic: "JWT authentication" }
-  → [shows recallContext: known mistakes + weak areas]
-  → asks: "What do you remember? Where will you struggle?"
+  → returns recallContext from prior weak evaluations + logged mistakes
+  → Claude shows that recall context to the candidate
+  → Claude asks: "What do you remember about these areas? Where do you think you will struggle?"
   → [you respond]
   → ask_question → submit_answer → evaluate_answer → next_question
-  → end_interview → log_mistake for any new gaps
+  → end_interview                  ← drill session finalized; weak drill answers can also create flashcards
+  → log_mistake { ... }            ← optional, for any new gaps discovered in the drill
 ```
 
 > Requires at least one completed interview for the topic first.
@@ -409,6 +433,30 @@ What are my weakest subjects across all sessions?
 get_report_weak_subjects { sessionId }
 ```
 
+The graph model works like this:
+
+- **Canonical nodes** — concepts are normalised before merge, so wording variants map to one stable node ID.
+- **Cluster membership** — a concept can belong to multiple clusters (`core concepts`, `practical usage`, `tradeoffs`, `best practices`) without becoming multiple nodes.
+- **Co-occurrence edges** — concepts that appear together in a session are linked with weighted co-occurrence edges.
+- **Semantic edges** — curated graph rules can also add explicit semantic relationships, for example tool-to-diagnosis links such as `thread-dump -> lock-contention`.
+
+Example: if the graph already contains `spring-mvc` and a new completed interview extracts `Spring MVC`, the new concept is normalised before merge and updates the existing `spring-mvc` node instead of creating a second node.
+
+Variations handled automatically today:
+
+- case differences: `Spring MVC` -> `spring-mvc`
+- spaces vs hyphens vs underscores: `thread dump`, `thread-dump`, `thread_dump`
+- repeated separators and punctuation cleanup
+- explicitly configured aliases such as `thread dump` / `thread dumps` / `thread-dump`
+
+Variations that still need an explicit alias rule:
+
+- true synonyms that are not just formatting variants
+- domain-specific renames such as `thread contention` -> `lock-contention`
+- concept families where plural/singular should collapse but the wording is not predictable from formatting alone
+
+Because the graph is derived from saved session concepts, changes to canonicalisation or semantic-edge rules may require a graph rebuild to backfill historical data.
+
 ---
 
 ### Full deliberate practice loop
@@ -590,30 +638,6 @@ npm run dev:ui
 
 Open **http://localhost:5173** to browse sessions and reports.
 Open **http://localhost:5173/graph** to explore the knowledge graph.
-
-The graph model now works like this:
-
-- **Canonical nodes** — concepts are normalised before merge, so wording variants map to one stable node ID.
-- **Cluster membership** — a concept can belong to multiple clusters (`core concepts`, `practical usage`, `tradeoffs`, `best practices`) without becoming multiple nodes.
-- **Co-occurrence edges** — concepts that appear together in a session are linked with weighted co-occurrence edges.
-- **Semantic edges** — curated graph rules can also add explicit semantic relationships, for example tool-to-diagnosis links such as thread-dump -> lock-contention.
-
-Example: if the graph already contains `spring-mvc` and a new completed interview extracts `Spring MVC`, the new concept is normalised before merge and updates the existing `spring-mvc` node instead of creating a second node.
-
-Variations handled automatically today:
-
-- case differences: `Spring MVC` -> `spring-mvc`
-- spaces vs hyphens vs underscores: `thread dump`, `thread-dump`, `thread_dump`
-- repeated separators and punctuation cleanup
-- explicitly configured aliases such as `thread dump` / `thread dumps` / `thread-dump`
-
-Variations that still need an explicit alias rule:
-
-- true synonyms that are not just formatting variants
-- domain-specific renames such as `thread contention` -> `lock-contention`
-- concept families where plural/singular should collapse but the wording is not predictable from formatting alone
-
-Because the graph is derived from saved session concepts, changes to canonicalisation or semantic-edge rules may require a graph rebuild to backfill historical data.
 Open **http://localhost:5173/flashcards** for flashcard review.
 
 ### Connecting the MCP servers to Claude
