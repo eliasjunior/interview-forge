@@ -24,7 +24,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 - [Full deliberate practice loop](#full-deliberate-practice-loop)
 
 **Reference**
-- [MCP tools — interview-mcp (27 tools)](#interview-mcp--27-tools)
+- [MCP tools — interview-mcp (27 tools)](#interview-mcp-27-tools)
 - [MCP tools — report-mcp (7 tools)](#report-mcp--7-tools)
 - [REST API](#rest-api-interview-mcp-port-3001)
 - [Monorepo scripts](#monorepo-scripts)
@@ -573,8 +573,8 @@ The UI and `report-mcp` both consume this API.
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/eliasjunior/interview-mcp-.git
-cd interview-mcp-
+git clone https://github.com/eliasjunior/interview-mcp.git
+cd interview-mcp
 npm install
 
 # 2. Configure interview-mcp
