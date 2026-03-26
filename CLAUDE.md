@@ -9,6 +9,28 @@ Before answering the user's request, first state whether `interview-mcp` is conn
 - If it is not connected, say: `Before I continue, I should check whether interview-mcp is connected in this Desktop session. It is not connected, so I have to stop here.`
 - Do not answer the user's actual request until this check has been reported.
 
+## MCP Connection Troubleshooting
+
+If `interview-mcp` fails to connect, follow this checklist before asking the user to do anything:
+
+### 1. Check the logs
+```bash
+tail -n 50 ~/Library/Logs/Claude/mcp-server-interview-mcp.log
+```
+
+### 2. Common causes & fixes
+
+| Symptom in log | Cause | Fix |
+|---|---|---|
+| `Cannot find module '.../dist/server.js'` | Project not built | Run `npm run build` from repo root |
+| `Server transport closed unexpectedly` | Process crashed on startup | Check for syntax errors or missing `.env` |
+| `Missing environment variables` | `.env` not loaded | Verify `interview-mcp/.env` has `AI_ENABLED` set |
+
+### 3. After fixing, always
+1. Run `npm run build` from the repo root if any TypeScript was changed or dist is missing
+2. Fully quit and reopen Claude Desktop (closing the window is not enough)
+3. Confirm reconnection by calling `server_status`
+
 ## Overview
 
 A study project for learning **Model Context Protocol (MCP)** server development. It runs mock technical interviews through Claude, evaluates answers with AI, and builds a growing knowledge graph across sessions — all visualised in a React dashboard.

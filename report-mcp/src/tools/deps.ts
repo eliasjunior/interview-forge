@@ -1,5 +1,6 @@
 import type { AIProvider } from "../ai/index.js";
-import type { Evaluation, KnowledgeGraph, Session } from "@mock-interview/shared";
+import type { Evaluation, KnowledgeGraph, Session, SessionKind } from "@mock-interview/shared";
+import type { ProgressOverview, ProgressOverviewOptions } from "../reportUtils.js";
 
 export type WeakSubject = {
   questionIndex: number;
@@ -24,6 +25,7 @@ export type FullReportQuestionContext = {
 };
 
 export type StateError = ReturnType<ToolDeps["stateError"]>;
+export type ProgressSessionKind = SessionKind | "all";
 
 export interface ToolDeps {
   ai: AIProvider | null;
@@ -34,26 +36,19 @@ export interface ToolDeps {
     content: Array<{ type: "text"; text: string }>;
   };
 
-  // Data access — sessions (read + write for regenerate_report deeper dives)
   loadSessions(): Record<string, Session>;
   saveSessions(sessions: Record<string, Session>): void;
-
-  // Data access — graph (read-only)
   loadGraph(): KnowledgeGraph;
-
-  // Report file persistence
   saveReport(session: Session): string;
-
-  // UI generation
   ensureGeneratedUiDir(): void;
   writeTextFile(path: string, content: string): void;
 
-  // Utility functions
   calcAvgScore(evaluations: Evaluation[]): string;
   buildSummary(session: Session): string;
   pickSessionByTopic(sessions: Record<string, Session>, topic: string): Session | null;
   extractWeakSubjects(session: Session, weakScoreThreshold: number, maxSubjects: number): WeakSubject[];
   buildFullQuestionContext(session: Session, weakScoreThreshold: number): FullReportQuestionContext[];
+  buildProgressOverview(sessions: Record<string, Session>, options: ProgressOverviewOptions): ProgressOverview;
   countLines(text: string): number;
   escapeHtml(value: string): string;
   serializeForInlineScript(value: unknown): string;

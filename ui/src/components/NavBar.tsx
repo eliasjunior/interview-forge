@@ -9,6 +9,12 @@ export default function NavBar() {
       </div>
       <div className="navbar-links">
         <NavLink
+          to="/topics"
+          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        >
+          Topics
+        </NavLink>
+        <NavLink
           to="/sessions"
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >
@@ -19,6 +25,12 @@ export default function NavBar() {
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >
           Knowledge Graph
+        </NavLink>
+        <NavLink
+          to="/progress"
+          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        >
+          Progress
         </NavLink>
         <NavLink
           to="/flashcards"

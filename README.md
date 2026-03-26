@@ -2,6 +2,8 @@
 
 A study project that runs **mock technical interviews through Claude**, evaluates your answers with AI, and builds a cumulative knowledge graph across sessions — all visualised in a React dashboard.
 
+`interview-mcp` is the **stateful interview engine**: it owns the interview state machine, session progress, persistence, and tool contract. Claude is the orchestrator and conversation layer, but `interview-mcp` is the source of truth for what step the interview is in.
+
 It is structured as an **npm workspaces monorepo** with four packages and two MCP servers that Claude connects to simultaneously.
 
 ---
@@ -24,8 +26,8 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 - [Full deliberate practice loop](#full-deliberate-practice-loop)
 
 **Reference**
-- [MCP tools — interview-mcp (27 tools)](#interview-mcp-27-tools)
-- [MCP tools — report-mcp (7 tools)](#report-mcp--7-tools)
+- [MCP tools — interview-mcp (27 tools)](#interview-mcp--27-tools)
+- [MCP tools — report-mcp (8 tools)](#report-mcp--8-tools)
 - [REST API](#rest-api-interview-mcp-port-3001)
 - [Monorepo scripts](#monorepo-scripts)
 - [Knowledge topics](#knowledge-topics)
@@ -58,7 +60,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 interview-forge/
 ├── interview-mcp/   MCP server — interview state machine, data owner, REST API
 ├── report-mcp/      MCP server — analytics, report generation, knowledge graph queries
-├── ui/              React + Vite dashboard (sessions, graph, reports, flashcards)
+├── ui/              React + Vite dashboard (topics, sessions, graph, reports, flashcards)
 └── shared/          TypeScript types only — shared across all packages
 ```
 
@@ -581,7 +583,7 @@ This server drives the interview session from start to finish.
 
 **Session state machine:** `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW_UP` (loops per question) → `ENDED`
 
-### report-mcp — 7 tools
+### report-mcp — 8 tools
 
 This server is focused on analysing and presenting completed sessions.
 
@@ -593,6 +595,7 @@ This server is focused on analysing and presenting completed sessions.
 | `get_report_weak_subjects` | Identifies low-scoring questions and returns structured context, ready to pipe into `generate_report_ui`. |
 | `get_report_full_context` | Returns all evaluated Q/A pairs for a session, with a pre-filled `nextCall` scaffold for `generate_report_ui`. |
 | `generate_report_ui` | Writes a per-session JSON dataset and returns a viewer URL (`/generated/report-ui.html?sessionId=…`). |
+| `get_progress_overview` | Aggregates ended sessions into score trends, topic progress, repeated-topic improvement, weak-question rate, and recent-session summaries. |
 | `get_graph` | Returns the full cumulative knowledge graph from the shared SQLite store. |
 
 [↑ Back to top](#table-of-contents)
@@ -611,6 +614,7 @@ The UI and `report-mcp` both consume this API.
 | `GET /api/graph` | Full knowledge graph JSON |
 | `GET /api/flashcards` | All flashcards |
 | `POST /api/flashcards/:id/review` | Submit a review rating `{ rating: 1\|2\|3\|4 }`, applies SM-2, returns updated card |
+| `GET /api/topics` | List of available interview topics from knowledge files — returns `{ file, displayName }[]` |
 | `GET /generated/report-ui.html` | Interactive HTML report viewer |
 
 [↑ Back to top](#table-of-contents)

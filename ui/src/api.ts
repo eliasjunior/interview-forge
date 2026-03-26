@@ -8,6 +8,8 @@ import type {
   GraphInspectionResult,
   SessionDeletionPreview,
   SessionDeleteResult,
+  ProgressOverview,
+  ProgressSessionKind,
 } from '@mock-interview/shared'
 
 const BASE = '/api'
@@ -34,8 +36,32 @@ async function del<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export interface Topic {
+  file: string
+  displayName: string
+}
+
+export const getTopics = (): Promise<Topic[]> => req(`${BASE}/topics`)
+
 export const getSessions = (): Promise<Session[]> => req(`${BASE}/sessions`)
 
+
+export interface ProgressQuery {
+  sessionKind?: ProgressSessionKind
+  weakScoreThreshold?: number
+  recentSessionsLimit?: number
+  topicLimit?: number
+}
+
+export const getProgressOverview = (query: ProgressQuery = {}): Promise<ProgressOverview> => {
+  const params = new URLSearchParams()
+  if (query.sessionKind) params.set('sessionKind', query.sessionKind)
+  if (typeof query.weakScoreThreshold === 'number') params.set('weakScoreThreshold', String(query.weakScoreThreshold))
+  if (typeof query.recentSessionsLimit === 'number') params.set('recentSessionsLimit', String(query.recentSessionsLimit))
+  if (typeof query.topicLimit === 'number') params.set('topicLimit', String(query.topicLimit))
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return req(`${BASE}/progress${suffix}`)
+}
 export const getSession = async (id: string): Promise<Session | null> => {
   const sessions = await getSessions()
   return sessions.find(s => s.id === id) ?? null

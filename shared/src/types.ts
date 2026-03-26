@@ -257,6 +257,82 @@ export interface Exercise {
   createdAt: string
 }
 
+// ── Progress reporting ─────────────────────────────────────────────────────────
+
+export type ProgressSessionKind = SessionKind | 'all'
+
+export interface ProgressOverviewFilters {
+  sessionKind: ProgressSessionKind
+  weakScoreThreshold: number
+  recentSessionsLimit: number
+  topicLimit: number
+}
+
+export interface ProgressOverviewTotals {
+  sessions: number
+  topics: number
+  questionsAnswered: number
+  avgScore: string
+  weakQuestions: number
+  weakQuestionRate: string
+  followUpCount: number
+  followUpRate: string
+  firstSessionAt: string | null
+  lastSessionAt: string | null
+}
+
+export interface ProgressRecentSession {
+  sessionId: string
+  topic: string
+  sessionKind: SessionKind
+  createdAt: string
+  endedAt?: string
+  avgScore: string
+  questionCount: number
+  weakQuestionCount: number
+  followUpCount: number
+}
+
+export interface ProgressTrendPoint {
+  sessionId: string
+  topic: string
+  endedAt: string
+  avgScore: string
+}
+
+export interface ProgressTopicBreakdown {
+  topic: string
+  sessionCount: number
+  avgScore: string
+  latestScore: string
+  deltaFromFirst: string
+  totalQuestions: number
+  weakQuestions: number
+  weakQuestionRate: string
+  lastSessionAt: string
+}
+
+export interface ProgressRepeatedTopic {
+  topic: string
+  sessionCount: number
+  firstScore: string
+  latestScore: string
+  delta: string
+  firstSessionAt: string
+  latestSessionAt: string
+}
+
+export interface ProgressOverview {
+  generatedAt: string
+  filters: ProgressOverviewFilters
+  totals: ProgressOverviewTotals
+  scoreDistribution: Record<'1' | '2' | '3' | '4' | '5', number>
+  recentSessions: ProgressRecentSession[]
+  scoreTrend: ProgressTrendPoint[]
+  topicBreakdown: ProgressTopicBreakdown[]
+  repeatedTopics: ProgressRepeatedTopic[]
+}
+
 // ── HTTP API responses (used by ui) ───────────────────────────────────────────
 
 export interface ReportMeta {
