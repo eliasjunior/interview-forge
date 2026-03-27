@@ -7,6 +7,8 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
 import { applySM2 } from "./srsUtils.js";
+import { FileKnowledgeStore } from "./knowledge/file.js";
+import { detectTopicLevel } from "./tools/getTopicLevel.js";
 import type {
   ReviewRating,
   Flashcard,
@@ -61,7 +63,7 @@ function parseBoundedInt(value: unknown, fallback: number, min: number, max: num
 }
 
 function parseProgressSessionKind(value: unknown): ProgressSessionKind {
-  if (value === "interview" || value === "study" || value === "drill" || value === "all") {
+  if (value === "interview" || value === "study" || value === "drill" || value === "warmup" || value === "all") {
     return value;
   }
   return "interview";
@@ -165,6 +167,21 @@ app.get("/api/topics", (_req, res) => {
     return { file: f.replace(".md", ""), displayName };
   });
   res.json(topics);
+});
+
+// API: Get the recommended warm-up level for a topic
+app.get("/api/topics/:topic/level", (req, res) => {
+  const topic = decodeURIComponent(req.params.topic);
+  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
+  const knowledgeTopic = store.findByTopic(topic);
+  const hasWarmupContent =
+    knowledgeTopic != null &&
+    knowledgeTopic.warmupLevels != null &&
+    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+
+  const sessions = loadSessions();
+  const { level, status, reason, nextLevelRequirement } = detectTopicLevel(topic, sessions, hasWarmupContent);
+  res.json({ topic, level, status, reason, nextLevelRequirement, hasWarmupContent });
 });
 
 // API: Get the full knowledge graph

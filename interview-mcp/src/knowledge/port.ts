@@ -1,5 +1,22 @@
 import type { Concept } from "@mock-interview/shared";
 
+// ── Warm-up quest data (internal to knowledge store) ─────────────────────────
+
+export interface WarmUpQuestion {
+  question: string;
+  /** MCQ option labels (e.g. ["Header", "SessionID", …]). Present at Level 0 only. */
+  choices?: string[];
+  /** Correct answer: option letter (L0), fill-in text (L1), or model answer (L2). */
+  answer: string;
+  /** Scaffolding hint shown before the candidate answers. Present at Level 2. */
+  hint?: string;
+}
+
+/** Content for one warm-up level (0, 1, or 2). Level 3 = full interview — no data needed. */
+export interface WarmUpLevelContent {
+  questions: WarmUpQuestion[];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // KnowledgeStore — port
 //
@@ -41,6 +58,13 @@ export interface KnowledgeTopic {
 
   /** Pre-defined concepts — replaces ai.extractConcepts */
   concepts: Concept[];
+
+  /**
+   * Warm-up quest content indexed by level (0, 1, 2).
+   * Level 3 redirects to a full interview — no content stored here.
+   * Missing levels mean no warm-up content was authored for that level.
+   */
+  warmupLevels?: Partial<Record<0 | 1 | 2, WarmUpLevelContent>>;
 }
 
 export interface KnowledgeStore {

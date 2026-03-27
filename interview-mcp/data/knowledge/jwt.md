@@ -80,3 +80,67 @@ A strong candidate understands not just what JWT is, but when stateless auth bec
 - practical usage: authentication, authorization, api-security, refresh-token, access-token, rbac, jwks, kid, token-introspection, oidc, oauth2
 - tradeoffs: revocation, payload-size, key-management, stateless-vs-stateful, hs256-vs-rs256, jwt-vs-opaque, clock-skew-vs-replay-window
 - best practices: httponly-cookies, short-expiry, asymmetric-signing, jti-claim, https-only, algorithm-allowlist, rotate-refresh-tokens, validate-aud-and-iss
+
+## Warm-up Quests
+
+### Level 0 — Recognition (MCQ)
+1. Which of the following is a structural part of a JWT?
+   A) Header
+   B) SessionID
+   C) Cookie
+   D) IP Address
+   Answer: A
+
+2. How many parts does a JWT have, separated by dots?
+   A) 1
+   B) 2
+   C) 3
+   D) 4
+   Answer: C
+
+3. Which algorithm type is considered safer for signing JWTs in production?
+   A) HS256 (symmetric, shared secret)
+   B) RS256 (asymmetric, public/private key pair)
+   C) MD5 (hash only)
+   D) Base64 (encoding only)
+   Answer: B
+
+4. Where should a JWT access token be stored in a browser for maximum security?
+   A) localStorage
+   B) sessionStorage
+   C) HttpOnly cookie
+   D) URL query parameter
+   Answer: C
+
+5. What does the "stateless" property of JWTs mean?
+   A) The token never expires
+   B) The server does not need to store session data to validate the token
+   C) The token has no claims
+   D) The token is encrypted
+   Answer: B
+
+### Level 1 — Fill in the Blank
+1. A JWT is made up of three parts: ___, payload, and signature, joined by dots.
+   Answer: header
+
+2. JWT stands for JSON ___ Token.
+   Answer: Web
+
+3. The JWT signature is created by signing the encoded header and payload with a ___.
+   Answer: secret key (or private key)
+
+4. To prevent a stolen JWT from being used forever, JWTs should have a short ___ time.
+   Answer: expiry (exp)
+
+5. When using asymmetric signing, the token is signed with a ___ key and verified with a ___ key.
+   Answer: private / public
+
+### Level 2 — Guided Answer
+1. Explain what a JWT is and why it is useful. Use this structure: [definition → structure → why stateless matters].
+   Hint: Think about what problem session-based auth has at scale, and how JWTs solve it.
+
+2. Describe the difference between HS256 and RS256. Use this structure: [how each works → when to use each → the risk of HS256].
+   Hint: Consider who holds the key in each case and what happens if a service is compromised.
+
+3. Explain how JWT revocation works and why it is hard. Use this structure: [why stateless makes revocation hard → common approaches → trade-offs of each].
+   Hint: Think about token blacklists, short expiry windows, and refresh token patterns.

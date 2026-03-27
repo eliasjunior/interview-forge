@@ -14,9 +14,17 @@ export type InterviewState =
   | 'FOLLOW_UP'
   | 'ENDED'
 
-export type SessionKind = 'interview' | 'study' | 'drill'
+export type SessionKind = 'interview' | 'study' | 'drill' | 'warmup'
 export type StudyCategory = 'topic' | 'algorithm'
 export type InterviewType = 'design' | 'code'
+
+// ── Warm-up quest levels ───────────────────────────────────────────────────────
+
+/** Progressive entry level for a topic. 0 = cold start, 3 = full interview ready. */
+export type WarmUpLevel = 0 | 1 | 2 | 3
+
+/** Question format used in warm-up sessions. */
+export type QuestionFormat = 'mcq' | 'fill_blank' | 'guided' | 'open'
 
 // ── Session data ──────────────────────────────────────────────────────────────
 
@@ -57,6 +65,14 @@ export interface Session {
   customContent?: string
   /** The interview angle for a scoped session, e.g. "robustness, reliability, and extensibility" */
   focusArea?: string
+  /** Warm-up quest level (0–3). Present only when sessionKind === 'warmup'. */
+  questLevel?: WarmUpLevel
+  /** Question format used in this warm-up session. */
+  questFormat?: QuestionFormat
+  /** MCQ answer choices, parallel to questions[]. Only present when questFormat === 'mcq'. */
+  questChoices?: string[][]
+  /** Correct answers for auto-evaluation (L0/L1). Parallel to questions[]. */
+  questAnswers?: string[]
   state: InterviewState
   currentQuestionIndex: number
   questions: string[]

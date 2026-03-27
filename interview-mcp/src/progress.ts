@@ -11,6 +11,19 @@ function getSessionKind(session: Session): SessionKind {
   return session.sessionKind ?? "interview";
 }
 
+/**
+ * Warm-up sessions count with reduced weight so their binary L0/L1 scores
+ * (always 1 or 5) don't distort overall averages.
+ * L0/L1 → 0.1, L2 → 0.3, full interview / drill / study → 1.0
+ */
+function getSessionWeight(session: Session): number {
+  if (session.sessionKind !== "warmup") return 1.0;
+  const level = session.questLevel ?? 0;
+  if (level <= 1) return 0.1;
+  if (level === 2) return 0.3;
+  return 1.0;
+}
+
 function getEndedAt(session: Session): string {
   return session.endedAt ?? session.createdAt;
 }
@@ -51,8 +64,19 @@ export function buildProgressOverview(
   const evaluations = chronologicalSessions.flatMap((session) => session.evaluations);
   const weakQuestions = evaluations.filter((evaluation) => evaluation.score <= options.weakScoreThreshold).length;
   const followUpCount = evaluations.filter((evaluation) => evaluation.needsFollowUp).length;
-  const totalScore = evaluations.reduce((sum, evaluation) => sum + evaluation.score, 0);
-  const avgScore = evaluations.length === 0 ? "N/A" : (totalScore / evaluations.length).toFixed(1);
+
+  // Weighted average score — warmup L0/L1 sessions count with reduced weight
+  // so their binary scores (always 1 or 5) don't distort the overall average.
+  let weightedScoreSum = 0;
+  let weightedCount = 0;
+  for (const session of chronologicalSessions) {
+    const w = getSessionWeight(session);
+    for (const ev of session.evaluations) {
+      weightedScoreSum += ev.score * w;
+      weightedCount += w;
+    }
+  }
+  const avgScore = weightedCount === 0 ? "N/A" : (weightedScoreSum / weightedCount).toFixed(1);
   const scoreDistribution: ProgressOverview["scoreDistribution"] = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
 
   for (const evaluation of evaluations) {

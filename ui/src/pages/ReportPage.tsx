@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { deleteSession, getGeneratedReportUi, getSession, getSessionDeletePreview, type ReportUiDataset } from '../api'
-import type { Session, Evaluation, Concept, SessionDeletionPreview } from '@mock-interview/shared'
+import type { Session, Evaluation, Concept, SessionDeletionPreview, SessionKind } from '@mock-interview/shared'
 import ScoreBadge, { ScoreBar } from '../components/ScoreBadge'
 
 function calcAvg(evals: Evaluation[]): string {
@@ -28,7 +28,7 @@ function conceptStyle(cluster: string) {
 
 type Tab = 'overview' | 'questions' | 'transcript'
 
-function getSessionKind(session: Session): 'interview' | 'study' | 'drill' {
+function getSessionKind(session: Session): SessionKind {
   return session.sessionKind ?? 'interview'
 }
 

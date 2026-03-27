@@ -16,6 +16,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 - [Modes](#modes)
 
 **How to use it**
+- [0. Starting a topic — warm-up ladder](#0-starting-a-topic--warm-up-ladder)
 - [1. Full interview](#1-full-interview)
 - [2. Targeted drill on weak spots](#2-targeted-drill-on-weak-spots)
 - [3. Scoped interview on custom content](#3-scoped-interview-on-custom-content)
@@ -83,9 +84,57 @@ All interactions happen in natural language inside **Claude Desktop** or **Claud
 
 ---
 
+### 0. Starting a topic — warm-up ladder
+
+Every topic now has a 4-level progression ladder. Claude always checks your history before starting anything and routes you to the right entry point.
+
+**You say:**
+```
+I want to study JWT authentication
+```
+
+**Claude runs:**
+```
+get_topic_level { topic: "JWT authentication" }
+  → returns level: 0, status: "cold"   ← never attempted, always starts at L0
+  → instruction: call start_warm_up { topic, level: 0 }
+```
+
+**Then — if topic has warm-up content (e.g. JWT):**
+```
+start_warm_up { topic: "JWT authentication", level: 0 }
+  → creates a warmup session (sessionKind: "warmup", questFormat: "mcq")
+  → ask_question { sessionId }
+  → [you pick A / B / C / D]
+  → submit_answer { sessionId, answer: "B" }
+  → evaluate_answer { sessionId }    ← auto-scored against correct answer
+  → next_question { sessionId }
+  → [repeat per question]
+  → end_interview { sessionId }      ← advances topic to next level when avg ≥ 4.0
+```
+
+**If topic has no warm-up content yet:** `start_warm_up` returns an error with the instruction to call `start_interview` directly. The Topics page still shows L0 "Not Started" so you know no sessions exist.
+
+**Level routing table:**
+
+| Status | What Claude calls |
+|---|---|
+| `cold` — no sessions | `start_warm_up { level: 0 }` (MCQ) |
+| `warmup` L0 in progress | `start_warm_up { level: 0 }` (retry) |
+| `warmup` L1 in progress | `start_warm_up { level: 1 }` (fill-in-blank) |
+| `warmup` L2 in progress | `start_warm_up { level: 2 }` (guided answer) |
+| `dropped` (interview avg < 2.5) | `start_warm_up { level: 1 }` (reinforcement) |
+| `ready` (interview avg ≥ 3.0) | `start_interview { topic }` |
+
+Advancement threshold: avg score ≥ 4.0 on a warm-up session unlocks the next level.
+
+---
+
 ### 1. Full interview
 
 The core loop. Claude asks questions one at a time, waits for your answer, scores it, optionally asks a follow-up, then moves to the next question. At the end it generates a report and flashcards for weak answers automatically.
+
+Reached after completing the warm-up ladder, or directly for topics without warm-up content.
 
 **You say:**
 ```
@@ -753,6 +802,38 @@ Within each tier, questions you have been asked least often across past sessions
 | `rotate-matrix-algorithm.md` | Rotate Matrix (algorithm) | 14 (5 foundation, 7 intermediate, 2 advanced) |
 | `mortgage-rest-design.md` | Mortgage REST API Design | 20 (5 foundation, 10 intermediate, 5 advanced) |
 
+### Warm-up quest levels
+
+Every topic has a 4-level progression ladder. Before jumping into a full interview, the system checks your session history and routes you to the right entry point.
+
+| Level | Color | Format | Goal | Evaluation |
+|---|---|---|---|---|
+| **L0** | Amber — Recognition | Multiple-choice (MCQ) | Trigger memory, reduce anxiety, build familiarity | Auto-scored — answer a letter (A/B/C/D) |
+| **L1** | Yellow — Assisted Recall | Fill in the blank | Partial activation with low cognitive load | Auto-scored — answer must contain the key term |
+| **L2** | Blue — Guided Answer | Open answer with structure hint | Structured thinking, reduce blank-page problem | Orchestrator scores against provided structure |
+| **L3** | Green — Interview Ready | Full open-ended question | Production-level explanation | Full evaluation with score, feedback, follow-up |
+
+**Status badges on the Topics page:**
+
+| Badge | Color | Meaning |
+|---|---|---|
+| L0 — Not Started | Grey | No sessions exist for this topic — always starts at L0 |
+| L0 — Recognition | Amber | Attempted L0 warm-up, still below threshold (avg < 4.0) |
+| L1 — Assisted Recall | Yellow | Working through L1, or dropped back from a poor interview (avg < 2.5) |
+| L2 — Guided Answer | Blue | Working through L2 |
+| L3 — Interview Ready (earned) | Green | Full interview completed with avg score ≥ 3.0 |
+
+**Level advancement thresholds:** avg score ≥ 4.0 on a warm-up session unlocks the next level. A full interview with avg < 2.5 drops the topic back to L1 for reinforcement.
+
+**MCP tools for the warm-up flow:**
+```
+get_topic_level { topic }               → check current level + status
+start_warm_up { topic, level? }         → begin warm-up (auto-detects level if omitted)
+evaluate_answer { sessionId }           → L0/L1 auto-score; L2 needs orchestrator score
+```
+
+Warm-up content lives in the `## Warm-up Quests` section of each knowledge file (see [Knowledge file format](#knowledge-file-format)). Currently only `jwt.md` has warm-up content authored — other topics show L0 "Not Started" and route directly to `start_interview` until content is added.
+
 ### Knowledge file format
 
 ```markdown
@@ -783,6 +864,28 @@ Within each tier, questions you have been asked least often across past sessions
 ```
 
 Cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
+
+To add warm-up content for a topic, append a `## Warm-up Quests` section:
+
+```markdown
+## Warm-up Quests
+
+### Level 0 — Recognition (MCQ)
+1. <Question text>
+   A) <Option A>
+   B) <Option B>
+   C) <Option C>
+   D) <Option D>
+   Answer: A
+
+### Level 1 — Fill in the Blank
+1. <Sentence with ___ gap>
+   Answer: <key term>
+
+### Level 2 — Guided Answer
+1. <Open question with structure hint>
+   Hint: <Scaffolding hint shown to candidate before they answer>
+```
 
 Set `AI_ENABLED=true` to let the server generate questions for any topic not in the knowledge base.
 

@@ -46,7 +46,39 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
 
       let result: { score: number; feedback: string; strongAnswer?: string; needsFollowUp: boolean; followUpQuestion?: string | null; deeperDive?: string };
 
-      if (deps.ai) {
+      // ── Warm-up auto-evaluation (L0 MCQ / L1 fill-in-blank) ────────────────
+      // For these formats the correct answer is stored on the session.
+      // No AI or orchestrator scoring is needed — evaluate automatically.
+      const warmupAnswer = session.questAnswers?.[session.currentQuestionIndex];
+      if (
+        session.sessionKind === "warmup" &&
+        (session.questFormat === "mcq" || session.questFormat === "fill_blank") &&
+        warmupAnswer !== undefined
+      ) {
+        const expected = warmupAnswer.trim();
+        let isCorrect: boolean;
+        let feedback: string;
+
+        if (session.questFormat === "mcq") {
+          // Candidate answer: any response whose first non-whitespace char is the correct letter
+          const candidateLetter = lastAnswer.content.trim().charAt(0).toUpperCase();
+          const correctLetter = expected.charAt(0).toUpperCase();
+          isCorrect = candidateLetter === correctLetter;
+          const choiceIdx = correctLetter.charCodeAt(0) - 65; // A=0, B=1 …
+          const choiceText = session.questChoices?.[session.currentQuestionIndex]?.[choiceIdx] ?? expected;
+          feedback = isCorrect
+            ? `Correct! ${correctLetter}) ${choiceText} is right.`
+            : `Not quite — the correct answer is ${correctLetter}) ${choiceText}.`;
+        } else {
+          // fill_blank: accept if the candidate's answer contains the expected key term
+          isCorrect = lastAnswer.content.toLowerCase().includes(expected.toLowerCase());
+          feedback = isCorrect
+            ? `Correct! The expected answer is: "${expected}".`
+            : `Not quite — the expected answer is: "${expected}".`;
+        }
+
+        result = { score: isCorrect ? 5 : 1, feedback, needsFollowUp: false };
+      } else if (deps.ai) {
         const entry = deps.knowledge.findByTopic(session.topic);
         // Prefer pre-selected criteria stored on the session (safe after question shuffling).
         // Fall back to positional lookup for legacy sessions and AI-generated questions.

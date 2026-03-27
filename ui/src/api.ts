@@ -43,6 +43,19 @@ export interface Topic {
 
 export const getTopics = (): Promise<Topic[]> => req(`${BASE}/topics`)
 
+export interface TopicLevel {
+  topic: string
+  level: 0 | 1 | 2 | 3
+  /** 'cold' = never attempted, 'warmup' = in the ladder, 'dropped' = fell back, 'ready' = interview-ready */
+  status: 'cold' | 'warmup' | 'dropped' | 'ready'
+  reason: string
+  nextLevelRequirement: string
+  hasWarmupContent: boolean
+}
+
+export const getTopicLevel = (topic: string): Promise<TopicLevel> =>
+  req(`${BASE}/topics/${encodeURIComponent(topic)}/level`)
+
 export const getSessions = (): Promise<Session[]> => req(`${BASE}/sessions`)
 
 
