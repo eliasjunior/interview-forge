@@ -51,6 +51,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 4. **Generates flashcards** — questions you scored below 4 are automatically turned into spaced-repetition flashcards (SM-2 algorithm). Due cards surface daily.
 5. **Produces reports** — a Markdown report and an interactive HTML viewer are generated per session, showing scores, feedback, and model answers side-by-side.
 6. **Visualises everything** — a React dashboard shows session history, the knowledge graph (D3), report viewer, and a flashcard review UI.
+7. **Adds a rewards loop** — the learning experience is designed to feel more engaging and motivating, using lightweight ideas from games and neuroscience to reinforce progress. Clear feedback, small wins, and visible momentum make practice more satisfying, helping you stay consistent and enjoy the process of learning.
 
 [↑ Back to top](#table-of-contents)
 
