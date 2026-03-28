@@ -4,6 +4,40 @@ import type { Evaluation } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
+function parseMcqAnswer(answer: string, choiceCount: number): string[] {
+  const normalised = answer.trim().toUpperCase();
+  if (!normalised) return [];
+
+  if (normalised === "ALL") {
+    return Array.from({ length: choiceCount }, (_, index) => String.fromCharCode(65 + index));
+  }
+
+  if (normalised === "NONE") {
+    return ["NONE"];
+  }
+
+  return Array.from(
+    new Set(
+      normalised
+        .split(/[,\s]+/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+    )
+  ).sort();
+}
+
+function formatMcqAnswer(answer: string[], choices: string[]): string {
+  if (answer.length === 1 && answer[0] === "NONE") return "NONE";
+
+  return answer
+    .map((letter) => {
+      const index = letter.charCodeAt(0) - 65;
+      const choiceText = choices[index];
+      return choiceText ? `${letter}) ${choiceText}` : letter;
+    })
+    .join(", ");
+}
+
 export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
     "evaluate_answer",
@@ -46,7 +80,7 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
 
       let result: { score: number; feedback: string; strongAnswer?: string; needsFollowUp: boolean; followUpQuestion?: string | null; deeperDive?: string };
 
-      // ── Warm-up auto-evaluation (L0 MCQ / L1 fill-in-blank) ────────────────
+      // ── Warm-up auto-evaluation (L0/L1 MCQ, legacy L1 fill-in-blank) ───────
       // For these formats the correct answer is stored on the session.
       // No AI or orchestrator scoring is needed — evaluate automatically.
       const warmupAnswer = session.questAnswers?.[session.currentQuestionIndex];
@@ -60,15 +94,17 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         let feedback: string;
 
         if (session.questFormat === "mcq") {
-          // Candidate answer: any response whose first non-whitespace char is the correct letter
-          const candidateLetter = lastAnswer.content.trim().charAt(0).toUpperCase();
-          const correctLetter = expected.charAt(0).toUpperCase();
-          isCorrect = candidateLetter === correctLetter;
-          const choiceIdx = correctLetter.charCodeAt(0) - 65; // A=0, B=1 …
-          const choiceText = session.questChoices?.[session.currentQuestionIndex]?.[choiceIdx] ?? expected;
+          const choices = session.questChoices?.[session.currentQuestionIndex] ?? [];
+          const expectedAnswers = parseMcqAnswer(expected, choices.length);
+          const candidateAnswers = parseMcqAnswer(lastAnswer.content, choices.length);
+          isCorrect =
+            expectedAnswers.length === candidateAnswers.length &&
+            expectedAnswers.every((value, index) => value === candidateAnswers[index]);
+
+          const renderedCorrectAnswer = formatMcqAnswer(expectedAnswers, choices);
           feedback = isCorrect
-            ? `Correct! ${correctLetter}) ${choiceText} is right.`
-            : `Not quite — the correct answer is ${correctLetter}) ${choiceText}.`;
+            ? `Correct! ${renderedCorrectAnswer} ${expectedAnswers.length > 1 || expectedAnswers[0] === "NONE" ? "are" : "is"} right.`
+            : `Not quite — the correct answer is ${renderedCorrectAnswer}.`;
         } else {
           // fill_blank: accept if the candidate's answer contains the expected key term
           isCorrect = lastAnswer.content.toLowerCase().includes(expected.toLowerCase());

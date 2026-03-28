@@ -108,3 +108,191 @@ Common pitfalls: race conditions, deadlocks (circular lock dependency), livelock
 - practical usage: synchronized, volatile, reentrantlock, readwritelock, executorservice, threadpoolexecutor, future, completablefuture, countdownlatch, cyclicbarrier, semaphore, blockingqueue, concurrenthashmap, copyonwritearraylist, forkjoinpool, atomic-variables, cas, atomicinteger, longadder
 - tradeoffs: context switching, lock contention, throughput vs latency, lock granularity, optimistic vs pessimistic locking, bounded vs unbounded queue, heap sharing, platform vs virtual threads, precision-vs-throughput
 - best practices: thread confinement, immutability, lock ordering, avoid shared mutable state, prefer concurrent collections over synchronized wrappers, use executorservice over raw threads, shutdown executor on exit, bounded queues with rejection policy, use-volatile-only-for-visibility-not-compound-updates
+
+## Warm-up Quests
+
+### Level 0
+
+1. In Java, what is the main difference between a process and a thread?
+A) A process shares the heap with other processes, but a thread does not
+B) A thread shares heap memory with other threads in the same process, but a process has its own memory space
+C) A thread always runs on a dedicated CPU core, but a process does not
+D) A process is lighter-weight than a thread
+Answer: B
+
+2. When would `volatile` be appropriate?
+A) When you need to make `count++` atomic across threads
+B) When you need mutual exclusion for a critical section
+C) When you need a shared flag to become visible quickly across threads
+D) When you need to update two related fields consistently
+Answer: C
+
+3. What is a race condition?
+A) When two threads are created at the same time
+B) When a thread is blocked waiting on I/O
+C) When the JVM uses more than one CPU core
+D) When program correctness depends on timing/interleaving of unsynchronized operations
+Answer: D
+
+4. Which type is most directly designed for a producer-consumer queue with blocking behavior?
+A) `HashMap`
+B) `ArrayList`
+C) `BlockingQueue`
+D) `AtomicInteger`
+Answer: C
+
+5. Why is `AtomicInteger` usually safer than a plain shared `int` for concurrent increments?
+A) Because it makes read-modify-write updates atomic
+B) Because it stores the value off-heap
+C) Because it guarantees fairness between threads
+D) Because it prevents all lock contention in the JVM
+Answer: A
+
+6. Which statement best distinguishes `CountDownLatch` from `CyclicBarrier`?
+A) `CountDownLatch` is reusable, `CyclicBarrier` is one-shot
+B) `CountDownLatch` releases one waiting thread at a time, `CyclicBarrier` releases none
+C) `CountDownLatch` is typically one-shot, while `CyclicBarrier` is reusable across rounds
+D) They are equivalent and differ only by package name
+Answer: C
+
+7. What does a `Semaphore` with 10 permits model most naturally?
+A) Only one thread may ever enter the protected code
+B) Exactly 10 threads must arrive before continuing
+C) 10 tasks must be executed sequentially
+D) Up to 10 concurrent holders may access the protected resource
+Answer: D
+
+8. Why is `ExecutorService` usually preferred over manually creating raw threads for every task?
+A) It manages worker reuse and task execution more efficiently
+B) It avoids all synchronization issues automatically
+C) It guarantees tasks run in submission order
+D) It makes every task non-blocking
+Answer: A
+
+9. Why is `ConcurrentHashMap` usually preferred over `HashMap` for concurrent access?
+A) It is always lock-free for every operation
+B) It automatically makes compound check-then-act operations atomic
+C) It preserves insertion order under concurrency
+D) It allows thread-safe access without external coarse-grained synchronization
+Answer: D
+
+10. What is `LongAdder` primarily optimized for?
+A) Exact transactional counters across multiple fields
+B) High-throughput counters under heavy write contention
+C) Single-threaded integer arithmetic
+D) Replacing all uses of `AtomicInteger`
+Answer: B
+
+### Level 1
+
+1. Which statements about `volatile` are correct?
+A) It guarantees visibility of writes to other threads
+B) It makes `count++` atomic
+C) It prevents some unsafe reordering around that variable access
+D) It provides mutual exclusion
+Answer: A,C
+
+2. Which statements about `count++` on a shared `volatile int` are correct?
+A) It is still a read-modify-write sequence
+B) Two threads can still lose updates
+C) `volatile` makes the whole increment atomic
+D) Visibility alone is not enough to make it correct
+Answer: A,B,D
+
+3. Which statements about `ConcurrentHashMap` are correct?
+A) Individual map operations are thread-safe
+B) Compound check-then-act logic may still need extra coordination
+C) `get` followed by conditional `put` is automatically atomic
+D) `computeIfAbsent` can help with atomic put-if-absent style logic
+Answer: A,B,D
+
+4. Which statements about `AtomicInteger` and `LongAdder` are correct?
+A) `AtomicInteger` is often better when you need a single exact value at each instant
+B) `LongAdder` reduces write contention by spreading updates across internal cells
+C) `LongAdder` is usually preferred for metrics-style counters under heavy concurrency
+D) `LongAdder` is always a drop-in replacement for rate-limiting correctness
+Answer: A,B,C
+
+5. Which statements about `ReentrantLock` are correct?
+A) It supports `tryLock`
+B) It supports interruptible lock acquisition
+C) It supports fairness configuration
+D) It is identical to `synchronized` in capabilities
+Answer: A,B,C
+
+6. Which statements about thread pools are correct?
+A) An unbounded queue can hide overload until memory pressure becomes severe
+B) A bounded queue can provide backpressure or trigger rejection
+C) `newCachedThreadPool()` always gives the safest production default
+D) Thread-pool design should consider whether work is CPU-bound or I/O-bound
+Answer: A,B,D
+
+7. Which statements about virtual threads are correct?
+A) They are well-suited to high-concurrency I/O-heavy workloads
+B) They make CPU-bound work inherently faster
+C) Blocking I/O can unmount a virtual thread from its carrier thread
+D) They eliminate the need to reason about shared mutable state
+Answer: A,C
+
+8. Which strategies help prevent deadlock?
+A) Acquire locks in a consistent global order
+B) Hold one lock while waiting indefinitely for another in arbitrary order
+C) Use timeouts or `tryLock` where appropriate
+D) Reduce the scope and duration of held locks
+Answer: A,C,D
+
+9. Which statements about `BlockingQueue` are correct?
+A) Producers can block when the queue is full
+B) Consumers can block when the queue is empty
+C) It is a natural fit for producer-consumer coordination
+D) It removes the need to think about capacity and overload behavior
+Answer: A,B,C
+
+10. Which statements about happens-before are correct?
+A) A monitor unlock happens-before a later lock on the same monitor
+B) A `volatile` write happens-before a later `volatile` read of the same variable
+C) Thread start and join establish happens-before relationships
+D) Without happens-before, another thread may observe stale or reordered effects
+Answer: ALL
+
+### Level 2
+
+1. Explain why `volatile boolean running` can work for a stop flag, but `volatile int count; count++;` is still broken.
+Hint: Separate visibility/ordering from atomicity, and describe the read-modify-write sequence.
+Answer: `volatile` can be enough for a stop flag because one thread writes a new value and another thread only needs to observe that value promptly. The Java Memory Model guarantees visibility and ordering for the volatile write/read pair. But `count++` is a compound read-modify-write operation: read current value, add one, write back. `volatile` makes each read and write visible, but it does not make the whole sequence atomic, so concurrent increments can overwrite each other and lose updates.
+
+2. In a backend service, how would you choose between `synchronized`, `AtomicInteger`, and `LongAdder` for metrics, ID generation, and rate limiting?
+Hint: Compare exactness, contention, and whether the operation is a simple increment or part of a larger invariant.
+Answer: Use `synchronized` when you must protect a larger critical section or maintain invariants across multiple reads/writes together. Use `AtomicInteger` when you need one exact shared value with atomic updates, such as a simple ID/counter under low or moderate contention. Use `LongAdder` for high-throughput counters like metrics where write throughput matters more than an exact instant-by-instant single value. For strict rate limiting, exactness and coordination matter, so `AtomicInteger` or a broader synchronized/distributed design is usually more appropriate than `LongAdder`.
+
+3. Design a bounded producer-consumer flow for background job processing and explain how backpressure works.
+Hint: Mention queue capacity, what happens when producers are faster than consumers, and why unbounded buffering is risky.
+Answer: Use a bounded `BlockingQueue` between producers and worker threads. Producers submit work into the queue; consumers take work and process it. When the queue is full, producers should block, slow down, or be rejected depending on the business requirement. That bounded capacity creates backpressure so the system cannot accumulate unbounded work and eventually fail with memory pressure. This pattern makes overload explicit instead of hiding it in an ever-growing queue.
+
+4. How should `ThreadPoolExecutor` be configured for a backend service, and why are unbounded queues risky?
+Hint: Discuss core/max size, queue type, rejection policy, and CPU-bound vs I/O-bound workloads.
+Answer: Configure `ThreadPoolExecutor` intentionally: choose pool sizes based on workload type, use a bounded queue, and define a rejection policy that matches the service behavior under overload. CPU-bound work usually needs a smaller pool near core count; I/O-bound work may tolerate more concurrency. Unbounded queues are risky because they can absorb overload silently, increase latency, and eventually drive memory exhaustion instead of forcing the system to shed load or apply backpressure.
+
+5. Compare `synchronized`, `ReentrantLock`, and `ReadWriteLock` for a read-heavy in-memory cache.
+Hint: Cover simplicity, flexibility, and when multiple readers help.
+Answer: `synchronized` is the simplest option and is often good enough when contention is modest and the critical section is straightforward. `ReentrantLock` is useful when you need features like `tryLock`, interruptible acquisition, fairness, or explicit condition variables. `ReadWriteLock` can help when reads are much more frequent than writes and read operations are substantial enough that allowing concurrent readers improves throughput. But it adds complexity, so it should be justified by measured contention or workload characteristics.
+
+6. What is a deadlock, and how would you prevent it with a lock-ordering strategy?
+Hint: Give a concrete two-lock example and explain why consistent ordering works.
+Answer: A deadlock happens when threads wait forever in a circular dependency, such as thread A holding lock 1 while waiting for lock 2 and thread B holding lock 2 while waiting for lock 1. A standard prevention strategy is global lock ordering: define that every code path must acquire locks in the same order, for example always acquire `accountId` with smaller numeric ID first. That removes the circular wait condition and prevents the deadlock from forming.
+
+7. Explain `CompletableFuture` chaining and where error handling belongs in an asynchronous workflow.
+Hint: Contrast `thenApply`, `thenCompose`, `thenCombine`, and `exceptionally`/`handle`.
+Answer: `thenApply` transforms a successful result, `thenCompose` is used when the next step itself returns another future, and `thenCombine` joins two independent futures. Error handling belongs explicitly in the chain with operators such as `exceptionally` or `handle`, rather than being left implicit or mixed into unrelated business logic. Good design keeps success flow and recovery/fallback behavior readable, and it uses explicit executors when async work should not run on the default execution context.
+
+8. Explain what can happen on a multi-core CPU when two Java threads read and write shared state without synchronization.
+Hint: Mention caches, reordering, stale reads, and happens-before.
+Answer: On a multi-core machine, threads may run on different cores that use local caches and registers, so one thread may temporarily observe an older value than another. The compiler and CPU may also reorder operations when no synchronization rule forbids it. Without a happens-before relationship, there is no guarantee that one thread will observe another thread’s writes promptly or in the intended order. `volatile`, locks, and atomic operations restore correctness by imposing visibility and ordering guarantees.
+
+9. Compare platform threads and virtual threads, including where virtual threads do not help.
+Hint: Separate I/O scalability from CPU throughput and mention pinning risks.
+Answer: Platform threads map much more directly to OS threads and are relatively expensive, so large counts can become costly. Virtual threads are lightweight JVM-managed threads that are excellent for high-concurrency I/O workloads because blocked I/O does not require one expensive platform thread per task. But they do not make CPU-bound work faster, they do not remove contention on shared mutable state, and some blocking patterns such as certain monitor-heavy sections can still pin carrier threads and reduce the benefit.
+
+10. Why does `LongAdder` often outperform `AtomicInteger` under heavy write contention?
+Hint: Compare one hot memory location versus striped cells and mention the read tradeoff.
+Answer: `AtomicInteger` concentrates all updates on one CAS-protected memory location, so many threads repeatedly contend on the same value and may spin through failed retries. That also increases cache-line bouncing between cores. `LongAdder` spreads updates across multiple internal cells, so concurrent writers are less likely to fight over the same location, which improves throughput. The tradeoff is that reads aggregate across cells and are better suited to throughput-oriented counters like metrics than to correctness-critical exact instant-by-instant values.

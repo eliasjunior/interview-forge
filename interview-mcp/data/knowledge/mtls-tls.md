@@ -73,3 +73,191 @@ A strong candidate understands not just the happy-path handshake but the failure
 - practical usage: sslcontext, keymanagerfactory, trustmanagerfactory, x509trustmanager, server-ssl-key-store, server-ssl-trust-store, client-auth, curl, openssl, javax-net-debug, eku, clientauth, serverauth, cert-manager, spiffe, ocsp-stapling, session-resumption, session-ticket
 - tradeoffs: tls-vs-mtls, security-vs-complexity, certificate-management-overhead, revocation-check-cost, mutual-vs-token-based-auth, edge-termination-vs-end-to-end, crl-vs-ocsp, pinning-leaf-vs-ca
 - best practices: separate-keystore-truststore, verify-eku, check-full-chain, monitor-cert-expiry, debug-with-openssl-before-jvm, never-transmit-private-key, pin-ca-not-leaf, use-ocsp-stapling, automate-rotation-with-cert-manager, short-lived-certs-for-zero-trust
+
+## Warm-up Quests
+
+### Level 0
+
+1. What is the main difference between TLS and mTLS?
+A) TLS encrypts traffic, but mTLS does not
+B) TLS authenticates only the server, while mTLS authenticates both client and server
+C) TLS uses certificates, but mTLS uses passwords
+D) mTLS works only inside Kubernetes
+Answer: B
+
+2. What does a Keystore primarily hold?
+A) Trusted CA certificates only
+B) DNS records for service discovery
+C) Private key plus certificate chain for your own identity
+D) Revoked certificate serial numbers
+Answer: C
+
+3. What does a Truststore primarily hold?
+A) Your application's private key
+B) Trusted CA certificates used to validate peers
+C) Session tickets for TLS resumption
+D) Load balancer routing rules
+Answer: B
+
+4. During mTLS, how does the server verify the client owns the private key?
+A) The client uploads the private key in encrypted form
+B) The client signs part of the handshake and the server verifies it with the public key in the certificate
+C) The client sends the keystore password over the wire
+D) The server checks only the certificate subject name
+Answer: B
+
+5. What does "PKIX path building failed" most commonly mean?
+A) The TLS version is too new
+B) The server rejected the HTTP method
+C) A valid certificate chain to a trusted root could not be built
+D) The private key algorithm is always unsupported by Java
+Answer: C
+
+6. Why does certificate expiry break a TLS connection?
+A) Expired certificates disable TCP keepalive
+B) Certificate validity dates are part of trust validation
+C) Expired certificates cannot be decrypted
+D) Expiry matters only for browsers, not backend services
+Answer: B
+
+7. What is TLS session resumption primarily for?
+A) Replacing certificate validation permanently
+B) Avoiding the cost of a full handshake on reconnect
+C) Rotating certificates automatically
+D) Disabling forward secrecy
+Answer: B
+
+8. What is certificate pinning?
+A) Storing certificates only in a Java keystore
+B) Forcing the server to use one cipher suite
+C) Rejecting certificates unless they match a preconfigured expected cert or public key
+D) Copying a CA certificate into every pod image
+Answer: C
+
+9. What is OCSP stapling?
+A) The client sends its certificate twice for reliability
+B) The server includes a cached signed revocation status response in the handshake
+C) The CA embeds the private key into the certificate chain
+D) A Kubernetes feature for mounting certificates
+Answer: B
+
+10. What is the main advantage of TLS 1.3 over TLS 1.2?
+A) It removes the need for certificates
+B) It only works with mTLS
+C) It simplifies the handshake and removes many weak legacy options
+D) It disables session resumption
+Answer: C
+
+### Level 1
+
+1. Which statements about TLS and mTLS are correct?
+A) TLS provides encryption in transit
+B) mTLS adds client certificate authentication
+C) mTLS is common for service-to-service trust inside zero-trust environments
+D) Plain TLS already proves the client's identity to the server
+Answer: A,B,C
+
+2. Which statements about Keystore and Truststore are correct?
+A) A keystore is about your presented identity
+B) A truststore is about who you trust
+C) An mTLS client typically needs both
+D) They are interchangeable files with different names only
+Answer: A,B,C
+
+3. Which statements about X.509 validation are correct?
+A) The certificate chain must lead to a trusted root or intermediate policy accepted by the truststore
+B) Expiration dates matter during validation
+C) Key usage / extended key usage can matter
+D) Validation ignores the issuer if the subject CN looks correct
+Answer: A,B,C
+
+4. Which statements about the TLS handshake are correct?
+A) The private key should never cross the network
+B) Certificate-based authentication proves key ownership via signature
+C) ClientHello and ServerHello participate in negotiation
+D) mTLS means the client skips validating the server
+Answer: A,B,C
+
+5. Which statements about certificate rotation are correct?
+A) Overlapping validity windows reduce operational risk
+B) Pinning the leaf certificate can make rotation brittle
+C) Clients may need updated trust material before the new cert is served
+D) Rotation always requires dropping all existing connections immediately
+Answer: A,B,C
+
+6. Which statements about TLS session resumption are correct?
+A) It reduces CPU and handshake latency on reconnect
+B) TLS 1.3 can support 0-RTT resumption with replay caveats
+C) It means certificates no longer need validation
+D) Session tickets allow the server to avoid storing per-session state centrally
+Answer: A,B,D
+
+7. Which statements about revocation are correct?
+A) CRLs can become large and stale between updates
+B) OCSP adds a live status lookup unless stapled
+C) OCSP stapling reduces separate revocation lookups from clients
+D) Revocation makes certificate expiry irrelevant
+Answer: A,B,C
+
+8. Which statements about TLS termination are correct?
+A) Edge termination decrypts at the load balancer
+B) End-to-end or re-encrypted TLS is usually stronger for zero-trust service communication
+C) Edge termination alone means traffic inside the cluster may be plain HTTP
+D) TLS passthrough allows the load balancer to inspect decrypted HTTP headers
+Answer: A,B,C
+
+9. Which statements about debugging TLS failures are correct?
+A) `openssl s_client` is useful before debugging Java-specific config
+B) `-Djavax.net.debug=ssl,handshake` can show JVM handshake details
+C) `curl -v` with client certs can help isolate mTLS issues
+D) TLS failures should always be debugged by changing cipher suites first
+Answer: A,B,C
+
+10. Which statements about zero-trust certificate automation are correct?
+A) Short-lived certificates reduce blast radius
+B) Automated rotation is essential at scale
+C) Service identity is stronger when bound to workload identity rather than IP address alone
+D) mTLS removes the need for authorization policy entirely
+Answer: A,B,C
+
+### Level 2
+
+1. Explain the difference between a keystore and a truststore in a Spring Boot mTLS setup.
+Hint: Map them to identity versus trust, then explain what the server and client each need.
+Answer: A keystore holds your own identity material: private key plus certificate chain. A truststore holds CA certificates that you trust for validating the other side. In Spring Boot mTLS, the server needs a keystore to present its identity and a truststore to validate client certificates. An mTLS client also needs a keystore to present its own cert and a truststore to validate the server certificate.
+
+2. Walk through the mTLS handshake and explain why the client does not send its private key.
+Hint: Mention certificate exchange, validation, and proof of possession by signature.
+Answer: The client connects and receives the server certificate chain, then validates that chain against its truststore. In mTLS, the server requests a client certificate. The client sends its certificate and proves ownership of the private key by signing handshake data; the server verifies that signature using the public key in the client certificate. The private key never leaves the client. Trust comes from both chain validation and proof that the sender controls the matching private key.
+
+3. A Java service fails with `PKIX path building failed`. What does that usually mean, and how do you debug it?
+Hint: Think about certificate chain completeness and trusted roots before changing application code.
+Answer: It usually means Java could not build a valid trust chain from the peer certificate up to a trusted root in the truststore. Common causes are a missing intermediate CA, using the wrong truststore, or trusting the wrong issuing CA. First inspect the presented chain with `openssl s_client -showcerts`, then verify the truststore contents, and enable `-Djavax.net.debug=ssl,handshake` if needed to see exactly where validation fails.
+
+4. How would you rotate an mTLS certificate in production without downtime?
+Hint: Cover overlapping trust, rollout order, and draining old connections.
+Answer: Issue the new certificate before the old one expires and ensure the validating side trusts the new issuing chain before the new certificate is presented. Roll out trust first when necessary, then deploy the new certificate and allow existing connections using the old certificate to drain naturally. After the fleet has converged, remove the old certificate and trust entries. In mTLS you must think about both server-side and client-side identities, not just one endpoint.
+
+5. Compare CRL, OCSP, and OCSP stapling from an operational point of view.
+Hint: Contrast freshness, latency, and dependency on external network calls.
+Answer: CRLs are simple but can be large and stale between downloads. OCSP gives fresher revocation status but requires a live query to the responder, which adds latency and operational dependency. OCSP stapling improves that by letting the server attach a recent signed OCSP response during the handshake, so clients get freshness information without each client making its own network call. At scale, stapling is usually the preferred operational default when revocation checking is required.
+
+6. Explain where TLS termination should happen in a microservices architecture and the tradeoff involved.
+Hint: Compare edge termination, passthrough, and re-encryption / end-to-end mTLS.
+Answer: Edge termination at the load balancer is simpler operationally because certificate management is centralized there, but traffic behind the load balancer may be unencrypted. TLS passthrough preserves end-to-end encryption but limits the load balancer's visibility into HTTP traffic. A stronger zero-trust design often terminates external TLS at the edge and then initiates a new mTLS connection to the backend, preserving identity and encryption across internal service boundaries at the cost of more certificate management complexity.
+
+7. What changes in TLS 1.3 compared with TLS 1.2, and why do those changes matter?
+Hint: Focus on round trips, removed legacy algorithms, and forward secrecy.
+Answer: TLS 1.3 simplifies the handshake so that key exchange happens earlier and the connection usually completes in fewer round trips. It removes many weak or obsolete algorithms such as RSA key exchange and other legacy options, which makes secure defaults easier. It also standardizes forward secrecy through ephemeral key exchange. The practical impact is lower latency, a smaller attack surface, and fewer unsafe configuration combinations.
+
+8. How would you design service-to-service mTLS in Kubernetes so certificates rotate automatically?
+Hint: Mention an issuing authority, secret delivery, renewal, and workload identity.
+Answer: Use an internal CA or a controller such as cert-manager to issue short-lived service certificates. Each workload receives its own certificate and private key through a managed secret or workload identity mechanism, and services trust the cluster CA that issued those certificates. Renewal should happen automatically before expiry, and rollout should avoid breaking live traffic. A service mesh or SPIFFE/SPIRE-style identity system can reduce application-level certificate handling and standardize authentication across the cluster.
+
+9. Why is certificate pinning powerful but dangerous operationally?
+Hint: Separate stronger trust assumptions from rotation and recovery risk.
+Answer: Pinning can reduce trust in the broad public CA ecosystem by requiring a known expected certificate or public key, which is useful in tightly controlled client-to-server relationships. But it creates operational brittleness: if the pinned cert or key changes and clients are not updated in time, valid connections fail immediately. That makes emergency rotation and recovery harder. Pinning a CA or public key set rather than a single leaf certificate is usually safer than pinning one specific leaf certificate.
+
+10. A certificate is valid on one machine but appears expired or not yet valid on another. What is happening?
+Hint: Think about certificate validity windows and infrastructure time sync.
+Answer: TLS validation depends on the `notBefore` and `notAfter` timestamps in the certificate. If system clocks are skewed, one machine may believe the certificate is not yet valid or already expired even though another machine accepts it. This is usually an infrastructure time-synchronization problem, not a cryptography bug. The operational fix is reliable NTP and alerting on clock drift.

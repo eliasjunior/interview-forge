@@ -103,6 +103,10 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       knowledgeSource: session.knowledgeSource,
       createdAt: session.createdAt,
       endedAt: session.endedAt,
+      questLevel: session.questLevel ?? null,
+      questFormat: session.questFormat ?? null,
+      questChoices: session.questChoices != null ? JSON.stringify(session.questChoices) : null,
+      questAnswers: session.questAnswers != null ? JSON.stringify(session.questAnswers) : null,
     },
     questions: session.questions.map((question, position) => ({
       sessionId: session.id,
@@ -187,6 +191,10 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
     createdAt: rows.session.createdAt,
     endedAt: rows.session.endedAt ?? undefined,
     knowledgeSource: rows.session.knowledgeSource as Session["knowledgeSource"],
+    questLevel: (rows.session.questLevel as Session["questLevel"]) ?? undefined,
+    questFormat: (rows.session.questFormat as Session["questFormat"]) ?? undefined,
+    questChoices: rows.session.questChoices != null ? JSON.parse(rows.session.questChoices) as string[][] : undefined,
+    questAnswers: rows.session.questAnswers != null ? JSON.parse(rows.session.questAnswers) as string[] : undefined,
   };
 }
 

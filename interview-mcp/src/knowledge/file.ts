@@ -108,7 +108,7 @@ function parseMCQQuestions(section: string): WarmUpQuestion[] {
     const choices: string[] = [];
     let answer = "";
     for (const line of lines.slice(1)) {
-      if (/^[A-D]\)/.test(line)) choices.push(line.replace(/^[A-D]\)\s*/, "").trim());
+      if (/^[A-Z]\)/.test(line)) choices.push(line.replace(/^[A-Z]\)\s*/, "").trim());
       else if (/^Answer:/i.test(line)) answer = line.replace(/^Answer:\s*/i, "").trim();
     }
     if (!question) return null;
@@ -156,7 +156,7 @@ function parseWarmupLevels(md: string): Partial<Record<0 | 1 | 2, WarmUpLevelCon
   if (l0) result[0] = { questions: parseMCQQuestions(l0) };
 
   const l1 = extractSubSection(sectionBody, "Level 1");
-  if (l1) result[1] = { questions: parseFillBlankQuestions(l1) };
+  if (l1) result[1] = { questions: parseMCQQuestions(l1) };
 
   const l2 = extractSubSection(sectionBody, "Level 2");
   if (l2) result[2] = { questions: parseGuidedQuestions(l2) };

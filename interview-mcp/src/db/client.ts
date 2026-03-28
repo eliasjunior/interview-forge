@@ -13,6 +13,10 @@ function ensureParentDir(filePath: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+export function ensureDbParentDir(filePath: string) {
+  ensureParentDir(filePath);
+}
+
 export function resolveDbPath() {
   return process.env.DATABASE_URL?.trim() || DEFAULT_DB_PATH;
 }

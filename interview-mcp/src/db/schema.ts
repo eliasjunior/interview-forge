@@ -18,6 +18,11 @@ export const sessions = sqliteTable("sessions", {
   knowledgeSource: text("knowledge_source").notNull(),
   createdAt: text("created_at").notNull(),
   endedAt: text("ended_at"),
+  // Warm-up quest fields
+  questLevel: integer("quest_level"),
+  questFormat: text("quest_format"),
+  questChoices: text("quest_choices"),   // JSON: string[][]
+  questAnswers: text("quest_answers"),   // JSON: string[]
 });
 
 export const sessionQuestions = sqliteTable(

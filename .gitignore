@@ -11,6 +11,7 @@ node_modules/
 interview-mcp/data/*.db
 interview-mcp/data/*.db-shm
 interview-mcp/data/*.db-wal
+interview-mcp/data/backups/
 
 # macOS metadata
 .DS_Store

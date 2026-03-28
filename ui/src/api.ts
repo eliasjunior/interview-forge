@@ -51,6 +51,13 @@ export interface TopicLevel {
   reason: string
   nextLevelRequirement: string
   hasWarmupContent: boolean
+  progress: {
+    current: number
+    required: number
+    targetLevel: 0 | 1 | 2 | 3 | 4
+    variant: 'warmup' | 'interview' | 'complete'
+    label: string
+  }
 }
 
 export const getTopicLevel = (topic: string): Promise<TopicLevel> =>

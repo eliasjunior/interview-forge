@@ -15,6 +15,7 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
       if (!guard.ok) return deps.stateError(guard.error);
 
       const question = session.questions[session.currentQuestionIndex];
+      const choices = session.questChoices?.[session.currentQuestionIndex];
       // Prefer pre-selected criteria stored on the session (populated when questions are
       // sampled from a knowledge file — avoids mismatched indices after shuffling).
       // Fall back to positional lookup from the knowledge file for legacy sessions.
@@ -39,6 +40,7 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
             questionNumber: session.currentQuestionIndex + 1,
             totalQuestions: session.questions.length,
             question,
+            choices: choices && choices.length > 0 ? choices : null,
             evaluationCriteria: evaluationCriteria ?? null,
             nextTool: "submit_answer",
           }),

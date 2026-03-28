@@ -8,15 +8,15 @@ import { selectQuestions } from "./startInterview.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // start_warm_up — Progressive entry sessions for levels 0–2.
 //
-// Level 0 → MCQ recognition     (questFormat: 'mcq')
-// Level 1 → Fill-in-blank recall (questFormat: 'fill_blank')
+// Level 0 → MCQ recognition      (questFormat: 'mcq')
+// Level 1 → Advanced MCQ         (questFormat: 'mcq')
 // Level 2 → Guided answer        (questFormat: 'guided')
 // Level 3/4 → Redirect: use start_interview instead.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FORMAT_BY_LEVEL: Record<0 | 1 | 2, QuestionFormat> = {
   0: "mcq",
-  1: "fill_blank",
+  1: "mcq",
   2: "guided",
 };
 
@@ -32,9 +32,10 @@ const LEVEL_INSTRUCTION: Record<0 | 1 | 2, string> = {
   0: "Present each MCQ question with its choices. Wait for the candidate to pick an option letter (A/B/C/D). " +
      "After they answer, call evaluate_answer — it will auto-score based on the correct answer. " +
      "Encourage the candidate; frame errors as learning moments, not failures.",
-  1: "Present each fill-in-the-blank question. Wait for the candidate's answer. " +
-     "Call evaluate_answer — it will auto-score based on key term matching. " +
-     "Keep pressure low: partial answers that capture the concept should score well.",
+  1: "Present each advanced MCQ question with its choices. Some questions may have multiple correct answers. " +
+     "Ask the candidate to answer with option letters like A or A,C, or use ALL / NONE when appropriate. " +
+     "Call evaluate_answer — it will auto-score based on the authored answer key. " +
+     "Keep the tone calm, but make the candidate justify subtle distinctions when they miss one.",
   2: "Present each guided question along with its scaffolding hint. " +
      "Encourage the candidate to use the provided structure. " +
      "Call evaluate_answer with your assessment of how well they followed the structure and hit the key concepts. " +
@@ -84,7 +85,7 @@ export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {
     {
       description:
         "Start a warm-up quest session for a topic. " +
-        "Levels: 0 = Spark (MCQ), 1 = Padawan (fill-in-the-blank), 2 = Forge (guided answer), 3 = Ranger (redirects to start_interview), 4 = Jedi Ready (redirects to start_interview). " +
+        "Levels: 0 = Spark (MCQ), 1 = Padawan (advanced MCQ with possible multi-answer keys), 2 = Forge (guided answer), 3 = Ranger (redirects to start_interview), 4 = Jedi Ready (redirects to start_interview). " +
         "Warm-up sessions are capped at 5 questions even when more are authored. " +
         "If level is omitted, auto-detects the appropriate level from session history. " +
         "Use after get_topic_level to route candidates correctly.",

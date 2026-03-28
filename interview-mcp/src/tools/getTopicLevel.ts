@@ -33,6 +33,14 @@ function calcAvg(scores: number[]): number | null {
  */
 export type TopicStatus = 'cold' | 'warmup' | 'dropped' | 'ready';
 
+export interface TopicLevelProgress {
+  current: number;
+  required: number;
+  targetLevel: WarmUpLevel;
+  variant: 'warmup' | 'interview' | 'complete';
+  label: string;
+}
+
 export function detectTopicLevel(
   topic: string,
   sessions: Record<string, import("@mock-interview/shared").Session>,
@@ -42,6 +50,7 @@ export function detectTopicLevel(
   status: TopicStatus;
   reason: string;
   nextLevelRequirement: string;
+  progress: TopicLevelProgress;
 } {
   const normalise = (s: string) => s.toLowerCase().replace(/[\s\-_]+/g, "");
   const topicNorm = normalise(topic);
@@ -61,6 +70,13 @@ export function detectTopicLevel(
       nextLevelRequirement: hasWarmupContent
         ? `Pass Level 0 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance.`
         : `Pass Level 0 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance.`,
+      progress: {
+        current: 0,
+        required: REQUIRED_WARMUP_PASSES,
+        targetLevel: 1,
+        variant: 'warmup',
+        label: '0 / 2 passes',
+      },
     };
   }
 
@@ -79,6 +95,7 @@ export function detectTopicLevel(
     const avg = calcAvg(scores);
     const latestTwo = sortedInterviews.slice(0, 2);
     const latestTwoAverages = latestTwo.map((session) => calcAvg(session.evaluations.map((e) => e.score)));
+    const consecutiveStrongInterviewCount = consecutiveStrongInterviews(sortedInterviews);
 
     if (
       latestTwo.length === 2 &&
@@ -89,6 +106,13 @@ export function detectTopicLevel(
         status: 'ready' as TopicStatus,
         reason: `Last 2 full interviews avg ${latestTwoAverages[0].toFixed(1)} and ${latestTwoAverages[1].toFixed(1)} — Jedi Ready.`,
         nextLevelRequirement: "Already at Level 4 — keep practising full interviews to stay sharp.",
+        progress: {
+          current: REQUIRED_WARMUP_PASSES,
+          required: REQUIRED_WARMUP_PASSES,
+          targetLevel: 4,
+          variant: 'complete',
+          label: 'Mastered',
+        },
       };
     }
 
@@ -101,6 +125,13 @@ export function detectTopicLevel(
         status: 'ready' as TopicStatus,
         reason: `Last 2 full interviews avg ${latestTwoAverages[0]!.toFixed(1)} and ${latestTwoAverages[1]!.toFixed(1)} — Ranger unlocked.`,
         nextLevelRequirement: "Complete 2 full interviews in a row with avg score ≥ 4.0 to reach Level 4.",
+        progress: {
+          current: Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_PASSES),
+          required: REQUIRED_WARMUP_PASSES,
+          targetLevel: 4,
+          variant: 'interview',
+          label: `${Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_PASSES)} / ${REQUIRED_WARMUP_PASSES} strong interviews`,
+        },
       };
     }
 
@@ -111,6 +142,13 @@ export function detectTopicLevel(
         status: 'warmup' as TopicStatus,
         reason: `Last interview avg ${avg.toFixed(1)} — good start. One more interview with avg ≥ 3.0 to confirm Ranger.`,
         nextLevelRequirement: "Complete one more full interview with avg score ≥ 3.0 to unlock Level 3.",
+        progress: {
+          current: 1,
+          required: REQUIRED_WARMUP_PASSES,
+          targetLevel: 3,
+          variant: 'interview',
+          label: `1 / ${REQUIRED_WARMUP_PASSES} interviews`,
+        },
       };
     }
 
@@ -120,6 +158,13 @@ export function detectTopicLevel(
         status: 'dropped' as TopicStatus,
         reason: `Last full interview avg score ${avg.toFixed(1)} — needs reinforcement. Warm-up recommended before next interview.`,
         nextLevelRequirement: `Pass Level 1 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to return to full interview.`,
+        progress: {
+          current: 0,
+          required: REQUIRED_WARMUP_PASSES,
+          targetLevel: 3,
+          variant: 'warmup',
+          label: `0 / ${REQUIRED_WARMUP_PASSES} passes`,
+        },
       };
     }
   }
@@ -130,6 +175,13 @@ export function detectTopicLevel(
       status: 'ready' as TopicStatus,
       reason: "No warm-up content authored for this topic — continue with full interviews.",
       nextLevelRequirement: "Complete a full interview session.",
+      progress: {
+        current: 0,
+        required: 1,
+        targetLevel: 4,
+        variant: 'interview',
+        label: 'No warm-up ladder',
+      },
     };
   }
 
@@ -164,6 +216,13 @@ export function detectTopicLevel(
           ? `Level ${lvl} warm-up progress ${passCount}/${REQUIRED_WARMUP_PASSES} passes (best avg ${avg!.toFixed(1)}).`
           : `Level ${lvl} warm-up not yet attempted.`,
         nextLevelRequirement: `Pass Level ${lvl} warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance to Level ${lvl + 1}.`,
+        progress: {
+          current: passCount,
+          required: REQUIRED_WARMUP_PASSES,
+          targetLevel: (lvl + 1) as WarmUpLevel,
+          variant: 'warmup',
+          label: `${passCount} / ${REQUIRED_WARMUP_PASSES} passes`,
+        },
       };
     }
   }
@@ -174,7 +233,31 @@ export function detectTopicLevel(
     status: 'ready' as TopicStatus,
     reason: "All warm-up levels completed — full mock unlocked. Use start_interview.",
     nextLevelRequirement: "Already at Level 3 — complete 2 full interviews in a row with avg score ≥ 4.0 to reach Level 4.",
+    progress: {
+      current: Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_PASSES),
+      required: REQUIRED_WARMUP_PASSES,
+      targetLevel: 4,
+      variant: 'interview',
+      label: `${Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_PASSES)} / ${REQUIRED_WARMUP_PASSES} strong interviews`,
+    },
   };
+}
+
+function consecutiveStrongInterviews(sessions: import("@mock-interview/shared").Session[]) {
+  const interviewSessions = sessions
+    .filter((s) => !s.sessionKind || s.sessionKind === "interview")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  let count = 0;
+  for (const session of interviewSessions) {
+    const avg = calcAvg(session.evaluations.map((e) => e.score));
+    if (avg !== null && avg >= JEDI_READY_THRESHOLD) {
+      count += 1;
+      continue;
+    }
+    break;
+  }
+  return count;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,6 +296,7 @@ export function registerGetTopicLevelTool(server: McpServer, deps: ToolDeps) {
             status: result.status,
             reason: result.reason,
             nextLevelRequirement: result.nextLevelRequirement,
+            progress: result.progress,
             hasWarmupContent,
             instruction:
               result.level < 3

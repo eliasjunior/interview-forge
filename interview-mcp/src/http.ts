@@ -180,8 +180,8 @@ app.get("/api/topics/:topic/level", (req, res) => {
     Object.keys(knowledgeTopic.warmupLevels).length > 0;
 
   const sessions = loadSessions();
-  const { level, status, reason, nextLevelRequirement } = detectTopicLevel(topic, sessions, hasWarmupContent);
-  res.json({ topic, level, status, reason, nextLevelRequirement, hasWarmupContent });
+  const { level, status, reason, nextLevelRequirement, progress } = detectTopicLevel(topic, sessions, hasWarmupContent);
+  res.json({ topic, level, status, reason, nextLevelRequirement, hasWarmupContent, progress });
 });
 
 // API: Get the full knowledge graph

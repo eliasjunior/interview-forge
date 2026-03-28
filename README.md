@@ -797,6 +797,8 @@ Within each tier, questions you have been asked least often across past sessions
 | `payment-api-design.md` | Payment API Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `url-shortener.md` | URL Shortener System Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `mtls-tls.md` | mTLS / TLS | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `tls-fundamentals.md` | TLS Fundamentals | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `java-tls-spring.md` | Java TLS, mTLS, and Spring | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `java-concurrency.md` | Java Concurrency | 21 (5 foundation, 9 intermediate, 7 advanced) |
 | `java-os-jvm.md` | Java OS & JVM Internals | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `js-fundamentals.md` | JavaScript Fundamentals: DOM, Callbacks, Promises, XHR, Event Loop & Web APIs | 16 (5 foundation, 7 intermediate, 4 advanced) |
@@ -984,3 +986,63 @@ Runtime state lives in SQLite (`interview-mcp/data/app.db`). Knowledge source fi
 - Confirm whether Claude Desktop is expected to forward MCP tools to Claude Code sub-agents, or if this is a known architectural boundary
 - Check if there is a way to configure Claude Code (via `.claude/settings.json` or similar) to load the same MCP servers independently, so it can call them directly
 - Test calling interview tools directly from the Claude Desktop conversation (not via Claude Code) to confirm they work there
+
+[↑ Back to top](#table-of-contents)
+
+---
+
+## Database Backups
+
+The live runtime database is the SQLite file `interview-mcp/data/app.db`.
+
+This file is intentionally local-only:
+
+- `interview-mcp/data/*.db`
+- `interview-mcp/data/*.db-shm`
+- `interview-mcp/data/*.db-wal`
+
+are ignored by git, so a normal daily `git push` does **not** back up the current database state.
+
+### Manual backup command
+
+Use the following command to create a timestamped local snapshot:
+
+```bash
+npm run db:backup -w interview-mcp
+```
+
+This writes backups to:
+
+```text
+interview-mcp/data/backups/
+```
+
+with filenames like:
+
+```text
+app.2026-03-28T11-53-28-779Z.backup.db
+```
+
+### Why this command exists
+
+The project runs SQLite in WAL mode, so copying only `app.db` naively can miss recent committed data that still lives in `app.db-wal`. The backup script uses SQLite's backup mechanism through `better-sqlite3`, which is safer than a plain file copy.
+
+### Retention
+
+By default, the script keeps the latest `10` backups and deletes older ones.
+
+You can change that with:
+
+```bash
+DB_BACKUP_KEEP=20 npm run db:backup -w interview-mcp
+```
+
+### When to run it
+
+Run a backup before:
+
+- schema migrations
+- graph rebuilds
+- cleanup scripts
+- manual SQL updates or deletes
+- any one-off data repair work
