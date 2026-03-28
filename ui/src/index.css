@@ -60,7 +60,12 @@ html, body, #root {
   gap: 10px;
 }
 
-.navbar-logo { font-size: 1.3rem; }
+.navbar-logo {
+  width: 24px;
+  height: 24px;
+  display: block;
+  flex-shrink: 0;
+}
 
 .navbar-title {
   font-weight: 700;
@@ -1479,15 +1484,135 @@ html, body, #root {
 }
 .topic-card-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .topic-card-right { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; flex-shrink: 0; }
-.topic-name { font-size: 0.95rem; font-weight: 500; color: var(--ink); }
-.topic-file {
-  font-size: 0.75rem;
-  color: var(--muted);
-  background: var(--bg);
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+.topic-action-menu {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  z-index: 15;
+  width: 320px;
+  padding: 10px;
+  border-radius: 14px;
   border: 1px solid var(--line);
+  background: rgba(9, 16, 30, 0.98);
+  box-shadow: var(--shadow);
+}
+.topic-action-menu-left {
+  top: calc(100% + 8px);
+  left: 0;
+  right: auto;
+}
+.topic-action-topic {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(42, 57, 87, 0.9);
+  background: rgba(11, 18, 32, 0.92);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.topic-action-menu-title {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.topic-action-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.topic-action-item:hover {
+  background: rgba(24, 36, 61, 0.92);
+  border-color: rgba(79, 209, 197, 0.28);
+  transform: translateY(-1px);
+}
+.topic-action-item.recommended {
+  background: rgba(24, 58, 68, 0.55);
+  border-color: rgba(79, 209, 197, 0.28);
+}
+.topic-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.topic-action-label {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.topic-action-badge {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(79, 209, 197, 0.16);
+  border: 1px solid rgba(79, 209, 197, 0.28);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.topic-action-helper {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.topic-action-prompt {
+  display: block;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(42, 57, 87, 0.9);
+  background: rgba(11, 18, 32, 0.92);
+  color: #bfdbfe;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  white-space: normal;
+}
+.topic-name { font-size: 0.95rem; font-weight: 500; color: var(--ink); }
+.topic-file-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.topic-file-button {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #c7d2fe;
+  background: linear-gradient(180deg, rgba(17, 26, 46, 0.98), rgba(12, 20, 36, 0.96));
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
   width: fit-content;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  transition: border-color .15s, color .15s, background .15s, transform .15s, box-shadow .15s;
+}
+.topic-file-button::after {
+  content: "⚔️";
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+.topic-file-button:hover {
+  border-color: rgba(79, 209, 197, 0.55);
+  color: #e6fffb;
+  background: linear-gradient(180deg, rgba(24, 58, 68, 0.82), rgba(16, 40, 48, 0.88));
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
 }
 .topic-level-badge {
   display: inline-flex;
@@ -1672,6 +1797,10 @@ html, body, #root {
 
   .topic-card-right {
     align-items: stretch;
+  }
+
+  .topic-action-menu {
+    width: min(100%, 360px);
   }
 
   .topic-progress,

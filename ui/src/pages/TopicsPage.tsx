@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Topic, TopicLevel } from '../api'
 
 import { getTopics, getTopicLevel } from '../api'
@@ -122,6 +122,67 @@ function getStoredLevels() {
   }
 }
 
+type TopicAction = {
+  key: string
+  label: string
+  prompt: string
+  helper: string
+}
+
+function getRecommendedAction(levelData: TopicLevel, topicFile: string): TopicAction {
+  if (levelData.status === 'dropped') {
+    return {
+      key: 'warmup-reset',
+      label: 'Warm-up reinforcement',
+      prompt: `Start a warm-up interview for "${topicFile}" at the recommended level.`,
+      helper: 'Recover the ladder after a weak full interview.',
+    }
+  }
+
+  if (levelData.level >= 3 || levelData.progress.variant === 'interview') {
+    return {
+      key: 'full',
+      label: 'Full interview',
+      prompt: `Start a mock interview for "${topicFile}".`,
+      helper: 'Push the topic forward with a full round.',
+    }
+  }
+
+  return {
+    key: 'warmup',
+    label: 'Warm-up',
+    prompt: `Start a warm-up interview for "${topicFile}".`,
+    helper: 'Best next move for the current ladder state.',
+  }
+}
+
+function getTopicActions(levelData: TopicLevel, topicFile: string): TopicAction[] {
+  const recommended = getRecommendedAction(levelData, topicFile)
+  const actions: TopicAction[] = [
+    recommended,
+    {
+      key: 'drill',
+      label: 'Drill weak spots',
+      prompt: `Drill me on weak spots for "${topicFile}".`,
+      helper: 'Good after at least one completed interview.',
+    },
+    {
+      key: 'flashcards',
+      label: 'Review flashcards',
+      prompt: `Review my due flashcards for "${topicFile}".`,
+      helper: 'Quick recall round for weak answers.',
+    },
+    {
+      key: 'copy',
+      label: 'Copy topic prompt',
+      prompt: `Start a mock interview for "${topicFile}".`,
+      helper: 'Plain prompt for the current topic slug.',
+    },
+  ]
+
+  return actions.filter((action, index, arr) => arr.findIndex((candidate) => candidate.key === action.key) === index)
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function TopicsPage() {
@@ -130,46 +191,90 @@ export default function TopicsPage() {
   const [celebrating, setCelebrating] = useState<Record<string, true>>({})
   const [toastQueue, setToastQueue] = useState<Array<{ id: string; message: string; level: 0 | 1 | 2 | 3 | 4 }>>([])
   const [activeToast, setActiveToast] = useState<{ id: string; message: string; level: 0 | 1 | 2 | 3 | 4 } | null>(null)
+  const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const pageRef = useRef<HTMLDivElement | null>(null)
+  const refreshInFlightRef = useRef(false)
 
   useEffect(() => {
     const storedLevels = getStoredLevels()
 
-    getTopics().then(data => {
-      setTopics(data)
-      setLoading(false)
-      // Load levels in parallel after topics are displayed
-      data.forEach(t => {
-        getTopicLevel(t.displayName)
-          .then(lvl => {
-            setLevels(prev => ({ ...prev, [t.file]: lvl }))
+    async function refreshTopics(showLoading = false) {
+      if (refreshInFlightRef.current) return
+      refreshInFlightRef.current = true
+      if (showLoading) setLoading(true)
 
-            const previousLevel = storedLevels[t.file]
-            if (typeof previousLevel === 'number' && lvl.level > previousLevel) {
-              setCelebrating(prev => ({ ...prev, [t.file]: true }))
-              setToastQueue(prev => [
-                ...prev,
-                {
-                  id: `${t.file}-${lvl.level}`,
-                  message: `${t.displayName} reached ${LEVEL_CONFIG[lvl.level].label}: ${LEVEL_CONFIG[lvl.level].desc}`,
-                  level: lvl.level,
-                },
-              ])
-              window.setTimeout(() => {
-                setCelebrating(prev => {
-                  const next = { ...prev }
-                  delete next[t.file]
-                  return next
-                })
-              }, 1800)
+      try {
+        const data = await getTopics()
+        setTopics(data)
+
+        const entries = await Promise.all(
+          data.map(async (t) => {
+            try {
+              const lvl = await getTopicLevel(t.displayName)
+              return [t.file, lvl, t.displayName] as const
+            } catch {
+              return null
             }
-
-            storedLevels[t.file] = lvl.level
-            window.localStorage.setItem(LEVEL_STORAGE_KEY, JSON.stringify(storedLevels))
           })
-          .catch(() => {/* silently skip if level fetch fails */})
-      })
-    })
+        )
+
+        const nextLevels: Record<string, TopicLevel> = {}
+        entries.forEach((entry) => {
+          if (!entry) return
+          const [file, lvl, displayName] = entry
+          nextLevels[file] = lvl
+
+          const previousLevel = storedLevels[file]
+          if (typeof previousLevel === 'number' && lvl.level > previousLevel) {
+            setCelebrating(prev => ({ ...prev, [file]: true }))
+            setToastQueue(prev => [
+              ...prev,
+              {
+                id: `${file}-${lvl.level}`,
+                message: `${displayName} reached ${LEVEL_CONFIG[lvl.level].label}: ${LEVEL_CONFIG[lvl.level].desc}`,
+                level: lvl.level,
+              },
+            ])
+            window.setTimeout(() => {
+              setCelebrating(prev => {
+                const next = { ...prev }
+                delete next[file]
+                return next
+              })
+            }, 1800)
+          }
+
+          storedLevels[file] = lvl.level
+        })
+
+        setLevels(nextLevels)
+        window.localStorage.setItem(LEVEL_STORAGE_KEY, JSON.stringify(storedLevels))
+      } finally {
+        setLoading(false)
+        refreshInFlightRef.current = false
+      }
+    }
+
+    refreshTopics(true)
+
+    function handleFocus() {
+      refreshTopics(false)
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        refreshTopics(false)
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   useEffect(() => {
@@ -185,6 +290,41 @@ export default function TopicsPage() {
     return () => window.clearTimeout(timeoutId)
   }, [activeToast])
 
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      if (!pageRef.current?.contains(event.target as Node)) {
+        setActiveMenu(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick)
+    return () => document.removeEventListener('mousedown', handleDocumentClick)
+  }, [])
+
+  async function handleCopyPrompt(topicFile: string, action: TopicAction) {
+    try {
+      await navigator.clipboard.writeText(action.prompt)
+      setToastQueue(prev => [
+        ...prev,
+        {
+          id: `${topicFile}-${action.key}-copied`,
+          message: `Copied: ${action.label}`,
+          level: 1,
+        },
+      ])
+      setActiveMenu(null)
+    } catch {
+      setToastQueue(prev => [
+        ...prev,
+        {
+          id: `${topicFile}-${action.key}-failed`,
+          message: `Could not copy the prompt for ${action.label}.`,
+          level: 0,
+        },
+      ])
+    }
+  }
+
   if (loading) return <div className="page-loading">Loading...</div>
 
   const sortedTopics = [...topics].sort((a, b) => {
@@ -195,7 +335,7 @@ export default function TopicsPage() {
   })
 
   return (
-    <div className="topics-page">
+    <div className="topics-page" ref={pageRef}>
       <div className="topics-header">
         <div>
           <h1 className="topics-title">Interview Topics</h1>
@@ -228,6 +368,7 @@ export default function TopicsPage() {
           const levelData = levels[topic.file]
           const level = levelData?.level
           const appearance = level !== undefined ? getLevelAppearance(level) : null
+          const actions = levelData ? getTopicActions(levelData, topic.file) : []
 
           return (
             <div
@@ -237,7 +378,37 @@ export default function TopicsPage() {
             >
               <div className="topic-card-main">
                 <div className="topic-name">{topic.displayName}</div>
-                <code className="topic-file">{topic.file}</code>
+                <div className="topic-file-row">
+                  <button
+                    className="topic-file-button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setActiveMenu(prev => (prev === topic.file ? null : topic.file))
+                    }}
+                  >
+                    New Round
+                  </button>
+                  {levelData && activeMenu === topic.file && (
+                    <div className="topic-action-menu topic-action-menu-left" onClick={(event) => event.stopPropagation()}>
+                      <div className="topic-action-menu-title">Suggested commands</div>
+                      <code className="topic-action-topic">{topic.file}</code>
+                      {actions.map((action, index) => (
+                        <button
+                          key={action.key}
+                          className={`topic-action-item ${index === 0 ? 'recommended' : ''}`}
+                          onClick={() => handleCopyPrompt(topic.file, action)}
+                        >
+                          <div className="topic-action-row">
+                            <span className="topic-action-label">{action.label}</span>
+                            {index === 0 && <span className="topic-action-badge">Recommended</span>}
+                          </div>
+                          <div className="topic-action-helper">{action.helper}</div>
+                          <code className="topic-action-prompt">{action.prompt}</code>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="topic-card-right">
