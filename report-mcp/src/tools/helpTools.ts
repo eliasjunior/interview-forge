@@ -35,6 +35,11 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
             }],
           },
         },
+        {
+          name: "get_progress_overview",
+          how: "Aggregate ended sessions into score trends, topic progress, and weak-question rates",
+          example: { sessionKind: "interview", weakScoreThreshold: 3, recentSessionsLimit: 5, topicLimit: 10 },
+        },
         { name: "get_graph", how: "Get full knowledge graph built from all completed sessions", example: {} },
       ];
 

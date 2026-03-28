@@ -9,6 +9,28 @@ Before answering the user's request, first state whether `interview-mcp` is conn
 - If it is not connected, say: `Before I continue, I should check whether interview-mcp is connected in this Desktop session. It is not connected, so I have to stop here.`
 - Do not answer the user's actual request until this check has been reported.
 
+## MCP Connection Troubleshooting
+
+If `interview-mcp` fails to connect, follow this checklist before asking the user to do anything:
+
+### 1. Check the logs
+```bash
+tail -n 50 ~/Library/Logs/Claude/mcp-server-interview-mcp.log
+```
+
+### 2. Common causes & fixes
+
+| Symptom in log | Cause | Fix |
+|---|---|---|
+| `Cannot find module '.../dist/server.js'` | Project not built | Run `npm run build` from repo root |
+| `Server transport closed unexpectedly` | Process crashed on startup | Check for syntax errors or missing `.env` |
+| `Missing environment variables` | `.env` not loaded | Verify `interview-mcp/.env` has `AI_ENABLED` set |
+
+### 3. After fixing, always
+1. Run `npm run build` from the repo root if any TypeScript was changed or dist is missing
+2. Fully quit and reopen Claude Desktop (closing the window is not enough)
+3. Confirm reconnection by calling `server_status`
+
 ## Overview
 
 A study project for learning **Model Context Protocol (MCP)** server development. It runs mock technical interviews through Claude, evaluates answers with AI, and builds a growing knowledge graph across sessions — all visualised in a React dashboard.
@@ -210,6 +232,19 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM local t
 - Storage: shared SQLite runtime database (`interview-mcp/data/app.db`) plus report/public artifacts on disk
 - **Flashcard generation is automatic** — triggered by `end_interview`, no manual step needed
 - **SM-2 logic lives only in `srsUtils.ts`** — never duplicate scheduling logic in tools or HTTP handlers
+
+## Coverage TODO
+
+- Add lightweight coverage reporting with `c8` while keeping the existing Node `--test` runner.
+- Add `test:coverage` scripts in `interview-mcp/package.json` and `report-mcp/package.json`.
+- Configure terminal summary and `lcov` output.
+- Scope coverage to `src/tools/**`, core logic modules, and repository/data access code.
+- Exclude `dist`, smoke/runtime scripts, and generated artifacts from coverage.
+- Run a baseline coverage pass for `interview-mcp` and `report-mcp` before adding new tests.
+- Prioritize new tests for MCP tool validation and error paths.
+- Prioritize new tests for interview state-machine transitions and session flow branches.
+- Prioritize new tests for repository-backed logic: flashcards, mistakes, exercises, reports, and graph access.
+- Add optional root workspace shortcuts such as `test:coverage:interview` and `test:coverage:report` after package scripts are stable.
 
 ## Shared Types (`shared/src/types.ts`)
 

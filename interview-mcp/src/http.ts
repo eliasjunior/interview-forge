@@ -7,23 +7,28 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
 import { applySM2 } from "./srsUtils.js";
+import { FileKnowledgeStore } from "./knowledge/file.js";
+import { buildSessionRewardSummary, detectTopicLevel } from "./tools/getTopicLevel.js";
 import type {
   ReviewRating,
   Flashcard,
   Session,
   GraphInspectionResult,
   GraphInspectionSession,
+  ProgressSessionKind,
 } from "@mock-interview/shared";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 import { canonicalizeConceptWord } from "./graph/concepts.js";
 import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sessions/admin.js";
+import { buildProgressOverview } from "./progress.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
 const PUBLIC_DIR = path.resolve(__dirname, "../public");
 const REPORTS_DIR = path.join(DATA_DIR, "reports");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
+const KNOWLEDGE_DIR = path.join(DATA_DIR, "knowledge");
 
 const PORT = process.env.PORT ?? 3001;
 const db = createDb();
@@ -48,6 +53,20 @@ function loadFlashcards(): Flashcard[] {
 
 function saveFlashcards(cards: Flashcard[]) {
   repositories.flashcards.replaceAll(cards);
+}
+
+function parseBoundedInt(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== "string") return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function parseProgressSessionKind(value: unknown): ProgressSessionKind {
+  if (value === "interview" || value === "study" || value === "drill" || value === "warmup" || value === "all") {
+    return value;
+  }
+  return "interview";
 }
 
 function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult {
@@ -134,6 +153,37 @@ function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult 
   };
 }
 
+// API: List available interview topics from knowledge files
+app.get("/api/topics", (_req, res) => {
+  if (!fs.existsSync(KNOWLEDGE_DIR)) {
+    res.json([]);
+    return;
+  }
+  const files = fs.readdirSync(KNOWLEDGE_DIR).filter(f => f.endsWith(".md"));
+  const topics = files.map(f => {
+    const content = fs.readFileSync(path.join(KNOWLEDGE_DIR, f), "utf8");
+    const match = content.match(/^#\s+(.+)/m);
+    const displayName = match ? match[1].trim() : f.replace(".md", "");
+    return { file: f.replace(".md", ""), displayName };
+  });
+  res.json(topics);
+});
+
+// API: Get the recommended warm-up level for a topic
+app.get("/api/topics/:topic/level", (req, res) => {
+  const topic = decodeURIComponent(req.params.topic);
+  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
+  const knowledgeTopic = store.findByTopic(topic);
+  const hasWarmupContent =
+    knowledgeTopic != null &&
+    knowledgeTopic.warmupLevels != null &&
+    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+
+  const sessions = loadSessions();
+  const { level, status, reason, nextLevelRequirement, progress } = detectTopicLevel(topic, sessions, hasWarmupContent);
+  res.json({ topic, level, status, reason, nextLevelRequirement, hasWarmupContent, progress });
+});
+
 // API: Get the full knowledge graph
 app.get("/api/graph", (_req, res) => {
   res.json(repositories.graph.get());
@@ -152,9 +202,42 @@ app.post("/api/graph/inspect", (req, res) => {
   res.json(buildGraphInspection(Array.from(new Set(selectedNodeIds))));
 });
 
+app.get("/api/progress", (req, res) => {
+  const progress = buildProgressOverview(loadSessions(), {
+    sessionKind: parseProgressSessionKind(req.query.sessionKind),
+    weakScoreThreshold: parseBoundedInt(req.query.weakScoreThreshold, 3, 1, 5),
+    recentSessionsLimit: parseBoundedInt(req.query.recentSessionsLimit, 6, 1, 20),
+    topicLimit: parseBoundedInt(req.query.topicLimit, 10, 1, 20),
+  });
+
+  res.json(progress);
+});
+
 // API: List all sessions
 app.get("/api/sessions", (_req, res) => {
   res.json(repositories.sessions.list());
+});
+
+app.get("/api/sessions/:id/reward-summary", (req, res) => {
+  const session = repositories.sessions.list().find((candidate) => candidate.id === req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.state !== "ENDED") {
+    res.status(409).json({ error: "Session is not finalized yet" });
+    return;
+  }
+
+  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
+  const knowledgeTopic = store.findByTopic(session.topic);
+  const hasWarmupContent =
+    knowledgeTopic != null &&
+    knowledgeTopic.warmupLevels != null &&
+    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+
+  res.json(buildSessionRewardSummary(session, loadSessions(), hasWarmupContent));
 });
 
 app.get("/api/sessions/:id/delete-preview", (req, res) => {

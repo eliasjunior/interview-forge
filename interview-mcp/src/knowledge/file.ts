@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { KnowledgeStore, KnowledgeTopic } from "./port.js";
+import type { KnowledgeStore, KnowledgeTopic, WarmUpLevelContent, WarmUpQuestion } from "./port.js";
 import type { Concept } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +84,86 @@ function parseConcepts(section: string): Concept[] {
   return concepts;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Warm-up quest parsers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Extract a ### sub-section from inside an already-extracted ## section body. */
+function extractSubSection(sectionBody: string, heading: string): string {
+  const regex = new RegExp(`###\\s+${heading}[^\\n]*\\n([\\s\\S]*?)(?=\\n###\\s|$)`, "i");
+  const match = sectionBody.match(regex);
+  return match ? match[1].trim() : "";
+}
+
+/** Split a section into blocks per numbered item (1. … 2. …). */
+function splitIntoBlocks(section: string): string[] {
+  return section.split(/(?=^\d+\.)/m).map((b) => b.trim()).filter(Boolean);
+}
+
+function parseMCQQuestions(section: string): WarmUpQuestion[] {
+  return splitIntoBlocks(section).map((block): WarmUpQuestion | null => {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return null;
+    const question = lines[0].replace(/^\d+\.\s*/, "").trim();
+    const choices: string[] = [];
+    let answer = "";
+    for (const line of lines.slice(1)) {
+      if (/^[A-Z]\)/.test(line)) choices.push(line.replace(/^[A-Z]\)\s*/, "").trim());
+      else if (/^Answer:/i.test(line)) answer = line.replace(/^Answer:\s*/i, "").trim();
+    }
+    if (!question) return null;
+    return { question, choices: choices.length ? choices : undefined, answer };
+  }).filter((q): q is WarmUpQuestion => q !== null);
+}
+
+function parseFillBlankQuestions(section: string): WarmUpQuestion[] {
+  return splitIntoBlocks(section).map((block): WarmUpQuestion | null => {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return null;
+    const question = lines[0].replace(/^\d+\.\s*/, "").trim();
+    let answer = "";
+    for (const line of lines.slice(1)) {
+      if (/^Answer:/i.test(line)) answer = line.replace(/^Answer:\s*/i, "").trim();
+    }
+    if (!question) return null;
+    return { question, answer };
+  }).filter((q): q is WarmUpQuestion => q !== null);
+}
+
+function parseGuidedQuestions(section: string): WarmUpQuestion[] {
+  return splitIntoBlocks(section).map((block): WarmUpQuestion | null => {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return null;
+    const question = lines[0].replace(/^\d+\.\s*/, "").trim();
+    const hints: string[] = [];
+    let answer = "";
+    for (const line of lines.slice(1)) {
+      if (/^Hint:/i.test(line)) hints.push(line.replace(/^Hint:\s*/i, "").trim());
+      else if (/^Answer:/i.test(line)) answer = line.replace(/^Answer:\s*/i, "").trim();
+    }
+    if (!question) return null;
+    return { question, hint: hints.length ? hints.join(" | ") : undefined, answer };
+  }).filter((q): q is WarmUpQuestion => q !== null);
+}
+
+function parseWarmupLevels(md: string): Partial<Record<0 | 1 | 2, WarmUpLevelContent>> | undefined {
+  const sectionBody = extractSection(md, "Warm-up Quests");
+  if (!sectionBody) return undefined;
+
+  const result: Partial<Record<0 | 1 | 2, WarmUpLevelContent>> = {};
+
+  const l0 = extractSubSection(sectionBody, "Level 0");
+  if (l0) result[0] = { questions: parseMCQQuestions(l0) };
+
+  const l1 = extractSubSection(sectionBody, "Level 1");
+  if (l1) result[1] = { questions: parseMCQQuestions(l1) };
+
+  const l2 = extractSubSection(sectionBody, "Level 2");
+  if (l2) result[2] = { questions: parseGuidedQuestions(l2) };
+
+  return Object.keys(result).length ? result : undefined;
+}
+
 function parseFile(filePath: string): KnowledgeTopic | null {
   try {
     const md = fs.readFileSync(filePath, "utf-8");
@@ -102,13 +182,14 @@ function parseFile(filePath: string): KnowledgeTopic | null {
     const evaluationCriteria   = parseCriteria(criteriaSection);
     const concepts             = parseConcepts(conceptsSection);
     const questionDifficulties = parseDifficulties(difficultySection);
+    const warmupLevels         = parseWarmupLevels(md);
 
     if (questions.length === 0) {
       console.error(`[knowledge] ${path.basename(filePath)}: no questions found — skipping`);
       return null;
     }
 
-    return { topic, summary, questions, evaluationCriteria, concepts, questionDifficulties };
+    return { topic, summary, questions, evaluationCriteria, concepts, questionDifficulties, warmupLevels };
   } catch (err) {
     console.error(`[knowledge] failed to parse ${filePath}:`, err);
     return null;

@@ -4,6 +4,40 @@ import type { Evaluation } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
+function parseMcqAnswer(answer: string, choiceCount: number): string[] {
+  const normalised = answer.trim().toUpperCase();
+  if (!normalised) return [];
+
+  if (normalised === "ALL") {
+    return Array.from({ length: choiceCount }, (_, index) => String.fromCharCode(65 + index));
+  }
+
+  if (normalised === "NONE") {
+    return ["NONE"];
+  }
+
+  return Array.from(
+    new Set(
+      normalised
+        .split(/[,\s]+/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+    )
+  ).sort();
+}
+
+function formatMcqAnswer(answer: string[], choices: string[]): string {
+  if (answer.length === 1 && answer[0] === "NONE") return "NONE";
+
+  return answer
+    .map((letter) => {
+      const index = letter.charCodeAt(0) - 65;
+      const choiceText = choices[index];
+      return choiceText ? `${letter}) ${choiceText}` : letter;
+    })
+    .join(", ");
+}
+
 export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
     "evaluate_answer",
@@ -46,7 +80,41 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
 
       let result: { score: number; feedback: string; strongAnswer?: string; needsFollowUp: boolean; followUpQuestion?: string | null; deeperDive?: string };
 
-      if (deps.ai) {
+      // ── Warm-up auto-evaluation (L0/L1 MCQ, legacy L1 fill-in-blank) ───────
+      // For these formats the correct answer is stored on the session.
+      // No AI or orchestrator scoring is needed — evaluate automatically.
+      const warmupAnswer = session.questAnswers?.[session.currentQuestionIndex];
+      if (
+        session.sessionKind === "warmup" &&
+        (session.questFormat === "mcq" || session.questFormat === "fill_blank") &&
+        warmupAnswer !== undefined
+      ) {
+        const expected = warmupAnswer.trim();
+        let isCorrect: boolean;
+        let feedback: string;
+
+        if (session.questFormat === "mcq") {
+          const choices = session.questChoices?.[session.currentQuestionIndex] ?? [];
+          const expectedAnswers = parseMcqAnswer(expected, choices.length);
+          const candidateAnswers = parseMcqAnswer(lastAnswer.content, choices.length);
+          isCorrect =
+            expectedAnswers.length === candidateAnswers.length &&
+            expectedAnswers.every((value, index) => value === candidateAnswers[index]);
+
+          const renderedCorrectAnswer = formatMcqAnswer(expectedAnswers, choices);
+          feedback = isCorrect
+            ? `Correct! ${renderedCorrectAnswer} ${expectedAnswers.length > 1 || expectedAnswers[0] === "NONE" ? "are" : "is"} right.`
+            : `Not quite — the correct answer is ${renderedCorrectAnswer}.`;
+        } else {
+          // fill_blank: accept if the candidate's answer contains the expected key term
+          isCorrect = lastAnswer.content.toLowerCase().includes(expected.toLowerCase());
+          feedback = isCorrect
+            ? `Correct! The expected answer is: "${expected}".`
+            : `Not quite — the expected answer is: "${expected}".`;
+        }
+
+        result = { score: isCorrect ? 5 : 1, feedback, needsFollowUp: false };
+      } else if (deps.ai) {
         const entry = deps.knowledge.findByTopic(session.topic);
         // Prefer pre-selected criteria stored on the session (safe after question shuffling).
         // Fall back to positional lookup for legacy sessions and AI-generated questions.

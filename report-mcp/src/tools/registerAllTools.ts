@@ -7,6 +7,7 @@ import { registerGetReportWeakSubjectsTool } from "./getReportWeakSubjects.js";
 import { registerGetReportFullContextTool } from "./getReportFullContext.js";
 import { registerGenerateReportUiTool } from "./generateReportUi.js";
 import { registerGetGraphTool } from "./getGraph.js";
+import { registerGetProgressOverviewTool } from "./getProgressOverview.js";
 
 export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerServerStatusTool(server, deps);
@@ -16,4 +17,5 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerGetReportFullContextTool(server, deps);
   registerGenerateReportUiTool(server, deps);
   registerGetGraphTool(server, deps);
+  registerGetProgressOverviewTool(server, deps);
 }

@@ -28,6 +28,8 @@ import { registerListExercisesTool } from "./listExercises.js";
 import { registerBuildScopeTool } from "./buildScope.js";
 import { registerDeleteSessionTool } from "./deleteSession.js";
 import { registerGenerateFlashcardVariationTool } from "./generateFlashcardVariation.js";
+import { registerGetTopicLevelTool } from "./getTopicLevel.js";
+import { registerStartWarmUpTool } from "./startWarmUp.js";
 
 export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerServerStatusTool(server, deps);
@@ -58,4 +60,6 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerBuildScopeTool(server, deps);
   registerDeleteSessionTool(server, deps);
   registerGenerateFlashcardVariationTool(server, deps);
+  registerGetTopicLevelTool(server, deps);
+  registerStartWarmUpTool(server, deps);
 }

@@ -119,6 +119,10 @@ function normalizeSession(session: Session | null) {
     studyCategory: session.studyCategory,
     sourcePath: session.sourcePath,
     sourceType: session.sourceType,
+    questLevel: session.questLevel,
+    questFormat: session.questFormat,
+    questChoices: session.questChoices,
+    questAnswers: session.questAnswers,
     evaluations: session.evaluations.map((evaluation) => ({
       ...evaluation,
       strongAnswer: evaluation.strongAnswer,

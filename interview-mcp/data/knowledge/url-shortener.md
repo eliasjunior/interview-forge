@@ -79,3 +79,106 @@ A strong candidate understands not just the happy path but the failure modes: ca
 - practical usage: caching, redis, cdn, analytics, rate-limiting, http-301-vs-302, kafka, safe-browsing-api, snowflake-id, sharding, consistent-hashing
 - tradeoffs: deduplication-vs-isolation, 301-vs-302, hash-vs-counter, sql-vs-nosql, sync-vs-async-analytics, strong-vs-eventual-consistency, preview-vs-direct-redirect
 - best practices: atomic-counter, cache-aside, ttl, write-once-read-many, short-expiry-for-302, fire-and-forget-analytics, validate-before-shortening, tombstone-deleted-codes
+
+## Warm-up Quests
+
+### Level 0 — Spark (MCQ)
+1. In a large-scale URL shortener, why is the redirect path usually the main thing to optimize?
+   A) Because creating short links happens more often than redirects
+   B) Because redirect traffic is much higher and directly affects user-perceived latency
+   C) Because redirect responses are larger than shorten responses
+   D) Because analytics queries run before every redirect
+   Answer: B
+
+2. Which short-code generation approach gives globally unique IDs without depending on collision retries for every write?
+   A) A distributed counter or Snowflake-style ID encoded in base62
+   B) Hash the long URL and retry on collision
+   C) Random strings with a uniqueness check on each write
+   D) UUID of the long URL truncated to 7 characters with collision retry
+   Answer: A
+
+3. What is the most important backend tradeoff between returning HTTP 301 and 302 for redirects?
+   A) 301 reduces repeated server hits through caching, while 302 preserves better server-side click visibility
+   B) 301 preserves server-side analytics, while 302 causes browsers to cache the redirect permanently
+   C) 301 is for custom aliases, while 302 is for generated aliases
+   D) 301 prevents collisions, while 302 prevents abuse
+   Answer: A
+
+4. What is the main danger of a hot key in a URL shortener after a cache miss or cache restart?
+   A) Many requests miss together and overload the database or origin store
+   B) The analytics queue falls out of order for the popular URL
+   C) The Redis cluster evicts the hot key and blocks all other reads
+   D) Browser redirects permanently cache the wrong destination
+   Answer: A
+
+5. Why might a system intentionally avoid returning the same short code for the same long URL every time?
+   A) Because databases cannot store the same long URL twice
+   B) Because deduplication makes redirects slower than SQL joins
+   C) Because 302 redirects require a unique short code per request
+   D) Because separate users may need different ownership, expiry, deletion, or privacy boundaries
+   Answer: D
+
+6. Which design best keeps analytics from slowing down redirects?
+   A) Write click events synchronously before returning the redirect
+   B) Batch analytics writes every 60 seconds inside the redirect handler
+   C) Only record analytics when Redis is unavailable
+   D) Publish click events asynchronously to a queue and process them off the critical path
+   Answer: D
+
+7. Why is it useful to separate custom aliases from the auto-generated short-code namespace?
+   A) So custom aliases can use a different HTTP status code
+   B) So Redis can store custom aliases in a dedicated cluster region
+   C) So generated codes remain predictable and collision-safe without conflicting with human-chosen names
+   D) So custom aliases never need URL validation
+   Answer: C
+
+8. What is the safest default treatment for deleted or expired short codes?
+   A) Reuse them immediately so the namespace stays compact
+   B) Archive them to cold storage and reuse after 24 hours
+   C) Tombstone them or delay reuse to avoid stale-cache and user-confusion issues
+   D) Convert them into admin-owned aliases and log the original owner
+   Answer: C
+
+### Level 1 — Padawan (Fill in the Blank)
+1. To keep redirect latency low, shortCode-to-longURL lookups are commonly served from a ___ before falling back to the primary store.
+   Answer: cache
+
+2. If many requests for the same short code miss the cache at once and all hit the database, that failure mode is called a cache ___.
+   Answer: stampede
+
+3. A globally unique numeric ID encoded into a short URL-friendly alphabet is often represented using ___ encoding.
+   Answer: base62
+
+4. To keep the redirect path fast, click events are usually recorded ___ through a queue.
+   Answer: asynchronously
+
+5. When a deleted short code is intentionally kept reserved so it is not immediately reused, it is usually ___.
+   Answer: tombstoned
+
+6. Returning the same short code for the same long URL is a form of ___.
+   Answer: deduplication
+
+7. A very popular short code that receives disproportionate traffic is often called a hot ___.
+   Answer: key
+
+8. To protect the shorten endpoint from abuse, systems commonly enforce rate ___.
+   Answer: limiting
+
+### Level 2 — Forge (Guided Answer)
+1. Explain the high-level backend architecture of a URL shortener. Use this structure: [shorten path → persistence model → redirect path → analytics offload].
+   Hint: Focus on why the read path and write path have different performance priorities.
+
+2. Explain two different short-code generation strategies. Use this structure: [strategy one → strategy two → operational tradeoffs → which one you would choose].
+   Hint: Compare collision handling, coordination cost, code length, and scalability under concurrent writes.
+
+3. Explain how to keep redirects fast under heavy traffic. Use this structure: [cache hierarchy → origin fallback → hot-key failure mode → mitigation].
+   Hint: Good answers usually mention Redis, CDN or edge caching, single-flight/request coalescing, and protecting the primary store.
+
+4. Explain the backend tradeoff between HTTP 301 and 302 in a URL shortener. Use this structure: [browser behavior → load implications → analytics implications → when to prefer each].
+   Hint: This is really a tradeoff between offloading repeated traffic and keeping better server-side visibility.
+
+5. Explain whether the same long URL should always return the same short code. Use this structure: [why deduplication is attractive → why isolation is attractive → ownership/expiry/privacy implications → your decision].
+   Hint: A strong answer should argue both sides before choosing a design.
+
+6. Explain how you would design abuse prevention for a production URL shortener. Use this structure: [write-time validation → rate limiting and identity controls → malicious destination detection → monitoring and response].
+   Hint: Think beyond regex validation. The interesting part is phishing, spam campaigns, bot-driven creation, and post-creation enforcement.

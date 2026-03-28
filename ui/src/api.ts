@@ -8,6 +8,9 @@ import type {
   GraphInspectionResult,
   SessionDeletionPreview,
   SessionDeleteResult,
+  ProgressOverview,
+  ProgressSessionKind,
+  SessionRewardSummary,
 } from '@mock-interview/shared'
 
 const BASE = '/api'
@@ -34,12 +37,61 @@ async function del<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export interface Topic {
+  file: string
+  displayName: string
+}
+
+export const getTopics = (): Promise<Topic[]> => req(`${BASE}/topics`)
+
+export interface TopicLevel {
+  topic: string
+  level: 0 | 1 | 2 | 3 | 4
+  /** 'cold' = never attempted, 'warmup' = in the ladder, 'dropped' = fell back, 'ready' = mock-ready or interview-ready */
+  status: 'cold' | 'warmup' | 'dropped' | 'ready'
+  reason: string
+  nextLevelRequirement: string
+  hasWarmupContent: boolean
+  progress: {
+    current: number
+    required: number
+    targetLevel: 0 | 1 | 2 | 3 | 4
+    variant: 'warmup' | 'interview' | 'complete'
+    label: string
+    attempted: boolean
+    almostThere: boolean
+  }
+}
+
+export const getTopicLevel = (topic: string): Promise<TopicLevel> =>
+  req(`${BASE}/topics/${encodeURIComponent(topic)}/level`)
+
 export const getSessions = (): Promise<Session[]> => req(`${BASE}/sessions`)
 
+
+export interface ProgressQuery {
+  sessionKind?: ProgressSessionKind
+  weakScoreThreshold?: number
+  recentSessionsLimit?: number
+  topicLimit?: number
+}
+
+export const getProgressOverview = (query: ProgressQuery = {}): Promise<ProgressOverview> => {
+  const params = new URLSearchParams()
+  if (query.sessionKind) params.set('sessionKind', query.sessionKind)
+  if (typeof query.weakScoreThreshold === 'number') params.set('weakScoreThreshold', String(query.weakScoreThreshold))
+  if (typeof query.recentSessionsLimit === 'number') params.set('recentSessionsLimit', String(query.recentSessionsLimit))
+  if (typeof query.topicLimit === 'number') params.set('topicLimit', String(query.topicLimit))
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return req(`${BASE}/progress${suffix}`)
+}
 export const getSession = async (id: string): Promise<Session | null> => {
   const sessions = await getSessions()
   return sessions.find(s => s.id === id) ?? null
 }
+
+export const getSessionRewardSummary = (id: string): Promise<SessionRewardSummary> =>
+  req(`${BASE}/sessions/${encodeURIComponent(id)}/reward-summary`)
 
 export const getSessionDeletePreview = (id: string): Promise<SessionDeletionPreview> =>
   req(`${BASE}/sessions/${encodeURIComponent(id)}/delete-preview`)

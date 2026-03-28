@@ -44,7 +44,7 @@ interview-mcp/data/
 
 ## Tools
 
-The server exposes **7 MCP tools**.
+The server exposes **8 MCP tools**.
 
 | Tool | Description |
 |---|---|
@@ -54,6 +54,7 @@ The server exposes **7 MCP tools**.
 | `get_report_weak_subjects` | Identifies low-scoring questions for a session and returns structured context plus a `nextCall` scaffold for `generate_report_ui`. |
 | `get_report_full_context` | Returns all evaluated Q/A pairs for a session plus a `nextCall` scaffold for `generate_report_ui`. |
 | `generate_report_ui` | Writes a per-session JSON dataset to `interview-mcp/data/public/generated/` and returns a viewer URL. |
+| `get_progress_overview` | Aggregates ended sessions into score trends, topic progress, repeated-topic improvement, weak-question rate, and recent-session summaries. |
 | `get_graph` | Returns the full cumulative knowledge graph from the shared SQLite store. |
 
 ### Dynamic Report Viewer Flow

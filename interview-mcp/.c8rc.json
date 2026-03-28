@@ -1,0 +1,32 @@
+{
+  "reporter": [
+    "text",
+    "lcov"
+  ],
+  "all": true,
+  "src": [
+    "src"
+  ],
+  "exclude": [
+    "dist/**",
+    "coverage/**",
+    "src/__tests__/**",
+    "src/server.ts",
+    "src/http.ts",
+    "src/scripts/**",
+    "src/ai/**",
+    "src/tools/deps.ts",
+    "src/db/backup.ts",
+    "src/db/backfillFlashcards.ts",
+    "src/db/backfillStrongAnswers.ts",
+    "src/db/importJsonData.ts",
+    "src/db/migrate.ts",
+    "src/db/rebuildGraph.ts",
+    "src/db/rescheduleFlashcards.ts"
+  ],
+  "check-coverage": true,
+  "lines": 50,
+  "functions": 50,
+  "branches": 50,
+  "statements": 50
+}

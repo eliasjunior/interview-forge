@@ -14,9 +14,50 @@ export type InterviewState =
   | 'FOLLOW_UP'
   | 'ENDED'
 
-export type SessionKind = 'interview' | 'study' | 'drill'
+export type SessionKind = 'interview' | 'study' | 'drill' | 'warmup'
 export type StudyCategory = 'topic' | 'algorithm'
 export type InterviewType = 'design' | 'code'
+
+// ── Warm-up quest levels ───────────────────────────────────────────────────────
+
+/** Topic progression level. 0–2 = warm-up ladder, 3 = mock-ready, 4 = sustained real-interview readiness. */
+export type WarmUpLevel = 0 | 1 | 2 | 3 | 4
+export type TopicStatus = 'cold' | 'warmup' | 'dropped' | 'ready'
+export type TopicProgressVariant = 'warmup' | 'interview' | 'complete'
+
+export interface TopicLevelProgressData {
+  current: number
+  required: number
+  targetLevel: WarmUpLevel
+  variant: TopicProgressVariant
+  label: string
+  attempted: boolean
+  almostThere: boolean
+}
+
+export interface TopicLevelSnapshot {
+  level: WarmUpLevel
+  status: TopicStatus
+  reason: string
+  nextLevelRequirement: string
+  progress: TopicLevelProgressData
+}
+
+export interface SessionRewardSummary {
+  sessionId: string
+  topic: string
+  eligible: boolean
+  state: 'level_up' | 'progress' | 'stalled' | 'complete' | 'ineligible'
+  previous: TopicLevelSnapshot
+  current: TopicLevelSnapshot
+  title: string
+  message: string
+  nextHint?: string
+  whyNoProgress?: string
+}
+
+/** Question format used in warm-up sessions. */
+export type QuestionFormat = 'mcq' | 'fill_blank' | 'guided' | 'open'
 
 // ── Session data ──────────────────────────────────────────────────────────────
 
@@ -57,6 +98,14 @@ export interface Session {
   customContent?: string
   /** The interview angle for a scoped session, e.g. "robustness, reliability, and extensibility" */
   focusArea?: string
+  /** Warm-up quest level recorded on warm-up sessions. In practice warm-up sessions use 0–2 only. */
+  questLevel?: WarmUpLevel
+  /** Question format used in this warm-up session. */
+  questFormat?: QuestionFormat
+  /** MCQ answer choices, parallel to questions[]. Only present when questFormat === 'mcq'. */
+  questChoices?: string[][]
+  /** Correct answers for auto-evaluation (L0/L1). Parallel to questions[]. */
+  questAnswers?: string[]
   state: InterviewState
   currentQuestionIndex: number
   questions: string[]
@@ -255,6 +304,82 @@ export interface Exercise {
   /** Path to the .md file relative to data/knowledge/exercises/ */
   filePath: string
   createdAt: string
+}
+
+// ── Progress reporting ─────────────────────────────────────────────────────────
+
+export type ProgressSessionKind = SessionKind | 'all'
+
+export interface ProgressOverviewFilters {
+  sessionKind: ProgressSessionKind
+  weakScoreThreshold: number
+  recentSessionsLimit: number
+  topicLimit: number
+}
+
+export interface ProgressOverviewTotals {
+  sessions: number
+  topics: number
+  questionsAnswered: number
+  avgScore: string
+  weakQuestions: number
+  weakQuestionRate: string
+  followUpCount: number
+  followUpRate: string
+  firstSessionAt: string | null
+  lastSessionAt: string | null
+}
+
+export interface ProgressRecentSession {
+  sessionId: string
+  topic: string
+  sessionKind: SessionKind
+  createdAt: string
+  endedAt?: string
+  avgScore: string
+  questionCount: number
+  weakQuestionCount: number
+  followUpCount: number
+}
+
+export interface ProgressTrendPoint {
+  sessionId: string
+  topic: string
+  endedAt: string
+  avgScore: string
+}
+
+export interface ProgressTopicBreakdown {
+  topic: string
+  sessionCount: number
+  avgScore: string
+  latestScore: string
+  deltaFromFirst: string
+  totalQuestions: number
+  weakQuestions: number
+  weakQuestionRate: string
+  lastSessionAt: string
+}
+
+export interface ProgressRepeatedTopic {
+  topic: string
+  sessionCount: number
+  firstScore: string
+  latestScore: string
+  delta: string
+  firstSessionAt: string
+  latestSessionAt: string
+}
+
+export interface ProgressOverview {
+  generatedAt: string
+  filters: ProgressOverviewFilters
+  totals: ProgressOverviewTotals
+  scoreDistribution: Record<'1' | '2' | '3' | '4' | '5', number>
+  recentSessions: ProgressRecentSession[]
+  scoreTrend: ProgressTrendPoint[]
+  topicBreakdown: ProgressTopicBreakdown[]
+  repeatedTopics: ProgressRepeatedTopic[]
 }
 
 // ── HTTP API responses (used by ui) ───────────────────────────────────────────

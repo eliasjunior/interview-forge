@@ -82,7 +82,7 @@ function captureToolHandler(deps: ToolDeps) {
   type Handler = (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }>;
   let handler!: Handler;
   const mockServer = {
-    tool(_n: string, _d: string, _s: object, h: Handler) { handler = h; },
+    registerTool(_n: string, _config: object, h: Handler) { handler = h; },
   };
   registerCreateFlashcardTool(mockServer as any, deps);
   return handler;
@@ -200,7 +200,13 @@ describe("create_flashcard tool handler — integration", () => {
     const { sqlite, repos } = setupDb();
     try {
       const handler = captureToolHandler(makeRealDeps(repos));
-      await handler({ front: "Q?", back: "A.", topic: "T", difficulty: "easy", tags: [] });
+      await handler({
+        front: "What is due immediately?",
+        back: "A newly created flashcard.",
+        topic: "Timing",
+        difficulty: "easy",
+        tags: [],
+      });
       const card = repos.flashcards.list()[0];
       assert.equal(card.dueDate, card.createdAt);
       assert.equal(card.repetitions, 0);
@@ -216,7 +222,13 @@ describe("create_flashcard tool handler — integration", () => {
     const handler = captureToolHandler(deps);
 
     // First call creates the card
-    await handler({ front: "Q?", back: "A.", topic: "T", difficulty: "easy", tags: [] });
+    await handler({
+      front: "What is idempotency?",
+      back: "Repeated saves should not duplicate the same card.",
+      topic: "Persistence",
+      difficulty: "easy",
+      tags: [],
+    });
     assert.equal(getSaveCalls(), 1);
 
     // Force a second persist of the same id to test the idempotency path
@@ -241,8 +253,8 @@ describe("create_flashcard tool handler — integration", () => {
     const { sqlite, repos } = setupDb();
     try {
       const handler = captureToolHandler(makeRealDeps(repos));
-      await handler({ front: "Q1?", back: "A1.", topic: "T", difficulty: "easy", tags: [] });
-      await handler({ front: "Q2?", back: "A2.", topic: "T", difficulty: "hard", tags: [] });
+      await handler({ front: "Question one?", back: "Answer one.", topic: "Topic", difficulty: "easy", tags: [] });
+      await handler({ front: "Question two?", back: "Answer two.", topic: "Topic", difficulty: "hard", tags: [] });
       assert.equal(repos.flashcards.list().length, 2);
     } finally {
       sqlite.close();

@@ -1,15 +1,101 @@
-import type { Evaluation, Session, KnowledgeGraph } from "@mock-interview/shared";
+import type { Evaluation, Session, SessionKind } from "@mock-interview/shared";
 import type { WeakSubject, FullReportQuestionContext } from "./tools/deps.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Session utilities
-// ─────────────────────────────────────────────────────────────────────────────
+export type ProgressSessionKind = SessionKind | "all";
+
+export interface ProgressOverviewOptions {
+  weakScoreThreshold: number;
+  recentSessionsLimit: number;
+  topicLimit: number;
+  sessionKind: ProgressSessionKind;
+}
+
+export interface ProgressOverview {
+  generatedAt: string;
+  filters: {
+    sessionKind: ProgressSessionKind;
+    weakScoreThreshold: number;
+    recentSessionsLimit: number;
+    topicLimit: number;
+  };
+  totals: {
+    sessions: number;
+    topics: number;
+    questionsAnswered: number;
+    avgScore: string;
+    weakQuestions: number;
+    weakQuestionRate: string;
+    followUpCount: number;
+    followUpRate: string;
+    firstSessionAt: string | null;
+    lastSessionAt: string | null;
+  };
+  scoreDistribution: Record<"1" | "2" | "3" | "4" | "5", number>;
+  recentSessions: Array<{
+    sessionId: string;
+    topic: string;
+    sessionKind: SessionKind;
+    createdAt: string;
+    endedAt?: string;
+    avgScore: string;
+    questionCount: number;
+    weakQuestionCount: number;
+    followUpCount: number;
+  }>;
+  scoreTrend: Array<{
+    sessionId: string;
+    topic: string;
+    endedAt: string;
+    avgScore: string;
+  }>;
+  topicBreakdown: Array<{
+    topic: string;
+    sessionCount: number;
+    avgScore: string;
+    latestScore: string;
+    deltaFromFirst: string;
+    totalQuestions: number;
+    weakQuestions: number;
+    weakQuestionRate: string;
+    lastSessionAt: string;
+  }>;
+  repeatedTopics: Array<{
+    topic: string;
+    sessionCount: number;
+    firstScore: string;
+    latestScore: string;
+    delta: string;
+    firstSessionAt: string;
+    latestSessionAt: string;
+  }>;
+}
+
+function getSessionKind(session: Session): SessionKind {
+  return session.sessionKind ?? "interview";
+}
+
+function getEndedAt(session: Session): string {
+  return session.endedAt ?? session.createdAt;
+}
+
+function numericAvg(evaluations: Evaluation[]): number {
+  if (evaluations.length === 0) return 0;
+  return evaluations.reduce((sum, evaluation) => sum + evaluation.score, 0) / evaluations.length;
+}
+
+function formatRate(count: number, total: number): string {
+  if (total === 0) return "0.0%";
+  return `${((count / total) * 100).toFixed(1)}%`;
+}
+
+function formatDelta(value: number): string {
+  const rounded = value.toFixed(1);
+  return value > 0 ? `+${rounded}` : rounded;
+}
 
 export function calcAvgScore(evaluations: Evaluation[]): string {
   if (evaluations.length === 0) return "N/A";
-  return (
-    evaluations.reduce((s, e) => s + e.score, 0) / evaluations.length
-  ).toFixed(1);
+  return numericAvg(evaluations).toFixed(1);
 }
 
 export function buildSummary(session: Session): string {
@@ -35,7 +121,6 @@ export function buildReport(session: Session): string {
 
   const scoreBar = (score: number) => "█".repeat(score) + "░".repeat(5 - score);
 
-  // ── Header ────────────────────────────────────────────────────────────────
   const lines: string[] = [
     `# Interview Report — ${session.topic}`,
     ``,
@@ -50,7 +135,6 @@ export function buildReport(session: Session): string {
     ``,
   ];
 
-  // ── Question breakdown ────────────────────────────────────────────────────
   if (session.evaluations.length > 0) {
     lines.push(`## Question Breakdown`, ``);
 
@@ -83,7 +167,6 @@ export function buildReport(session: Session): string {
     }
   }
 
-  // ── Overall summary ───────────────────────────────────────────────────────
   lines.push(
     `## Summary`,
     ``,
@@ -91,7 +174,6 @@ export function buildReport(session: Session): string {
     ``,
   );
 
-  // ── Concepts ──────────────────────────────────────────────────────────────
   if (session.concepts && session.concepts.length > 0) {
     const byCluster: Record<string, string[]> = {};
     for (const c of session.concepts) {
@@ -107,7 +189,6 @@ export function buildReport(session: Session): string {
     lines.push(``);
   }
 
-  // ── Full transcript ───────────────────────────────────────────────────────
   if (session.messages.length > 0) {
     lines.push(`---`, ``, `## Full Transcript`, ``);
     for (const m of session.messages) {
@@ -119,9 +200,127 @@ export function buildReport(session: Session): string {
   return lines.join("\n");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Report helper utilities
-// ─────────────────────────────────────────────────────────────────────────────
+export function buildProgressOverview(
+  sessionsById: Record<string, Session>,
+  options: ProgressOverviewOptions,
+): ProgressOverview {
+  const endedSessions = Object.values(sessionsById)
+    .filter((session) => session.state === "ENDED")
+    .filter((session) => options.sessionKind === "all" || getSessionKind(session) === options.sessionKind);
+
+  const chronologicalSessions = endedSessions
+    .slice()
+    .sort((a, b) => new Date(getEndedAt(a)).getTime() - new Date(getEndedAt(b)).getTime());
+
+  const reverseChronologicalSessions = chronologicalSessions.slice().reverse();
+  const evaluations = chronologicalSessions.flatMap((session) => session.evaluations);
+  const weakQuestions = evaluations.filter((evaluation) => evaluation.score <= options.weakScoreThreshold).length;
+  const followUpCount = evaluations.filter((evaluation) => evaluation.needsFollowUp).length;
+  const totalScore = evaluations.reduce((sum, evaluation) => sum + evaluation.score, 0);
+  const avgScore = evaluations.length === 0 ? "N/A" : (totalScore / evaluations.length).toFixed(1);
+  const scoreDistribution: ProgressOverview["scoreDistribution"] = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+
+  for (const evaluation of evaluations) {
+    scoreDistribution[String(evaluation.score) as keyof typeof scoreDistribution] += 1;
+  }
+
+  const topicGroups = new Map<string, Session[]>();
+  for (const session of chronologicalSessions) {
+    const key = session.topic.trim().toLowerCase();
+    const group = topicGroups.get(key) ?? [];
+    group.push(session);
+    topicGroups.set(key, group);
+  }
+
+  const topicBreakdown = Array.from(topicGroups.values())
+    .map((sessions) => {
+      const topicEvaluations = sessions.flatMap((session) => session.evaluations);
+      const firstSession = sessions[0];
+      const latestSession = sessions[sessions.length - 1];
+      const firstAvg = numericAvg(firstSession.evaluations);
+      const latestAvg = numericAvg(latestSession.evaluations);
+      const weakCount = topicEvaluations.filter((evaluation) => evaluation.score <= options.weakScoreThreshold).length;
+
+      return {
+        topic: latestSession.topic,
+        sessionCount: sessions.length,
+        avgScore: topicEvaluations.length === 0 ? "N/A" : (topicEvaluations.reduce((sum, evaluation) => sum + evaluation.score, 0) / topicEvaluations.length).toFixed(1),
+        latestScore: calcAvgScore(latestSession.evaluations),
+        deltaFromFirst: formatDelta(latestAvg - firstAvg),
+        totalQuestions: topicEvaluations.length,
+        weakQuestions: weakCount,
+        weakQuestionRate: formatRate(weakCount, topicEvaluations.length),
+        lastSessionAt: getEndedAt(latestSession),
+      };
+    })
+    .sort((a, b) => {
+      const scoreDiff = Number(a.avgScore) - Number(b.avgScore);
+      if (scoreDiff !== 0) return scoreDiff;
+      return new Date(b.lastSessionAt).getTime() - new Date(a.lastSessionAt).getTime();
+    })
+    .slice(0, options.topicLimit);
+
+  const repeatedTopics = Array.from(topicGroups.values())
+    .filter((sessions) => sessions.length >= 2)
+    .map((sessions) => {
+      const firstSession = sessions[0];
+      const latestSession = sessions[sessions.length - 1];
+      const firstScore = numericAvg(firstSession.evaluations);
+      const latestScore = numericAvg(latestSession.evaluations);
+      return {
+        topic: latestSession.topic,
+        sessionCount: sessions.length,
+        firstScore: calcAvgScore(firstSession.evaluations),
+        latestScore: calcAvgScore(latestSession.evaluations),
+        delta: formatDelta(latestScore - firstScore),
+        firstSessionAt: getEndedAt(firstSession),
+        latestSessionAt: getEndedAt(latestSession),
+      };
+    })
+    .sort((a, b) => Number(b.delta) - Number(a.delta));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    filters: {
+      sessionKind: options.sessionKind,
+      weakScoreThreshold: options.weakScoreThreshold,
+      recentSessionsLimit: options.recentSessionsLimit,
+      topicLimit: options.topicLimit,
+    },
+    totals: {
+      sessions: chronologicalSessions.length,
+      topics: topicGroups.size,
+      questionsAnswered: evaluations.length,
+      avgScore,
+      weakQuestions,
+      weakQuestionRate: formatRate(weakQuestions, evaluations.length),
+      followUpCount,
+      followUpRate: formatRate(followUpCount, evaluations.length),
+      firstSessionAt: chronologicalSessions[0] ? getEndedAt(chronologicalSessions[0]) : null,
+      lastSessionAt: chronologicalSessions.length > 0 ? getEndedAt(chronologicalSessions[chronologicalSessions.length - 1]) : null,
+    },
+    scoreDistribution,
+    recentSessions: reverseChronologicalSessions.slice(0, options.recentSessionsLimit).map((session) => ({
+      sessionId: session.id,
+      topic: session.topic,
+      sessionKind: getSessionKind(session),
+      createdAt: session.createdAt,
+      endedAt: session.endedAt,
+      avgScore: calcAvgScore(session.evaluations),
+      questionCount: session.evaluations.length,
+      weakQuestionCount: session.evaluations.filter((evaluation) => evaluation.score <= options.weakScoreThreshold).length,
+      followUpCount: session.evaluations.filter((evaluation) => evaluation.needsFollowUp).length,
+    })),
+    scoreTrend: chronologicalSessions.map((session) => ({
+      sessionId: session.id,
+      topic: session.topic,
+      endedAt: getEndedAt(session),
+      avgScore: calcAvgScore(session.evaluations),
+    })),
+    topicBreakdown,
+    repeatedTopics,
+  };
+}
 
 export function escapeHtml(value: string): string {
   return value
@@ -134,9 +333,9 @@ export function escapeHtml(value: string): string {
 
 export function serializeForInlineScript(value: unknown): string {
   return JSON.stringify(value)
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026");
+    .replace(/</g, "\u003c")
+    .replace(/>/g, "\u003e")
+    .replace(/&/g, "\u0026");
 }
 
 export function countLines(text: string): number {

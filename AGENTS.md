@@ -209,3 +209,16 @@ create_exercise { name, topic, difficulty, ... }
 - `interview-mcp` is the data owner; new features should respect that boundary.
 - The `AIProvider` layer is intentionally narrow and stable. New tools should not expand it unless there is a deliberate architecture change.
 - Algorithm-style practice is currently supported through `start_scoped_interview`; first-class `interviewType: "code"` workflows are parked for future work.
+
+## Coverage TODO
+
+- Add lightweight coverage reporting with `c8` while keeping the existing Node `--test` runner.
+- Add `test:coverage` scripts in `interview-mcp/package.json` and `report-mcp/package.json`.
+- Configure terminal summary and `lcov` output.
+- Scope coverage to `src/tools/**`, core logic modules, and repository/data access code.
+- Exclude `dist`, smoke/runtime scripts, and generated artifacts from coverage.
+- Run a baseline coverage pass for `interview-mcp` and `report-mcp` before adding new tests.
+- Prioritize new tests for MCP tool validation and error paths.
+- Prioritize new tests for interview state-machine transitions and session flow branches.
+- Prioritize new tests for repository-backed logic: flashcards, mistakes, exercises, reports, and graph access.
+- Add optional root workspace shortcuts such as `test:coverage:interview` and `test:coverage:report` after package scripts are stable.

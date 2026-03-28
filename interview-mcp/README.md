@@ -138,7 +138,9 @@ interview-mcp/
 │   └── knowledge/          # Curated topic files — committed to git
 │       ├── java-concurrency.md
 │       ├── java-os-jvm.md
+│       ├── java-tls-spring.md
 │       ├── mtls-tls.md
+│       ├── tls-fundamentals.md
 │       ├── rest-spring-jpa.md
 │       ├── payment-api-design.md
 │       └── …               # Add more to expand coverage

@@ -5,6 +5,8 @@ import ReportPage from './pages/ReportPage'
 import GraphPage from './pages/GraphPage'
 import FlashcardsPage from './pages/FlashcardsPage'
 import MistakesPage from './pages/MistakesPage'
+import TopicsPage from './pages/TopicsPage'
+import ProgressPage from './pages/ProgressPage'
 
 export default function App() {
   const location = useLocation()
@@ -19,8 +21,10 @@ export default function App() {
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/sessions/:id" element={<ReportPage />} />
           <Route path="/graph" element={<GraphPage />} />
+          <Route path="/progress" element={<ProgressPage />} />
           <Route path="/flashcards" element={<FlashcardsPage />} />
           <Route path="/mistakes" element={<MistakesPage />} />
+          <Route path="/topics" element={<TopicsPage />} />
         </Routes>
       </main>
     </div>

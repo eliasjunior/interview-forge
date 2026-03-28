@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
+import { buildSessionRewardSummary } from "./getTopicLevel.js";
 
 export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
@@ -19,6 +20,12 @@ export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
 
       if (done) {
         const { summary, avgScore, concepts, reportFile } = await deps.finalizeSession(session, sessions);
+        const knowledgeTopic = deps.knowledge.findByTopic(session.topic);
+        const hasWarmupContent =
+          knowledgeTopic != null &&
+          knowledgeTopic.warmupLevels != null &&
+          Object.keys(knowledgeTopic.warmupLevels).length > 0;
+        const rewardSummary = buildSessionRewardSummary(session, deps.loadSessions(), hasWarmupContent);
 
         return {
           content: [{
@@ -31,6 +38,7 @@ export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
               summary,
               conceptsExtracted: concepts.length,
               reportFile,
+              rewardSummary,
               nextTool: null,
               instruction: "Interview complete. Use get_graph to inspect the knowledge graph.",
             }),

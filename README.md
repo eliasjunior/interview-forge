@@ -1,6 +1,8 @@
 # interview-forge
 
-A study project that runs **mock technical interviews through Claude**, evaluates your answers with AI, and builds a cumulative knowledge graph across sessions — all visualised in a React dashboard.
+An interview practice system that starts with low-pressure warm-ups, builds toward full mock interviews, and reinforces weak spots with drills, recall, flashcards, reports, and progress tracking.
+
+`interview-mcp` is the **stateful interview engine**: it owns the interview state machine, session progress, persistence, and tool contract. Claude is the orchestrator and conversation layer, but `interview-mcp` is the source of truth for what step the interview is in.
 
 It is structured as an **npm workspaces monorepo** with four packages and two MCP servers that Claude connects to simultaneously.
 
@@ -14,6 +16,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 - [Modes](#modes)
 
 **How to use it**
+- [0. Starting a topic — warm-up ladder](#0-starting-a-topic--warm-up-ladder)
 - [1. Full interview](#1-full-interview)
 - [2. Targeted drill on weak spots](#2-targeted-drill-on-weak-spots)
 - [3. Scoped interview on custom content](#3-scoped-interview-on-custom-content)
@@ -24,10 +27,11 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 - [Full deliberate practice loop](#full-deliberate-practice-loop)
 
 **Reference**
-- [MCP tools — interview-mcp (27 tools)](#interview-mcp-27-tools)
-- [MCP tools — report-mcp (7 tools)](#report-mcp--7-tools)
+- [MCP tools — interview-mcp (27 tools)](#interview-mcp--27-tools)
+- [MCP tools — report-mcp (8 tools)](#report-mcp--8-tools)
 - [REST API](#rest-api-interview-mcp-port-3001)
 - [Monorepo scripts](#monorepo-scripts)
+- [Tests](#tests)
 - [Knowledge topics](#knowledge-topics)
 - [Flashcard system](#flashcard-system)
 
@@ -58,7 +62,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 interview-forge/
 ├── interview-mcp/   MCP server — interview state machine, data owner, REST API
 ├── report-mcp/      MCP server — analytics, report generation, knowledge graph queries
-├── ui/              React + Vite dashboard (sessions, graph, reports, flashcards)
+├── ui/              React + Vite dashboard (topics, sessions, graph, reports, flashcards)
 └── shared/          TypeScript types only — shared across all packages
 ```
 
@@ -81,9 +85,59 @@ All interactions happen in natural language inside **Claude Desktop** or **Claud
 
 ---
 
+### 0. Starting a topic — warm-up ladder
+
+Every topic now has a 5-level progression ladder. Claude always checks your history before starting anything and routes you to the right entry point.
+
+**You say:**
+```
+I want to study JWT authentication
+```
+
+**Claude runs:**
+```
+get_topic_level { topic: "JWT authentication" }
+  → returns level: 0, status: "cold"   ← never attempted, always starts at L0
+  → instruction: call start_warm_up { topic, level: 0 }
+```
+
+**Then — if topic has warm-up content (e.g. JWT):**
+```
+start_warm_up { topic: "JWT authentication", level: 0 }
+  → creates a warmup session (sessionKind: "warmup", questFormat: "mcq")
+  → ask_question { sessionId }
+  → [you pick A / B / C / D]
+  → submit_answer { sessionId, answer: "B" }
+  → evaluate_answer { sessionId }    ← auto-scored against correct answer
+  → next_question { sessionId }
+  → [repeat per question]
+  → end_interview { sessionId }      ← counts as 1 pass when avg ≥ 4.0; 2 passes at the same level are required to advance
+```
+
+Each warm-up session is capped at 5 questions. If more than 5 questions exist for that level, the server picks a different subset per session while keeping the selected order aligned to the authored progression.
+
+**If topic has no warm-up content yet:** `start_warm_up` uses up to 5 regular topic questions for L0 and asks the orchestrator to generate MCQ options on the fly.
+
+**Level routing table:**
+
+| Status | What Claude calls |
+|---|---|
+| `cold` — no sessions | `start_warm_up { level: 0 }` (MCQ) |
+| `warmup` L0 in progress | `start_warm_up { level: 0 }` (retry) |
+| `warmup` L1 in progress | `start_warm_up { level: 1 }` (fill-in-blank) |
+| `warmup` L2 in progress | `start_warm_up { level: 2 }` (guided answer) |
+| `dropped` (interview avg < 2.5) | `start_warm_up { level: 1 }` (reinforcement) |
+| `ready` (`L3`/`L4`) | `start_interview { topic }` |
+
+Warm-up advancement rule: a level advances only after 2 completed warm-up sessions at that same level with avg score ≥ 4.0. With 5 questions, that effectively means at least 4/5 correct twice for L0/L1. `L4` requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
+
+---
+
 ### 1. Full interview
 
 The core loop. Claude asks questions one at a time, waits for your answer, scores it, optionally asks a follow-up, then moves to the next question. At the end it generates a report and flashcards for weak answers automatically.
+
+Reached after completing the warm-up ladder, or directly for topics without warm-up content.
 
 **You say:**
 ```
@@ -581,7 +635,7 @@ This server drives the interview session from start to finish.
 
 **Session state machine:** `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW_UP` (loops per question) → `ENDED`
 
-### report-mcp — 7 tools
+### report-mcp — 8 tools
 
 This server is focused on analysing and presenting completed sessions.
 
@@ -593,6 +647,7 @@ This server is focused on analysing and presenting completed sessions.
 | `get_report_weak_subjects` | Identifies low-scoring questions and returns structured context, ready to pipe into `generate_report_ui`. |
 | `get_report_full_context` | Returns all evaluated Q/A pairs for a session, with a pre-filled `nextCall` scaffold for `generate_report_ui`. |
 | `generate_report_ui` | Writes a per-session JSON dataset and returns a viewer URL (`/generated/report-ui.html?sessionId=…`). |
+| `get_progress_overview` | Aggregates ended sessions into score trends, topic progress, repeated-topic improvement, weak-question rate, and recent-session summaries. |
 | `get_graph` | Returns the full cumulative knowledge graph from the shared SQLite store. |
 
 [↑ Back to top](#table-of-contents)
@@ -611,6 +666,7 @@ The UI and `report-mcp` both consume this API.
 | `GET /api/graph` | Full knowledge graph JSON |
 | `GET /api/flashcards` | All flashcards |
 | `POST /api/flashcards/:id/review` | Submit a review rating `{ rating: 1\|2\|3\|4 }`, applies SM-2, returns updated card |
+| `GET /api/topics` | List of available interview topics from knowledge files — returns `{ file, displayName }[]` |
 | `GET /generated/report-ui.html` | Interactive HTML report viewer |
 
 [↑ Back to top](#table-of-contents)
@@ -717,6 +773,46 @@ Run these from the repo root.
 
 ---
 
+## Tests
+
+Run these from the repo root unless noted otherwise.
+
+### Monorepo root commands
+
+| Command | Description |
+|---|---|
+| `npm run test -w interview-mcp` | Run the `interview-mcp` test suite |
+| `npm run test -w report-mcp` | Run the `report-mcp` test suite |
+| `npm run test:coverage -w interview-mcp` | Run `interview-mcp` tests with `c8` coverage |
+| `npm run test:coverage -w report-mcp` | Run `report-mcp` tests with `c8` coverage |
+| `npm run test:coverage -w interview-mcp && npm run test:coverage -w report-mcp` | Run both MCP coverage suites sequentially |
+
+### Package-level view
+
+#### `interview-mcp/`
+
+```bash
+npm test
+npm run test:coverage
+```
+
+#### `report-mcp/`
+
+```bash
+npm test
+npm run test:coverage
+```
+
+### Coverage notes
+
+- Coverage is currently wired with `c8`.
+- Initial coverage gate is `50%` for lines, branches, functions, and statements in both MCP packages.
+- Coverage reports emit terminal output and `lcov`.
+
+[↑ Back to top](#table-of-contents)
+
+---
+
 ## Knowledge topics
 
 Knowledge files live in `interview-mcp/data/knowledge/*.md`. Each file follows a fixed structure: `## Summary`, `## Questions`, `## Difficulty`, `## Evaluation Criteria`, and `## Concepts`. The `## Difficulty` section tags every question as `foundation`, `intermediate`, or `advanced`.
@@ -742,12 +838,47 @@ Within each tier, questions you have been asked least often across past sessions
 | `payment-api-design.md` | Payment API Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `url-shortener.md` | URL Shortener System Design | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `mtls-tls.md` | mTLS / TLS | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `tls-fundamentals.md` | TLS Fundamentals | 16 (5 foundation, 7 intermediate, 4 advanced) |
+| `java-tls-spring.md` | Java TLS, mTLS, and Spring | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `java-concurrency.md` | Java Concurrency | 21 (5 foundation, 9 intermediate, 7 advanced) |
 | `java-os-jvm.md` | Java OS & JVM Internals | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `js-fundamentals.md` | JavaScript Fundamentals: DOM, Callbacks, Promises, XHR, Event Loop & Web APIs | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `cicd-release-flow.md` | CI/CD Release Flow for Backend Engineers | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `rotate-matrix-algorithm.md` | Rotate Matrix (algorithm) | 14 (5 foundation, 7 intermediate, 2 advanced) |
 | `mortgage-rest-design.md` | Mortgage REST API Design | 20 (5 foundation, 10 intermediate, 5 advanced) |
+
+### Warm-up quest levels
+
+Every topic has a 4-level progression ladder. Before jumping into a full interview, the system checks your session history and routes you to the right entry point.
+
+| Level | Format | Goal | Evaluation |
+|---|---|---|---|
+| **L0 — Spark** | Multiple-choice (MCQ) | Trigger memory, reduce anxiety, build familiarity | Auto-scored — answer a letter (A/B/C/D) |
+| **L1 — Padawan** | Fill in the blank | Partial activation with low cognitive load | Auto-scored — answer must contain the key term |
+| **L2 — Forge** | Open answer with structure hint | Structured thinking, reduce blank-page problem | Orchestrator scores against provided structure |
+| **L3 — Ranger** | Full open-ended question | Mock-interview capable | Full evaluation with score, feedback, follow-up |
+| **L4 — Jedi Ready** | Full open-ended question | Sustained real-interview readiness | Earned after repeated strong full interviews |
+
+**Status badges on the Topics page:**
+
+| Badge | Meaning |
+|---|---|
+| L0 — Spark | No sessions exist for this topic yet, or the candidate is still below the first warm-up threshold |
+| L1 — Padawan | Working through L1, or dropped back from a poor interview (avg < 2.5) |
+| L2 — Forge | Working through L2 |
+| L3 — Ranger | Full interview unlocked; latest full interview avg score ≥ 3.0, or all warm-up levels completed |
+| L4 — Jedi Ready | Last 2 completed full interviews for this topic both have avg score ≥ 4.0 |
+
+**Level advancement thresholds:** a warm-up level advances only after 2 completed sessions at that level with avg score ≥ 4.0. Warm-up sessions are capped at 5 questions and can draw a different subset each run when more authored questions exist. A full interview with avg < 2.5 drops the topic back to L1 for reinforcement. `L4` requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
+
+**MCP tools for the warm-up flow:**
+```
+get_topic_level { topic }               → check current level + status
+start_warm_up { topic, level? }         → begin warm-up (auto-detects level if omitted)
+evaluate_answer { sessionId }           → L0/L1 auto-score; L2 needs orchestrator score
+```
+
+Warm-up content lives in the `## Warm-up Quests` section of each knowledge file (see [Knowledge file format](#knowledge-file-format)). When more than 5 questions exist for a level, `start_warm_up` selects up to 5 per session.
 
 ### Knowledge file format
 
@@ -779,6 +910,28 @@ Within each tier, questions you have been asked least often across past sessions
 ```
 
 Cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
+
+To add warm-up content for a topic, append a `## Warm-up Quests` section:
+
+```markdown
+## Warm-up Quests
+
+### Level 0 — Spark (MCQ)
+1. <Question text>
+   A) <Option A>
+   B) <Option B>
+   C) <Option C>
+   D) <Option D>
+   Answer: A
+
+### Level 1 — Padawan (Fill in the Blank)
+1. <Sentence with ___ gap>
+   Answer: <key term>
+
+### Level 2 — Forge (Guided Answer)
+1. <Open question with structure hint>
+   Hint: <Scaffolding hint shown to candidate before they answer>
+```
 
 Set `AI_ENABLED=true` to let the server generate questions for any topic not in the knowledge base.
 
@@ -874,3 +1027,63 @@ Runtime state lives in SQLite (`interview-mcp/data/app.db`). Knowledge source fi
 - Confirm whether Claude Desktop is expected to forward MCP tools to Claude Code sub-agents, or if this is a known architectural boundary
 - Check if there is a way to configure Claude Code (via `.claude/settings.json` or similar) to load the same MCP servers independently, so it can call them directly
 - Test calling interview tools directly from the Claude Desktop conversation (not via Claude Code) to confirm they work there
+
+[↑ Back to top](#table-of-contents)
+
+---
+
+## Database Backups
+
+The live runtime database is the SQLite file `interview-mcp/data/app.db`.
+
+This file is intentionally local-only:
+
+- `interview-mcp/data/*.db`
+- `interview-mcp/data/*.db-shm`
+- `interview-mcp/data/*.db-wal`
+
+are ignored by git, so a normal daily `git push` does **not** back up the current database state.
+
+### Manual backup command
+
+Use the following command to create a timestamped local snapshot:
+
+```bash
+npm run db:backup -w interview-mcp
+```
+
+This writes backups to:
+
+```text
+interview-mcp/data/backups/
+```
+
+with filenames like:
+
+```text
+app.2026-03-28T11-53-28-779Z.backup.db
+```
+
+### Why this command exists
+
+The project runs SQLite in WAL mode, so copying only `app.db` naively can miss recent committed data that still lives in `app.db-wal`. The backup script uses SQLite's backup mechanism through `better-sqlite3`, which is safer than a plain file copy.
+
+### Retention
+
+By default, the script keeps the latest `10` backups and deletes older ones.
+
+You can change that with:
+
+```bash
+DB_BACKUP_KEEP=20 npm run db:backup -w interview-mcp
+```
+
+### When to run it
+
+Run a backup before:
+
+- schema migrations
+- graph rebuilds
+- cleanup scripts
+- manual SQL updates or deletes
+- any one-off data repair work

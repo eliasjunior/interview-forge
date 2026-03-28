@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSessions } from '../api'
-import type { Session } from '@mock-interview/shared'
+import type { Session, SessionKind } from '@mock-interview/shared'
 import ScoreBadge from '../components/ScoreBadge'
 
 function calcAvg(session: Session): string {
@@ -16,7 +16,7 @@ function formatDate(iso: string): string {
   })
 }
 
-function getSessionKind(session: Session): 'interview' | 'study' | 'drill' {
+function getSessionKind(session: Session): SessionKind {
   return session.sessionKind ?? 'interview'
 }
 

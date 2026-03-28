@@ -14,6 +14,7 @@ import {
   calcAvgScore,
   buildSummary,
   buildReport,
+  buildProgressOverview,
   escapeHtml,
   serializeForInlineScript,
   countLines,
@@ -30,17 +31,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AI_ENABLED = process.env.AI_ENABLED !== "false";
 const ai: AIProvider | null = AI_ENABLED ? createAIProvider() : null;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Data paths — report-mcp shares the interview-mcp data directory.
-//
-// Both services live as siblings under the same workspace:
-//   <workspace>/
-//   ├── interview-mcp/   ← owns app.db, reports/, and public/
-//   └── report-mcp/      ← reads shared app.db, writes reports + generated UI
-//
-// Override with DATA_DIR / PUBLIC_DIR env vars if the layout differs.
-// ─────────────────────────────────────────────────────────────────────────────
-
 const DATA_DIR = process.env.DATA_DIR
   ?? path.resolve(__dirname, "../../interview-mcp/data");
 const PUBLIC_DIR = process.env.PUBLIC_DIR
@@ -50,10 +40,6 @@ const REPORTS_DIR = path.join(DATA_DIR, "reports");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
 const UI_PORT = process.env.PORT ?? "3001";
 const dataStore = createSQLiteReportDataStore({ dataDir: DATA_DIR });
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function stateError(msg: string) {
   return {
@@ -105,6 +91,7 @@ const deps: ToolDeps = {
   pickSessionByTopic,
   extractWeakSubjects,
   buildFullQuestionContext,
+  buildProgressOverview,
   countLines,
   escapeHtml,
   serializeForInlineScript,
