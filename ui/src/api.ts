@@ -45,8 +45,8 @@ export const getTopics = (): Promise<Topic[]> => req(`${BASE}/topics`)
 
 export interface TopicLevel {
   topic: string
-  level: 0 | 1 | 2 | 3
-  /** 'cold' = never attempted, 'warmup' = in the ladder, 'dropped' = fell back, 'ready' = interview-ready */
+  level: 0 | 1 | 2 | 3 | 4
+  /** 'cold' = never attempted, 'warmup' = in the ladder, 'dropped' = fell back, 'ready' = mock-ready or interview-ready */
   status: 'cold' | 'warmup' | 'dropped' | 'ready'
   reason: string
   nextLevelRequirement: string

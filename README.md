@@ -1,6 +1,6 @@
 # interview-forge
 
-A study project that runs **mock technical interviews through Claude**, evaluates your answers with AI, and builds a cumulative knowledge graph across sessions — all visualised in a React dashboard.
+An interview practice system that starts with low-pressure warm-ups, builds toward full mock interviews, and reinforces weak spots with drills, recall, flashcards, reports, and progress tracking.
 
 `interview-mcp` is the **stateful interview engine**: it owns the interview state machine, session progress, persistence, and tool contract. Claude is the orchestrator and conversation layer, but `interview-mcp` is the source of truth for what step the interview is in.
 
@@ -86,7 +86,7 @@ All interactions happen in natural language inside **Claude Desktop** or **Claud
 
 ### 0. Starting a topic — warm-up ladder
 
-Every topic now has a 4-level progression ladder. Claude always checks your history before starting anything and routes you to the right entry point.
+Every topic now has a 5-level progression ladder. Claude always checks your history before starting anything and routes you to the right entry point.
 
 **You say:**
 ```
@@ -110,10 +110,12 @@ start_warm_up { topic: "JWT authentication", level: 0 }
   → evaluate_answer { sessionId }    ← auto-scored against correct answer
   → next_question { sessionId }
   → [repeat per question]
-  → end_interview { sessionId }      ← advances topic to next level when avg ≥ 4.0
+  → end_interview { sessionId }      ← counts as 1 pass when avg ≥ 4.0; 2 passes at the same level are required to advance
 ```
 
-**If topic has no warm-up content yet:** `start_warm_up` returns an error with the instruction to call `start_interview` directly. The Topics page still shows L0 "Not Started" so you know no sessions exist.
+Each warm-up session is capped at 5 questions. If more than 5 questions exist for that level, the server picks a different subset per session while keeping the selected order aligned to the authored progression.
+
+**If topic has no warm-up content yet:** `start_warm_up` uses up to 5 regular topic questions for L0 and asks the orchestrator to generate MCQ options on the fly.
 
 **Level routing table:**
 
@@ -124,9 +126,9 @@ start_warm_up { topic: "JWT authentication", level: 0 }
 | `warmup` L1 in progress | `start_warm_up { level: 1 }` (fill-in-blank) |
 | `warmup` L2 in progress | `start_warm_up { level: 2 }` (guided answer) |
 | `dropped` (interview avg < 2.5) | `start_warm_up { level: 1 }` (reinforcement) |
-| `ready` (interview avg ≥ 3.0) | `start_interview { topic }` |
+| `ready` (`L3`/`L4`) | `start_interview { topic }` |
 
-Advancement threshold: avg score ≥ 4.0 on a warm-up session unlocks the next level.
+Warm-up advancement rule: a level advances only after 2 completed warm-up sessions at that same level with avg score ≥ 4.0. With 5 questions, that effectively means at least 4/5 correct twice for L0/L1. `L4` requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
 
 ---
 
@@ -806,24 +808,25 @@ Within each tier, questions you have been asked least often across past sessions
 
 Every topic has a 4-level progression ladder. Before jumping into a full interview, the system checks your session history and routes you to the right entry point.
 
-| Level | Color | Format | Goal | Evaluation |
-|---|---|---|---|---|
-| **L0** | Amber — Recognition | Multiple-choice (MCQ) | Trigger memory, reduce anxiety, build familiarity | Auto-scored — answer a letter (A/B/C/D) |
-| **L1** | Yellow — Assisted Recall | Fill in the blank | Partial activation with low cognitive load | Auto-scored — answer must contain the key term |
-| **L2** | Blue — Guided Answer | Open answer with structure hint | Structured thinking, reduce blank-page problem | Orchestrator scores against provided structure |
-| **L3** | Green — Interview Ready | Full open-ended question | Production-level explanation | Full evaluation with score, feedback, follow-up |
+| Level | Format | Goal | Evaluation |
+|---|---|---|---|
+| **L0 — Spark** | Multiple-choice (MCQ) | Trigger memory, reduce anxiety, build familiarity | Auto-scored — answer a letter (A/B/C/D) |
+| **L1 — Padawan** | Fill in the blank | Partial activation with low cognitive load | Auto-scored — answer must contain the key term |
+| **L2 — Forge** | Open answer with structure hint | Structured thinking, reduce blank-page problem | Orchestrator scores against provided structure |
+| **L3 — Ranger** | Full open-ended question | Mock-interview capable | Full evaluation with score, feedback, follow-up |
+| **L4 — Jedi Ready** | Full open-ended question | Sustained real-interview readiness | Earned after repeated strong full interviews |
 
 **Status badges on the Topics page:**
 
-| Badge | Color | Meaning |
-|---|---|---|
-| L0 — Not Started | Grey | No sessions exist for this topic — always starts at L0 |
-| L0 — Recognition | Amber | Attempted L0 warm-up, still below threshold (avg < 4.0) |
-| L1 — Assisted Recall | Yellow | Working through L1, or dropped back from a poor interview (avg < 2.5) |
-| L2 — Guided Answer | Blue | Working through L2 |
-| L3 — Interview Ready (earned) | Green | Full interview completed with avg score ≥ 3.0 |
+| Badge | Meaning |
+|---|---|
+| L0 — Spark | No sessions exist for this topic yet, or the candidate is still below the first warm-up threshold |
+| L1 — Padawan | Working through L1, or dropped back from a poor interview (avg < 2.5) |
+| L2 — Forge | Working through L2 |
+| L3 — Ranger | Full interview unlocked; latest full interview avg score ≥ 3.0, or all warm-up levels completed |
+| L4 — Jedi Ready | Last 2 completed full interviews for this topic both have avg score ≥ 4.0 |
 
-**Level advancement thresholds:** avg score ≥ 4.0 on a warm-up session unlocks the next level. A full interview with avg < 2.5 drops the topic back to L1 for reinforcement.
+**Level advancement thresholds:** a warm-up level advances only after 2 completed sessions at that level with avg score ≥ 4.0. Warm-up sessions are capped at 5 questions and can draw a different subset each run when more authored questions exist. A full interview with avg < 2.5 drops the topic back to L1 for reinforcement. `L4` requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
 
 **MCP tools for the warm-up flow:**
 ```
@@ -832,7 +835,7 @@ start_warm_up { topic, level? }         → begin warm-up (auto-detects level if
 evaluate_answer { sessionId }           → L0/L1 auto-score; L2 needs orchestrator score
 ```
 
-Warm-up content lives in the `## Warm-up Quests` section of each knowledge file (see [Knowledge file format](#knowledge-file-format)). Currently only `jwt.md` has warm-up content authored — other topics show L0 "Not Started" and route directly to `start_interview` until content is added.
+Warm-up content lives in the `## Warm-up Quests` section of each knowledge file (see [Knowledge file format](#knowledge-file-format)). When more than 5 questions exist for a level, `start_warm_up` selects up to 5 per session.
 
 ### Knowledge file format
 
@@ -870,7 +873,7 @@ To add warm-up content for a topic, append a `## Warm-up Quests` section:
 ```markdown
 ## Warm-up Quests
 
-### Level 0 — Recognition (MCQ)
+### Level 0 — Spark (MCQ)
 1. <Question text>
    A) <Option A>
    B) <Option B>
@@ -878,11 +881,11 @@ To add warm-up content for a topic, append a `## Warm-up Quests` section:
    D) <Option D>
    Answer: A
 
-### Level 1 — Fill in the Blank
+### Level 1 — Padawan (Fill in the Blank)
 1. <Sentence with ___ gap>
    Answer: <key term>
 
-### Level 2 — Guided Answer
+### Level 2 — Forge (Guided Answer)
 1. <Open question with structure hint>
    Hint: <Scaffolding hint shown to candidate before they answer>
 ```

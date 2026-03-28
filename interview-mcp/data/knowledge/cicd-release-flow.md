@@ -74,3 +74,120 @@ The focus is practical software engineering: branch and merge strategy, build re
 - practical usage: pull-request-checks, branch-protection, unit-test, integration-test, contract-test, smoke-test, migration, container-image, artifact-repository, feature-flag, canary-release, health-check, observability
 - tradeoffs: speed-vs-safety, build-once-vs-rebuild-per-env, rollback-vs-roll-forward, manual-approval-vs-full-automation, broad-release-vs-progressive-rollout, test-depth-vs-feedback-time
 - best practices: keep-main-branch-releasable, build-once-promote-many, automate-release-verification, use-backward-compatible-migrations, gate-on-production-signals, clean-up-feature-flags, least-privilege-for-pipelines
+
+## Warm-up Quests
+
+### Level 0 — Recognition (MCQ)
+1. What does "build once, promote many" mean in a CI/CD pipeline?
+   A) Build a fresh artifact separately in staging and production
+   B) Build one immutable artifact in CI and promote that same artifact across environments
+   C) Keep rebuilding until the tests pass in each environment
+   D) Use one deployment script for many services
+   Answer: B
+
+2. Which test stage should usually run earliest because it is fast and gives quick feedback?
+   A) Smoke tests in production
+   B) Long-running end-to-end tests
+   C) Unit tests
+   D) Manual exploratory testing
+   Answer: C
+
+3. What is the main purpose of a feature flag in the release process?
+   A) To replace all automated tests
+   B) To decouple code deployment from feature exposure
+   C) To build container images faster
+   D) To replace environment-specific config at deploy time
+   Answer: B
+
+4. What best describes a canary release?
+   A) Deploying to all users at once after CI passes
+   B) Rebuilding the artifact in production for safety
+   C) Sending a small percentage of production traffic to the new version first
+   D) Running only database migrations before code deployment
+   Answer: C
+
+5. Which credential strategy is safer for CI/CD systems?
+   A) Store long-lived production credentials in plain CI variables for convenience
+   B) Share one admin token across all jobs and environments
+   C) Use least-privilege, short-lived credentials with restricted deployment permissions
+   D) Commit deployment secrets into the repo so runners always have them
+   Answer: C
+
+6. What is the difference between continuous delivery and continuous deployment?
+   A) They are the same thing; both always require a manual production approval
+   B) Continuous delivery keeps the system releasable with a manual production decision, while continuous deployment automatically pushes every validated change to production
+   C) Continuous delivery is only about writing tests, while continuous deployment is only about infrastructure
+   D) Continuous delivery applies to frontend systems and continuous deployment applies to backend systems
+   Answer: B
+
+7. What should a CI pipeline typically do when a developer opens a pull request?
+   A) Deploy directly to production to test under real traffic
+   B) Run validation steps such as build, lint or static checks, and automated tests, then report pass/fail status back to the PR
+   C) Skip tests to keep developer feedback fast
+   D) Rebuild different artifacts for every target environment immediately
+   Answer: B
+
+8. When is blue/green deployment often preferred over canary rollout?
+   A) When you want an immediate environment-level switch and fast rollback between two full versions
+   B) When you want to test on a small percentage of traffic first
+   C) When the system has no health checks
+   D) When you want to avoid versioning artifacts
+   Answer: A
+
+9. What is the main goal of a rollback strategy in CI/CD?
+   A) To run the new release on a canary percentage first
+   B) To restore a known good state quickly after a bad release
+   C) To trigger a roll-forward patch automatically
+   D) To replace feature flags entirely
+   Answer: B
+
+10. Which migration pattern is safest when deploying a database schema change alongside a backend release?
+    A) Drop the old column in the same deploy that adds the new code
+    B) Apply all schema changes after the new code is already live
+    C) Use an expand-and-contract pattern — add the new structure first, then migrate data, then remove the old
+    D) Avoid migrations and let the ORM handle schema sync automatically
+    Answer: C
+
+### Level 1 — Fill in the Blank
+1. Continuous delivery means the system is always releasable, but production still requires a manual ___ step.
+   Answer: approval
+
+2. To avoid environment drift, teams should build an immutable ___ in CI and promote it across environments.
+   Answer: artifact
+
+3. A deployment should not be considered successful just because the command finished; it also needs post-deploy ___ checks.
+   Answer: verification
+
+4. A safe database release often uses an expand-and-___ migration pattern to preserve compatibility during rollout.
+   Answer: contract
+
+5. To reduce blast radius, a new version can first be exposed to a small percentage of traffic in a ___ release.
+   Answer: canary
+
+6. A lightweight post-deploy test that checks the most critical path is often called a ___ test.
+   Answer: smoke
+
+7. Continuous ___ means developers merge changes frequently and validate them automatically in a shared pipeline.
+   Answer: integration
+
+8. A failed release may be handled by reverting to the previous known good version, which is called a ___.
+   Answer: rollback
+
+### Level 2 — Guided Answer
+1. Explain the backend release flow from commit to production. Use this structure: [CI validation → artifact build → environment promotion → production verification].
+   Hint: Emphasize why the same artifact should move across environments and where release gates belong.
+
+2. Explain how to balance fast developer feedback with release safety. Use this structure: [cheap checks first → parallelization/caching → slower gates later → merge/deploy protections].
+   Hint: Think about test layering, branch protection, and why removing safeguards entirely is not the right tradeoff.
+
+3. Explain how to roll out and verify a risky production change safely. Use this structure: [deployment strategy → progressive exposure → health signals → rollback or roll-forward decision].
+   Hint: Consider canaries, feature flags, error rate/latency, and what should trigger a stop.
+
+4. Explain what should happen when a developer opens a pull request. Use this structure: [validation steps → feedback to the PR → merge protections → why this improves release quality].
+   Hint: Include build, automated tests, status checks, and how CI should block bad changes from reaching the main branch.
+
+5. Explain how you would handle a failed production deployment. Use this structure: [detect failure → assess blast radius → rollback or roll-forward choice → follow-up actions].
+   Hint: Think about immutable artifacts, schema compatibility, feature flags, and how to restore a known good state quickly.
+
+6. Explain how to keep trust in CI when tests are flaky or infrastructure is unreliable. Use this structure: [separate signal from noise → quarantine or fix flaky tests → selective retries → keep main branch releasable].
+   Hint: The goal is not just to get green builds, but to make pipeline results credible enough that engineers act on them.

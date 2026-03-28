@@ -13,6 +13,12 @@ const ADVANCE_THRESHOLD = 4.0;
 /** Full interview avg score below this triggers a drop back to warm-up. */
 const DROP_THRESHOLD = 2.5;
 
+/** Real interview readiness requires repeated strong full-interview performance. */
+const JEDI_READY_THRESHOLD = 4.0;
+
+/** Warm-up advancement requires repeated passed sessions at the same level. */
+const REQUIRED_WARMUP_PASSES = 2;
+
 function calcAvg(scores: number[]): number | null {
   if (!scores.length) return null;
   return scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -23,7 +29,7 @@ function calcAvg(scores: number[]): number | null {
  * - 'cold'    — never attempted; no sessions exist
  * - 'warmup'  — currently working through the warm-up ladder (L0–L2)
  * - 'dropped' — fell back from interview due to a poor score
- * - 'ready'   — completed warm-up or has a good interview score
+ * - 'ready'   — completed warm-up or has strong full interview performance
  */
 export type TopicStatus = 'cold' | 'warmup' | 'dropped' | 'ready';
 
@@ -53,8 +59,8 @@ export function detectTopicLevel(
       status: 'cold',
       reason: "No sessions found for this topic — start from Level 0.",
       nextLevelRequirement: hasWarmupContent
-        ? "Complete Level 0 warm-up with avg score ≥ 4.0 to advance."
-        : "Complete Level 0 warm-up (MCQ generated from topic questions) with avg score ≥ 4.0 to advance.",
+        ? `Pass Level 0 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance.`
+        : `Pass Level 0 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance.`,
     };
   }
 
@@ -63,20 +69,48 @@ export function detectTopicLevel(
     (s) => !s.sessionKind || s.sessionKind === "interview"
   );
 
-  // Check if already interview-ready via full interview performance
+  // Check if already mock-ready / interview-ready via full interview performance
   if (interviewSessions.length > 0) {
-    const latestInterview = interviewSessions.sort(
+    const sortedInterviews = interviewSessions.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )[0];
+    );
+    const latestInterview = sortedInterviews[0];
     const scores = latestInterview.evaluations.map((e) => e.score);
     const avg = calcAvg(scores);
+    const latestTwo = sortedInterviews.slice(0, 2);
+    const latestTwoAverages = latestTwo.map((session) => calcAvg(session.evaluations.map((e) => e.score)));
 
-    if (avg !== null && avg >= 3.0) {
+    if (
+      latestTwo.length === 2 &&
+      latestTwoAverages.every((value): value is number => value !== null && value >= JEDI_READY_THRESHOLD)
+    ) {
+      return {
+        level: 4,
+        status: 'ready' as TopicStatus,
+        reason: `Last 2 full interviews avg ${latestTwoAverages[0].toFixed(1)} and ${latestTwoAverages[1].toFixed(1)} — Jedi Ready.`,
+        nextLevelRequirement: "Already at Level 4 — keep practising full interviews to stay sharp.",
+      };
+    }
+
+    if (
+      latestTwo.length === 2 &&
+      latestTwoAverages.every((v): v is number => v !== null && v >= 3.0)
+    ) {
       return {
         level: 3,
         status: 'ready' as TopicStatus,
-        reason: `Last full interview avg score ${avg.toFixed(1)} — interview-ready. Use start_interview to continue.`,
-        nextLevelRequirement: "Already at Level 3 — keep practising full interviews.",
+        reason: `Last 2 full interviews avg ${latestTwoAverages[0]!.toFixed(1)} and ${latestTwoAverages[1]!.toFixed(1)} — Ranger unlocked.`,
+        nextLevelRequirement: "Complete 2 full interviews in a row with avg score ≥ 4.0 to reach Level 4.",
+      };
+    }
+
+    // 1 good interview or inconsistent — approaching L3 but not confirmed yet
+    if (avg !== null && avg >= 3.0) {
+      return {
+        level: 2,
+        status: 'warmup' as TopicStatus,
+        reason: `Last interview avg ${avg.toFixed(1)} — good start. One more interview with avg ≥ 3.0 to confirm Ranger.`,
+        nextLevelRequirement: "Complete one more full interview with avg score ≥ 3.0 to unlock Level 3.",
       };
     }
 
@@ -85,7 +119,7 @@ export function detectTopicLevel(
         level: 1,
         status: 'dropped' as TopicStatus,
         reason: `Last full interview avg score ${avg.toFixed(1)} — needs reinforcement. Warm-up recommended before next interview.`,
-        nextLevelRequirement: `Complete Level 1 warm-up with avg score ≥ ${ADVANCE_THRESHOLD} to return to full interview.`,
+        nextLevelRequirement: `Pass Level 1 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to return to full interview.`,
       };
     }
   }
@@ -102,7 +136,8 @@ export function detectTopicLevel(
   // Determine highest warmup level passed
   const warmupSessions = topicSessions.filter((s) => s.sessionKind === "warmup");
 
-  // Group by questLevel, keep the best (highest avg) session per level
+  // Count how many times each warm-up level has been passed.
+  const passedCountByLevel = new Map<number, number>();
   const bestAvgByLevel = new Map<number, number>();
   for (const s of warmupSessions) {
     const lvl = s.questLevel ?? 0;
@@ -111,20 +146,24 @@ export function detectTopicLevel(
     if (avg === null) continue;
     const current = bestAvgByLevel.get(lvl) ?? -1;
     if (avg > current) bestAvgByLevel.set(lvl, avg);
+    if (avg >= ADVANCE_THRESHOLD) {
+      passedCountByLevel.set(lvl, (passedCountByLevel.get(lvl) ?? 0) + 1);
+    }
   }
 
   // Walk levels 0 → 1 → 2 and find the first one not yet passed
   for (const lvl of [0, 1, 2] as const) {
     const avg = bestAvgByLevel.get(lvl);
-    if (avg === undefined || avg < ADVANCE_THRESHOLD) {
+    const passCount = passedCountByLevel.get(lvl) ?? 0;
+    if (passCount < REQUIRED_WARMUP_PASSES) {
       const attempted = avg !== undefined;
       return {
         level: lvl,
         status: 'warmup' as TopicStatus,
         reason: attempted
-          ? `Level ${lvl} warm-up attempted (best avg ${avg!.toFixed(1)}) — below threshold. Practice again.`
+          ? `Level ${lvl} warm-up progress ${passCount}/${REQUIRED_WARMUP_PASSES} passes (best avg ${avg!.toFixed(1)}).`
           : `Level ${lvl} warm-up not yet attempted.`,
-        nextLevelRequirement: `Score avg ≥ ${ADVANCE_THRESHOLD} on Level ${lvl} warm-up to advance to Level ${lvl + 1}.`,
+        nextLevelRequirement: `Pass Level ${lvl} warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance to Level ${lvl + 1}.`,
       };
     }
   }
@@ -133,8 +172,8 @@ export function detectTopicLevel(
   return {
     level: 3,
     status: 'ready' as TopicStatus,
-    reason: "All warm-up levels completed — interview-ready. Use start_interview.",
-    nextLevelRequirement: "Already at Level 3 — use start_interview for full practice.",
+    reason: "All warm-up levels completed — full mock unlocked. Use start_interview.",
+    nextLevelRequirement: "Already at Level 3 — complete 2 full interviews in a row with avg score ≥ 4.0 to reach Level 4.",
   };
 }
 
@@ -147,9 +186,9 @@ export function registerGetTopicLevelTool(server: McpServer, deps: ToolDeps) {
     "get_topic_level",
     {
       description:
-        "Returns the recommended warm-up level (0–3) for a topic based on session history. " +
-        "Level 0 = cold start (MCQ recognition), Level 1 = fill-in-blank recall, " +
-        "Level 2 = guided answer, Level 3 = ready for full interview. " +
+        "Returns the recommended topic level (0–4) for a topic based on session history. " +
+        "Level 0 = Spark, Level 1 = Padawan, Level 2 = Forge, Level 3 = Ranger (full mock unlocked), " +
+        "Level 4 = Jedi Ready (2 strong full interviews in a row). " +
         "Use before start_warm_up or start_interview to route the user correctly.",
       inputSchema: z.object({
         topic: z.string().describe("The topic to check, e.g. 'JWT authentication'"),
@@ -178,7 +217,7 @@ export function registerGetTopicLevelTool(server: McpServer, deps: ToolDeps) {
             instruction:
               result.level < 3
                 ? `Call start_warm_up { topic: "${topic}", level: ${result.level} } to begin the warm-up.`
-                : `Call start_interview { topic: "${topic}" } — candidate is interview-ready.`,
+                : `Call start_interview { topic: "${topic}" } — candidate is ready for a full interview.`,
           }),
         }],
       };

@@ -20,8 +20,8 @@ export type InterviewType = 'design' | 'code'
 
 // ── Warm-up quest levels ───────────────────────────────────────────────────────
 
-/** Progressive entry level for a topic. 0 = cold start, 3 = full interview ready. */
-export type WarmUpLevel = 0 | 1 | 2 | 3
+/** Topic progression level. 0–2 = warm-up ladder, 3 = mock-ready, 4 = sustained real-interview readiness. */
+export type WarmUpLevel = 0 | 1 | 2 | 3 | 4
 
 /** Question format used in warm-up sessions. */
 export type QuestionFormat = 'mcq' | 'fill_blank' | 'guided' | 'open'
@@ -65,7 +65,7 @@ export interface Session {
   customContent?: string
   /** The interview angle for a scoped session, e.g. "robustness, reliability, and extensibility" */
   focusArea?: string
-  /** Warm-up quest level (0–3). Present only when sessionKind === 'warmup'. */
+  /** Warm-up quest level recorded on warm-up sessions. In practice warm-up sessions use 0–2 only. */
   questLevel?: WarmUpLevel
   /** Question format used in this warm-up session. */
   questFormat?: QuestionFormat
