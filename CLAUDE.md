@@ -233,6 +233,19 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM local t
 - **Flashcard generation is automatic** — triggered by `end_interview`, no manual step needed
 - **SM-2 logic lives only in `srsUtils.ts`** — never duplicate scheduling logic in tools or HTTP handlers
 
+## Coverage TODO
+
+- Add lightweight coverage reporting with `c8` while keeping the existing Node `--test` runner.
+- Add `test:coverage` scripts in `interview-mcp/package.json` and `report-mcp/package.json`.
+- Configure terminal summary and `lcov` output.
+- Scope coverage to `src/tools/**`, core logic modules, and repository/data access code.
+- Exclude `dist`, smoke/runtime scripts, and generated artifacts from coverage.
+- Run a baseline coverage pass for `interview-mcp` and `report-mcp` before adding new tests.
+- Prioritize new tests for MCP tool validation and error paths.
+- Prioritize new tests for interview state-machine transitions and session flow branches.
+- Prioritize new tests for repository-backed logic: flashcards, mistakes, exercises, reports, and graph access.
+- Add optional root workspace shortcuts such as `test:coverage:interview` and `test:coverage:report` after package scripts are stable.
+
 ## Shared Types (`shared/src/types.ts`)
 
 Key domain types (all imported via `@mock-interview/shared`):

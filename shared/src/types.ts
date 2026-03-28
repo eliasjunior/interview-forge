@@ -22,6 +22,39 @@ export type InterviewType = 'design' | 'code'
 
 /** Topic progression level. 0–2 = warm-up ladder, 3 = mock-ready, 4 = sustained real-interview readiness. */
 export type WarmUpLevel = 0 | 1 | 2 | 3 | 4
+export type TopicStatus = 'cold' | 'warmup' | 'dropped' | 'ready'
+export type TopicProgressVariant = 'warmup' | 'interview' | 'complete'
+
+export interface TopicLevelProgressData {
+  current: number
+  required: number
+  targetLevel: WarmUpLevel
+  variant: TopicProgressVariant
+  label: string
+  attempted: boolean
+  almostThere: boolean
+}
+
+export interface TopicLevelSnapshot {
+  level: WarmUpLevel
+  status: TopicStatus
+  reason: string
+  nextLevelRequirement: string
+  progress: TopicLevelProgressData
+}
+
+export interface SessionRewardSummary {
+  sessionId: string
+  topic: string
+  eligible: boolean
+  state: 'level_up' | 'progress' | 'stalled' | 'complete' | 'ineligible'
+  previous: TopicLevelSnapshot
+  current: TopicLevelSnapshot
+  title: string
+  message: string
+  nextHint?: string
+  whyNoProgress?: string
+}
 
 /** Question format used in warm-up sessions. */
 export type QuestionFormat = 'mcq' | 'fill_blank' | 'guided' | 'open'

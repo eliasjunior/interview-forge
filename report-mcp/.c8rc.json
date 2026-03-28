@@ -1,0 +1,24 @@
+{
+  "reporter": [
+    "text",
+    "lcov"
+  ],
+  "all": true,
+  "src": [
+    "src"
+  ],
+  "exclude": [
+    "dist/**",
+    "coverage/**",
+    "src/__tests__/**",
+    "src/server.ts",
+    "src/scripts/**",
+    "src/ai/**",
+    "src/tools/deps.ts"
+  ],
+  "check-coverage": true,
+  "lines": 50,
+  "functions": 50,
+  "branches": 50,
+  "statements": 50
+}

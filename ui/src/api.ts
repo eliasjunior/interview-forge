@@ -10,6 +10,7 @@ import type {
   SessionDeleteResult,
   ProgressOverview,
   ProgressSessionKind,
+  SessionRewardSummary,
 } from '@mock-interview/shared'
 
 const BASE = '/api'
@@ -57,6 +58,8 @@ export interface TopicLevel {
     targetLevel: 0 | 1 | 2 | 3 | 4
     variant: 'warmup' | 'interview' | 'complete'
     label: string
+    attempted: boolean
+    almostThere: boolean
   }
 }
 
@@ -86,6 +89,9 @@ export const getSession = async (id: string): Promise<Session | null> => {
   const sessions = await getSessions()
   return sessions.find(s => s.id === id) ?? null
 }
+
+export const getSessionRewardSummary = (id: string): Promise<SessionRewardSummary> =>
+  req(`${BASE}/sessions/${encodeURIComponent(id)}/reward-summary`)
 
 export const getSessionDeletePreview = (id: string): Promise<SessionDeletionPreview> =>
   req(`${BASE}/sessions/${encodeURIComponent(id)}/delete-preview`)

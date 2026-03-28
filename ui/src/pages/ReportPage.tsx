@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { deleteSession, getGeneratedReportUi, getSession, getSessionDeletePreview, type ReportUiDataset } from '../api'
-import type { Session, Evaluation, Concept, SessionDeletionPreview, SessionKind } from '@mock-interview/shared'
+import { deleteSession, getGeneratedReportUi, getSession, getSessionDeletePreview, getSessionRewardSummary, type ReportUiDataset } from '../api'
+import type { Session, Evaluation, Concept, SessionDeletionPreview, SessionKind, SessionRewardSummary } from '@mock-interview/shared'
 import ScoreBadge, { ScoreBar } from '../components/ScoreBadge'
 
 function calcAvg(evals: Evaluation[]): string {
@@ -41,6 +41,7 @@ export default function ReportPage() {
   const navigate = useNavigate()
   const [session, setSession] = useState<Session | null>(null)
   const [reportUi, setReportUi] = useState<ReportUiDataset | null>(null)
+  const [rewardSummary, setRewardSummary] = useState<SessionRewardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
@@ -58,6 +59,13 @@ export default function ReportPage() {
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    if (!id || !session || session.state !== 'ENDED' || getSessionKind(session) === 'study') return
+    getSessionRewardSummary(id)
+      .then(setRewardSummary)
+      .catch(() => setRewardSummary(null))
+  }, [id, session])
 
   if (loading) return <div className="loading">Loading report…</div>
   if (error || !session) return <div className="error-msg">{error ?? 'Session not found'}</div>
@@ -175,10 +183,42 @@ export default function ReportPage() {
           )}
 
           {!isStudy && session.summary && (
-            <div style={{ marginBottom: 24 }}>
-              <div className="page-subtitle" style={{ marginBottom: 8 }}>Summary</div>
-              <div className="summary-box">{session.summary}</div>
-            </div>
+            <>
+              {rewardSummary && (
+                <div className={`reward-summary-card reward-${rewardSummary.state}`} style={{ marginBottom: 24 }}>
+                  <div className="reward-summary-header">
+                    <div>
+                      <div className="page-subtitle" style={{ marginBottom: 6 }}>Progress</div>
+                      <div className="reward-summary-title">{rewardSummary.title}</div>
+                    </div>
+                    <div className="reward-summary-badge">
+                      L{rewardSummary.previous.level} → L{rewardSummary.current.level}
+                    </div>
+                  </div>
+                  <div className="reward-summary-message">{rewardSummary.message}</div>
+                  <div className="reward-summary-progress">
+                    <span>Before: {rewardSummary.previous.progress.label}</span>
+                    <span>Now: {rewardSummary.current.progress.label}</span>
+                  </div>
+                  {rewardSummary.nextHint && (
+                    <div className="reward-summary-next">{rewardSummary.nextHint}</div>
+                  )}
+                  {rewardSummary.whyNoProgress && (
+                    <div className="reward-summary-why">{rewardSummary.whyNoProgress}</div>
+                  )}
+                  <div className="reward-summary-actions">
+                    <button className="btn-secondary" onClick={() => navigate('/topics')}>
+                      View topic ladder
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginBottom: 24 }}>
+                <div className="page-subtitle" style={{ marginBottom: 8 }}>Summary</div>
+                <div className="summary-box">{session.summary}</div>
+              </div>
+            </>
           )}
 
           {session.concepts && session.concepts.length > 0 && (

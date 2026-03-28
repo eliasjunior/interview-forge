@@ -68,9 +68,48 @@ function ProgressPips({ current, required }: { current: number; required: number
   )
 }
 
+function LadderRungs({ currentLevel }: { currentLevel: 0 | 1 | 2 | 3 | 4 }) {
+  return (
+    <div className="topic-rungs" aria-label="Topic progression ladder">
+      {([0, 1, 2, 3, 4] as const).map((lvl) => {
+        const state = lvl < currentLevel ? 'done' : lvl === currentLevel ? 'current' : 'locked'
+        return (
+          <div key={lvl} className={`topic-rung topic-rung-${state}`}>
+            <span className="topic-rung-mark">{lvl < currentLevel ? '✓' : lvl === currentLevel ? '•' : '○'}</span>
+            <span className="topic-rung-label">{LEVEL_CONFIG[lvl].label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function getProgressTitle(levelData: TopicLevel) {
   if (levelData.progress.variant === 'complete') return 'Interview ready'
   return `Progress to L${levelData.progress.targetLevel}`
+}
+
+function getAlmostThereCopy(levelData: TopicLevel) {
+  if (!levelData.progress.almostThere) return null
+  if (levelData.progress.variant === 'interview') {
+    return `One strong interview unlocks ${LEVEL_CONFIG[levelData.progress.targetLevel].label}.`
+  }
+  return `One more pass unlocks ${LEVEL_CONFIG[levelData.progress.targetLevel].label}.`
+}
+
+function getNoProgressCopy(levelData: TopicLevel) {
+  if (levelData.progress.almostThere || levelData.progress.variant === 'complete') return null
+  if (!levelData.progress.attempted) return null
+
+  if (levelData.status === 'dropped') {
+    return levelData.reason
+  }
+
+  if (levelData.progress.current === 0) {
+    return levelData.reason
+  }
+
+  return null
 }
 
 function getStoredLevels() {
@@ -205,6 +244,7 @@ export default function TopicsPage() {
                 {level !== undefined && levelData ? <LevelBadge level={level} /> : <LevelSkeleton />}
                 {levelData && level !== undefined && (
                   <div className="topic-progress">
+                    <LadderRungs currentLevel={level} />
                     <div className="topic-progress-header">
                       <span className="topic-progress-title">{getProgressTitle(levelData)}</span>
                       <span className="topic-progress-meta">{levelData.progress.label}</span>
@@ -216,6 +256,16 @@ export default function TopicsPage() {
                     <div className="topic-next-step">
                       {levelData.nextLevelRequirement}
                     </div>
+                    {getAlmostThereCopy(levelData) && (
+                      <div className="topic-almost-there">
+                        {getAlmostThereCopy(levelData)}
+                      </div>
+                    )}
+                    {getNoProgressCopy(levelData) && (
+                      <div className="topic-why-stalled">
+                        {getNoProgressCopy(levelData)}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

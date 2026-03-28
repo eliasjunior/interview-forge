@@ -21,9 +21,14 @@
     "start:interview": "npm run start -w interview-mcp",
     "start:http": "npm run start:http -w interview-mcp",
     "start:report": "npm run start -w report-mcp",
-    "preview:ui": "npm run preview -w ui"
+    "preview:ui": "npm run preview -w ui",
+    "test:interview": "npm run test -w interview-mcp",
+    "test:report": "npm run test -w report-mcp",
+    "test:coverage:interview": "npm run test:coverage -w interview-mcp",
+    "test:coverage:report": "npm run test:coverage -w report-mcp"
   },
   "devDependencies": {
+    "c8": "^11.0.0",
     "drizzle-orm": "^0.45.1"
   }
 }

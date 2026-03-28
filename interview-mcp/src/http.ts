@@ -8,7 +8,7 @@ import fs from "fs";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
 import { applySM2 } from "./srsUtils.js";
 import { FileKnowledgeStore } from "./knowledge/file.js";
-import { detectTopicLevel } from "./tools/getTopicLevel.js";
+import { buildSessionRewardSummary, detectTopicLevel } from "./tools/getTopicLevel.js";
 import type {
   ReviewRating,
   Flashcard,
@@ -216,6 +216,28 @@ app.get("/api/progress", (req, res) => {
 // API: List all sessions
 app.get("/api/sessions", (_req, res) => {
   res.json(repositories.sessions.list());
+});
+
+app.get("/api/sessions/:id/reward-summary", (req, res) => {
+  const session = repositories.sessions.list().find((candidate) => candidate.id === req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.state !== "ENDED") {
+    res.status(409).json({ error: "Session is not finalized yet" });
+    return;
+  }
+
+  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
+  const knowledgeTopic = store.findByTopic(session.topic);
+  const hasWarmupContent =
+    knowledgeTopic != null &&
+    knowledgeTopic.warmupLevels != null &&
+    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+
+  res.json(buildSessionRewardSummary(session, loadSessions(), hasWarmupContent));
 });
 
 app.get("/api/sessions/:id/delete-preview", (req, res) => {

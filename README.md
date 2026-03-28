@@ -31,6 +31,7 @@ It is structured as an **npm workspaces monorepo** with four packages and two MC
 - [MCP tools — report-mcp (8 tools)](#report-mcp--8-tools)
 - [REST API](#rest-api-interview-mcp-port-3001)
 - [Monorepo scripts](#monorepo-scripts)
+- [Tests](#tests)
 - [Knowledge topics](#knowledge-topics)
 - [Flashcard system](#flashcard-system)
 
@@ -767,6 +768,46 @@ Run these from the repo root.
 | `npm run build:interview` | Build `interview-mcp` only |
 | `npm run build:report` | Build `report-mcp` only |
 | `npm run build:ui` | Build `ui` only |
+
+[↑ Back to top](#table-of-contents)
+
+---
+
+## Tests
+
+Run these from the repo root unless noted otherwise.
+
+### Monorepo root commands
+
+| Command | Description |
+|---|---|
+| `npm run test -w interview-mcp` | Run the `interview-mcp` test suite |
+| `npm run test -w report-mcp` | Run the `report-mcp` test suite |
+| `npm run test:coverage -w interview-mcp` | Run `interview-mcp` tests with `c8` coverage |
+| `npm run test:coverage -w report-mcp` | Run `report-mcp` tests with `c8` coverage |
+| `npm run test:coverage -w interview-mcp && npm run test:coverage -w report-mcp` | Run both MCP coverage suites sequentially |
+
+### Package-level view
+
+#### `interview-mcp/`
+
+```bash
+npm test
+npm run test:coverage
+```
+
+#### `report-mcp/`
+
+```bash
+npm test
+npm run test:coverage
+```
+
+### Coverage notes
+
+- Coverage is currently wired with `c8`.
+- Initial coverage gate is `50%` for lines, branches, functions, and statements in both MCP packages.
+- Coverage reports emit terminal output and `lcov`.
 
 [↑ Back to top](#table-of-contents)
 

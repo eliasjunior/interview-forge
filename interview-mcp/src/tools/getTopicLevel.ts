@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolDeps } from "./deps.js";
-import type { WarmUpLevel } from "@mock-interview/shared";
+import type { Session, SessionRewardSummary, TopicLevelSnapshot, TopicStatus, WarmUpLevel } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Level detection logic
@@ -31,7 +31,6 @@ function calcAvg(scores: number[]): number | null {
  * - 'dropped' — fell back from interview due to a poor score
  * - 'ready'   — completed warm-up or has strong full interview performance
  */
-export type TopicStatus = 'cold' | 'warmup' | 'dropped' | 'ready';
 
 export interface TopicLevelProgress {
   current: number;
@@ -39,19 +38,15 @@ export interface TopicLevelProgress {
   targetLevel: WarmUpLevel;
   variant: 'warmup' | 'interview' | 'complete';
   label: string;
+  attempted: boolean;
+  almostThere: boolean;
 }
 
 export function detectTopicLevel(
   topic: string,
-  sessions: Record<string, import("@mock-interview/shared").Session>,
+  sessions: Record<string, Session>,
   hasWarmupContent: boolean
-): {
-  level: WarmUpLevel;
-  status: TopicStatus;
-  reason: string;
-  nextLevelRequirement: string;
-  progress: TopicLevelProgress;
-} {
+): TopicLevelSnapshot {
   const normalise = (s: string) => s.toLowerCase().replace(/[\s\-_]+/g, "");
   const topicNorm = normalise(topic);
 
@@ -76,6 +71,8 @@ export function detectTopicLevel(
         targetLevel: 1,
         variant: 'warmup',
         label: '0 / 2 passes',
+        attempted: false,
+        almostThere: false,
       },
     };
   }
@@ -112,6 +109,8 @@ export function detectTopicLevel(
           targetLevel: 4,
           variant: 'complete',
           label: 'Mastered',
+          attempted: true,
+          almostThere: false,
         },
       };
     }
@@ -131,6 +130,8 @@ export function detectTopicLevel(
           targetLevel: 4,
           variant: 'interview',
           label: `${Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_PASSES)} / ${REQUIRED_WARMUP_PASSES} strong interviews`,
+          attempted: true,
+          almostThere: Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_PASSES) === REQUIRED_WARMUP_PASSES - 1,
         },
       };
     }
@@ -148,6 +149,8 @@ export function detectTopicLevel(
           targetLevel: 3,
           variant: 'interview',
           label: `1 / ${REQUIRED_WARMUP_PASSES} interviews`,
+          attempted: true,
+          almostThere: true,
         },
       };
     }
@@ -164,6 +167,8 @@ export function detectTopicLevel(
           targetLevel: 3,
           variant: 'warmup',
           label: `0 / ${REQUIRED_WARMUP_PASSES} passes`,
+          attempted: true,
+          almostThere: false,
         },
       };
     }
@@ -181,6 +186,8 @@ export function detectTopicLevel(
         targetLevel: 4,
         variant: 'interview',
         label: 'No warm-up ladder',
+        attempted: false,
+        almostThere: false,
       },
     };
   }
@@ -222,6 +229,8 @@ export function detectTopicLevel(
           targetLevel: (lvl + 1) as WarmUpLevel,
           variant: 'warmup',
           label: `${passCount} / ${REQUIRED_WARMUP_PASSES} passes`,
+          attempted,
+          almostThere: passCount === REQUIRED_WARMUP_PASSES - 1,
         },
       };
     }
@@ -239,11 +248,13 @@ export function detectTopicLevel(
       targetLevel: 4,
       variant: 'interview',
       label: `${Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_PASSES)} / ${REQUIRED_WARMUP_PASSES} strong interviews`,
+      attempted: true,
+      almostThere: Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_PASSES) === REQUIRED_WARMUP_PASSES - 1,
     },
   };
 }
 
-function consecutiveStrongInterviews(sessions: import("@mock-interview/shared").Session[]) {
+function consecutiveStrongInterviews(sessions: Session[]) {
   const interviewSessions = sessions
     .filter((s) => !s.sessionKind || s.sessionKind === "interview")
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -258,6 +269,102 @@ function consecutiveStrongInterviews(sessions: import("@mock-interview/shared").
     break;
   }
   return count;
+}
+
+function buildRewardCopy(
+  session: Session,
+  previous: TopicLevelSnapshot,
+  current: TopicLevelSnapshot,
+): Omit<SessionRewardSummary, "sessionId" | "topic" | "eligible" | "previous" | "current"> {
+  const currentLabel = `L${current.level}`;
+  const previousLabel = `L${previous.level}`;
+  const progressMoved = current.progress.current > previous.progress.current;
+  const leveledUp = current.level > previous.level;
+
+  if (session.sessionKind === "study" || session.sessionKind === "drill") {
+    return {
+      state: "ineligible",
+      title: "No ladder progress",
+      message: session.sessionKind === "drill"
+        ? "Drill sessions sharpen recall but do not change the topic ladder."
+        : "Study sessions do not count toward topic level progression.",
+      whyNoProgress: session.sessionKind === "drill"
+        ? "This session helps reinforcement, but only warm-ups and full interviews move the topic ladder."
+        : "The topic ladder only advances through warm-up passes and full interview performance.",
+    };
+  }
+
+  if (current.progress.variant === "complete" && current.level === 4) {
+    return {
+      state: "complete",
+      title: leveledUp ? "Level up" : "Interview ready",
+      message: leveledUp
+        ? `${session.topic} reached ${currentLabel}.`
+        : `${session.topic} remains ${currentLabel}.`,
+      nextHint: "You are at the top rung. Keep practising full interviews to stay sharp.",
+    };
+  }
+
+  if (leveledUp) {
+    return {
+      state: "level_up",
+      title: "Level up",
+      message: `${session.topic} advanced from ${previousLabel} to ${currentLabel}.`,
+      nextHint: current.progress.almostThere
+        ? current.progress.variant === "interview"
+          ? `One strong interview unlocks L${current.progress.targetLevel}.`
+          : `One more pass unlocks L${current.progress.targetLevel}.`
+        : current.nextLevelRequirement,
+    };
+  }
+
+  if (progressMoved) {
+    return {
+      state: "progress",
+      title: "Progress updated",
+      message: current.progress.label,
+      nextHint: current.progress.almostThere
+        ? current.progress.variant === "interview"
+          ? `One strong interview unlocks L${current.progress.targetLevel}.`
+          : `One more pass unlocks L${current.progress.targetLevel}.`
+        : current.nextLevelRequirement,
+    };
+  }
+
+  return {
+    state: "stalled",
+    title: "No level progress",
+    message: current.nextLevelRequirement,
+    whyNoProgress: current.reason,
+    nextHint: current.progress.almostThere
+      ? current.progress.variant === "interview"
+        ? `One strong interview unlocks L${current.progress.targetLevel}.`
+        : `One more pass unlocks L${current.progress.targetLevel}.`
+      : undefined,
+  };
+}
+
+export function buildSessionRewardSummary(
+  session: Session,
+  sessions: Record<string, Session>,
+  hasWarmupContent: boolean,
+): SessionRewardSummary {
+  const previousSessions = Object.fromEntries(
+    Object.entries(sessions).filter(([id]) => id !== session.id)
+  );
+  const previous = detectTopicLevel(session.topic, previousSessions, hasWarmupContent);
+  const current = detectTopicLevel(session.topic, sessions, hasWarmupContent);
+  const eligible = session.sessionKind !== "study" && session.sessionKind !== "drill";
+  const rewardCopy = buildRewardCopy(session, previous, current);
+
+  return {
+    sessionId: session.id,
+    topic: session.topic,
+    eligible,
+    previous,
+    current,
+    ...rewardCopy,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

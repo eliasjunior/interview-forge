@@ -199,6 +199,8 @@ describe("topic progression flow", () => {
       targetLevel: 1,
       variant: "warmup",
       label: "0 / 2 passes",
+      attempted: false,
+      almostThere: false,
     });
 
     await finishWarmupSession(0);
