@@ -107,26 +107,26 @@ C) PKCS12
 D) TAR
 Answer: C
 
-7. What JVM flag is useful for detailed TLS handshake debugging?
-A) `-Dserver.port=8443`
-B) `-Djava.net.trace=true`
-C) `-Dspring.profiles.active=tls`
-D) `-Djavax.net.debug=ssl,handshake`
-Answer: D
+7. What is `SSLContext` in Java primarily responsible for?
+A) Storing SQL migrations for Spring Boot
+B) Assembling TLS behavior from identity and trust material
+C) Replacing the need for certificates
+D) Generating DNS records for service discovery
+Answer: B
 
-8. In Spring Boot, what property enables mandatory client certificates for inbound mTLS?
-A) `tls.client.required=yes`
-B) `server.http.client-auth=true`
-C) `server.ssl.client-auth=need`
-D) `spring.ssl.mtls=on`
+8. In a Spring application, why should inbound server TLS and outbound client TLS be thought about separately?
+A) Because they are unrelated to certificates
+B) Because Spring only supports one direction at a time
+C) Because serving HTTPS and calling HTTPS use different identity and trust responsibilities
+D) Because inbound TLS uses TCP and outbound TLS uses UDP
 Answer: C
 
-9. What does hostname verification check?
-A) Whether the certificate is stored in PKCS12
-B) Whether the cert is valid for the hostname you intended to reach
-C) Whether the keystore password is correct
-D) Whether the CA is public
-Answer: B
+9. In Java TLS, what is the practical difference between a keystore problem and a truststore problem?
+A) A keystore problem usually affects presenting your own identity; a truststore problem usually affects validating the remote side
+B) A keystore problem only affects Linux, while a truststore problem only affects macOS
+C) A keystore problem breaks DNS, while a truststore problem breaks TCP
+D) There is no practical difference because both files do the same thing
+Answer: A
 
 10. What should you usually inspect first in a Java TLS incident?
 A) Change cipher suites immediately

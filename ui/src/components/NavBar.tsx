@@ -4,8 +4,8 @@ export default function NavBar() {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <span className="navbar-logo">🎙</span>
-        <span className="navbar-title">Mock Interview</span>
+        <img className="navbar-logo" src="/favicon.svg" alt="interview-forge logo" />
+        <span className="navbar-title">interview-forge</span>
       </div>
       <div className="navbar-links">
         <NavLink

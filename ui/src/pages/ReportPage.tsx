@@ -47,6 +47,7 @@ export default function ReportPage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [openQ, setOpenQ] = useState<number | null>(0)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -58,14 +59,34 @@ export default function ReportPage() {
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, refreshTick])
 
   useEffect(() => {
     if (!id || !session || session.state !== 'ENDED' || getSessionKind(session) === 'study') return
     getSessionRewardSummary(id)
       .then(setRewardSummary)
       .catch(() => setRewardSummary(null))
-  }, [id, session])
+  }, [id, session, refreshTick])
+
+  useEffect(() => {
+    function triggerRefresh() {
+      setRefreshTick((value) => value + 1)
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        triggerRefresh()
+      }
+    }
+
+    window.addEventListener('focus', triggerRefresh)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', triggerRefresh)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
 
   if (loading) return <div className="loading">Loading report…</div>
   if (error || !session) return <div className="error-msg">{error ?? 'Session not found'}</div>
