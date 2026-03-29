@@ -10,6 +10,7 @@ A stateful mock interview system that turns interviews, drills, flashcards, repo
 
 Most interview apps stop at asking questions. `interview-forge` keeps the whole study loop connected.
 
+- **Built for pressure, not just passive familiarity** — reading, watching, and recognizing concepts can create the illusion of understanding, but real interviews demand fast recall, structured thinking, and clear communication under stress.
 - **Stateful, not just conversational** — the interview flow is enforced by MCP tools and a strict session state machine, so the session never drifts out of sync.
 - **Built for repeated learning, not one-off practice** — weak answers feed the next cycle through drills, flashcards, reports, and graph updates.
 - **Tracks how your understanding evolves** — completed sessions merge into a cumulative knowledge graph instead of disappearing into chat history.

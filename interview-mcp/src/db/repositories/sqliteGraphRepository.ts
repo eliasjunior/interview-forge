@@ -4,6 +4,12 @@ import type { AppDb } from "../client.js";
 import { graphEdges, graphNodeClusters, graphNodes, graphSessions } from "../schema.js";
 import { mapGraphAggregateToDomain, mapGraphToNormalizedRecord } from "../../repositories/mappers.js";
 
+function chunks<T>(arr: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) result.push(arr.slice(i, i + size));
+  return result;
+}
+
 export class SQLiteGraphRepository implements GraphRepository {
   constructor(private readonly db: AppDb) {}
 
@@ -25,10 +31,10 @@ export class SQLiteGraphRepository implements GraphRepository {
       tx.delete(graphSessions).run();
       tx.delete(graphNodes).run();
 
-      if (record.nodes.length) tx.insert(graphNodes).values(record.nodes).run();
-      if (record.nodeClusters.length) tx.insert(graphNodeClusters).values(record.nodeClusters).run();
-      if (record.edges.length) tx.insert(graphEdges).values(record.edges).run();
-      if (record.sessions.length) tx.insert(graphSessions).values(record.sessions).run();
+      for (const batch of chunks(record.nodes, 499)) tx.insert(graphNodes).values(batch).run();
+      for (const batch of chunks(record.nodeClusters, 499)) tx.insert(graphNodeClusters).values(batch).run();
+      for (const batch of chunks(record.edges, 199)) tx.insert(graphEdges).values(batch).run();
+      for (const batch of chunks(record.sessions, 999)) tx.insert(graphSessions).values(batch).run();
     });
   }
 }

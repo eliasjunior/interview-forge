@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 import { buildSessionRewardSummary } from "./getTopicLevel.js";
+import { buildEndInterviewRecommendations } from "../interviewUtils.js";
 
 export function registerEndInterviewTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
@@ -14,6 +15,7 @@ export function registerEndInterviewTool(server: McpServer, deps: ToolDeps) {
       if (session.state === "ENDED") return deps.stateError("Session is already ended.");
 
       const { summary, concepts, reportFile } = await deps.finalizeSession(session, sessions);
+      const recommendations = buildEndInterviewRecommendations(session, deps.loadMistakes(session.topic));
       const knowledgeTopic = deps.knowledge.findByTopic(session.topic);
       const hasWarmupContent =
         knowledgeTopic != null &&
@@ -31,6 +33,7 @@ export function registerEndInterviewTool(server: McpServer, deps: ToolDeps) {
             conceptsExtracted: concepts.length,
             reportFile,
             rewardSummary,
+            recommendations,
           }),
         }],
       };

@@ -33,7 +33,7 @@ tail -n 50 ~/Library/Logs/Claude/mcp-server-interview-mcp.log
 
 ## Overview
 
-A study project for learning **Model Context Protocol (MCP)** server development. It runs mock technical interviews through Claude, evaluates answers with AI, and builds a growing knowledge graph across sessions — all visualised in a React dashboard.
+A study project for learning **Model Context Protocol (MCP)** server development. It runs mock technical interviews through Claude, evaluates answers with AI, builds a growing knowledge graph across sessions, and uses a simple reward system with level-ups and progress tracking in the UI — all visualised in a React dashboard.
 
 **npm workspaces monorepo** with four packages:
 
@@ -41,7 +41,7 @@ A study project for learning **Model Context Protocol (MCP)** server development
 |---|---|
 | `interview-mcp` | MCP server — interview state machine, session data owner, REST API on port 3001 |
 | `report-mcp` | MCP server — analytics and reporting on completed sessions, HTML report viewer |
-| `ui` | React + Vite dashboard — sessions list, tabbed report viewer, D3 knowledge graph |
+| `ui` | React + Vite dashboard — sessions list, tabbed report viewer, D3 knowledge graph, learner progress and level display |
 | `shared` | TypeScript types only — single source of truth, imported at compile time only |
 
 ## Architecture
@@ -56,12 +56,21 @@ Claude Desktop / Claude Code (orchestrator LLM)
               │
          interview-mcp HTTP :3001
               │ fetch /api/*
-         ui :5173  (React dashboard)
+         ui :5173  (React dashboard with progress and level display)
 ```
 
 **Two LLMs are in play:**
 - **Orchestrator** — Claude inside Claude Desktop/Code (drives the conversation, calls tools)
 - **Worker** — Claude via Anthropic API (`src/ai/`) — generates questions, scores answers, extracts concepts. Optional: `AI_ENABLED=false` disables all API calls.
+
+## Core Product Features
+
+- Mock technical interviews driven through MCP tools
+- AI-assisted answer evaluation and feedback
+- Knowledge graph growth across completed sessions
+- Session reports and report viewer UI
+- Flashcards, mistakes, and targeted drills for deliberate practice
+- A simple reward system that levels the user up and shows progress in the UI
 
 ## Interview Behavior Rules
 
@@ -305,6 +314,11 @@ All knowledge files live in `interview-mcp/data/knowledge/*.md` and follow this 
 2. <Question 2>
 ...
 
+## Difficulty
+- Question 1: foundation
+- Question 2: intermediate
+...
+
 ## Evaluation Criteria
 - Question 1: <What a strong answer includes. What a weak answer misses. Bonus points.>
 - Question 2: ...
@@ -314,9 +328,17 @@ All knowledge files live in `interview-mcp/data/knowledge/*.md` and follow this 
 - practical usage: word4, word5
 - tradeoffs: word6, word7
 - best practices: word8, word9
+
+## Warm-up Quests
+
+### Level 0
+1. <Lightweight recognition or multiple-choice prompt>
+   Answer: <Correct option>
 ```
 
 Cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
+
+Knowledge topics now commonly include both a per-question difficulty ladder (`foundation`, `intermediate`, `advanced`) and `Warm-up Quests` as a lighter on-ramp before the main interview flow.
 
 ### UI — Session type badge
 

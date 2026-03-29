@@ -194,6 +194,9 @@ describe("flashcard and end-interview tools", () => {
     assert.equal(payload.summary, "Interview ended");
     assert.equal(payload.conceptsExtracted, 1);
     assert.equal(payload.reportFile, "reports/session-1.md");
+    assert.equal(payload.recommendations.drill.tool, "start_drill");
+    assert.equal(payload.recommendations.drill.args.sessionId, "session-1");
+    assert.equal(payload.recommendations.deepExplanation.mode, "deep_explanation");
     assert.equal(getFinalizeCalls(), 1);
     assert.equal(sessions["session-1"]?.state, "ENDED");
     assert.equal(sessions["session-1"]?.endedAt, "2026-03-28T10:30:00.000Z");

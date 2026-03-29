@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { Topic, TopicLevel } from '../api'
 
 import { getTopics, getTopicLevel } from '../api'
 
 const LEVEL_STORAGE_KEY = 'topics-level-snapshot'
+const TOPIC_FOCUS_STORAGE_KEY = 'topics-focus-plan'
+const TOPIC_PRIORITY_STORAGE_KEY = 'topics-priority-plan'
 
 // ── Level config ──────────────────────────────────────────────────────────────
 
@@ -17,7 +19,7 @@ const LEVEL_CONFIG: Record<0 | 1 | 2 | 3 | 4, {
   semantic: string
 }> = {
   0: { color: '#cbd5e1', bg: '#1f293760', text: '#e5e7eb', label: 'L0', desc: 'Spark', semantic: 'First exposure and recognition' },
-  1: { color: '#7dd3fc', bg: '#082f4960', text: '#dbeafe', label: 'L1', desc: 'Padawan', semantic: 'Assisted recall with guidance' },
+  1: { color: '#2dd4bf', bg: '#0f3d3660', text: '#ccfbf1', label: 'L1', desc: 'Padawan', semantic: 'Assisted recall with guidance' },
   2: { color: '#3b82f6', bg: '#0d1a3a60', text: '#bfdbfe', label: 'L2', desc: 'Forge', semantic: 'Shaping structured answers' },
   3: { color: '#f97316', bg: '#31130460', text: '#fdba74', label: 'L3', desc: 'Ranger', semantic: 'Capable in full mock interviews' },
   4: { color: '#c084fc', bg: '#3b076460', text: '#f3e8ff', label: 'L4', desc: 'Jedi Ready', semantic: 'Sustained real-interview readiness' },
@@ -112,6 +114,13 @@ function getNoProgressCopy(levelData: TopicLevel) {
   return null
 }
 
+function getCompactCardNote(levelData: TopicLevel) {
+  if (levelData.progress.almostThere) return getAlmostThereCopy(levelData)
+  if (levelData.status === 'dropped') return 'Needs reinforcement before the next full round.'
+  if (levelData.progress.variant === 'complete') return 'Interview ready.'
+  return null
+}
+
 function getStoredLevels() {
   try {
     const raw = window.localStorage.getItem(LEVEL_STORAGE_KEY)
@@ -120,6 +129,53 @@ function getStoredLevels() {
   } catch {
     return {} as Record<string, number>
   }
+}
+
+function getStoredFocusMap() {
+  try {
+    const raw = window.localStorage.getItem(TOPIC_FOCUS_STORAGE_KEY)
+    if (!raw) return {} as Record<string, boolean>
+    return JSON.parse(raw) as Record<string, boolean>
+  } catch {
+    return {} as Record<string, boolean>
+  }
+}
+
+type TopicPriority = 'core' | 'secondary' | 'optional'
+type TopicFilter = 'plan' | 'core' | 'almost-there' | 'needs-reinforcement' | 'all'
+
+const PRIORITY_LABELS: Record<TopicPriority, string> = {
+  core: 'Core',
+  secondary: 'Secondary',
+  optional: 'Optional',
+}
+
+const PRIORITY_ORDER: Record<TopicPriority, number> = {
+  core: 0,
+  secondary: 1,
+  optional: 2,
+}
+
+const FILTER_LABELS: Record<TopicFilter, string> = {
+  plan: 'Plan',
+  core: 'Core',
+  'almost-there': 'Almost there',
+  'needs-reinforcement': 'Needs reinforcement',
+  all: 'All',
+}
+
+function getStoredPriorityMap() {
+  try {
+    const raw = window.localStorage.getItem(TOPIC_PRIORITY_STORAGE_KEY)
+    if (!raw) return {} as Record<string, TopicPriority>
+    return JSON.parse(raw) as Record<string, TopicPriority>
+  } catch {
+    return {} as Record<string, TopicPriority>
+  }
+}
+
+function getPriority(priorityMap: Record<string, TopicPriority>, file: string): TopicPriority {
+  return priorityMap[file] ?? 'secondary'
 }
 
 type TopicAction = {
@@ -183,6 +239,58 @@ function getTopicActions(levelData: TopicLevel, topicFile: string): TopicAction[
   return actions.filter((action, index, arr) => arr.findIndex((candidate) => candidate.key === action.key) === index)
 }
 
+function TopicActionLauncher({
+  topicFile,
+  levelData,
+  activeMenu,
+  setActiveMenu,
+  handleCopyPrompt,
+  compact = false,
+}: {
+  topicFile: string
+  levelData: TopicLevel
+  activeMenu: string | null
+  setActiveMenu: Dispatch<SetStateAction<string | null>>
+  handleCopyPrompt: (topicFile: string, action: TopicAction) => void | Promise<void>
+  compact?: boolean
+}) {
+  const actions = getTopicActions(levelData, topicFile)
+
+  return (
+    <div className={`topic-action-anchor ${compact ? 'compact' : ''}`}>
+      <button
+        className={`topic-file-button ${compact ? 'compact' : ''}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          setActiveMenu(prev => (prev === topicFile ? null : topicFile))
+        }}
+      >
+        New Round
+      </button>
+      {activeMenu === topicFile && (
+        <div className="topic-action-menu topic-action-menu-left" onClick={(event) => event.stopPropagation()}>
+          <div className="topic-action-menu-title">Suggested commands</div>
+          <code className="topic-action-topic">{topicFile}</code>
+          {actions.map((action, index) => (
+            <button
+              key={action.key}
+              className={`topic-action-item ${index === 0 ? 'recommended' : ''}`}
+              onClick={() => handleCopyPrompt(topicFile, action)}
+            >
+              <div className="topic-action-row">
+                <span className="topic-action-label">{action.label}</span>
+                {index === 0 && <span className="topic-action-badge">Recommended</span>}
+              </div>
+              <div className="topic-action-helper">{action.helper}</div>
+              <code className="topic-action-prompt">{action.prompt}</code>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function TopicsPage() {
@@ -192,6 +300,9 @@ export default function TopicsPage() {
   const [toastQueue, setToastQueue] = useState<Array<{ id: string; message: string; level: 0 | 1 | 2 | 3 | 4 }>>([])
   const [activeToast, setActiveToast] = useState<{ id: string; message: string; level: 0 | 1 | 2 | 3 | 4 } | null>(null)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [focusMap, setFocusMap] = useState<Record<string, boolean>>(() => getStoredFocusMap())
+  const [priorityMap, setPriorityMap] = useState<Record<string, TopicPriority>>(() => getStoredPriorityMap())
+  const [activeFilter, setActiveFilter] = useState<TopicFilter>('all')
   const [loading, setLoading] = useState(true)
   const pageRef = useRef<HTMLDivElement | null>(null)
   const refreshInFlightRef = useRef(false)
@@ -278,6 +389,14 @@ export default function TopicsPage() {
   }, [])
 
   useEffect(() => {
+    window.localStorage.setItem(TOPIC_FOCUS_STORAGE_KEY, JSON.stringify(focusMap))
+  }, [focusMap])
+
+  useEffect(() => {
+    window.localStorage.setItem(TOPIC_PRIORITY_STORAGE_KEY, JSON.stringify(priorityMap))
+  }, [priorityMap])
+
+  useEffect(() => {
     if (activeToast || toastQueue.length === 0) return
     const [nextToast, ...rest] = toastQueue
     setActiveToast(nextToast)
@@ -328,10 +447,26 @@ export default function TopicsPage() {
   if (loading) return <div className="page-loading">Loading...</div>
 
   const sortedTopics = [...topics].sort((a, b) => {
+    const focusedA = focusMap[a.file] ? 0 : 1
+    const focusedB = focusMap[b.file] ? 0 : 1
+    if (focusedA !== focusedB) return focusedA - focusedB
+    const priorityA = PRIORITY_ORDER[getPriority(priorityMap, a.file)]
+    const priorityB = PRIORITY_ORDER[getPriority(priorityMap, b.file)]
+    if (priorityA !== priorityB) return priorityA - priorityB
     const levelA = levels[a.file]?.level ?? Number.POSITIVE_INFINITY
     const levelB = levels[b.file]?.level ?? Number.POSITIVE_INFINITY
     if (levelA !== levelB) return levelA - levelB
     return a.displayName.localeCompare(b.displayName)
+  })
+  const plannedTopics = sortedTopics.filter((topic) => focusMap[topic.file])
+  const visibleTopics = sortedTopics.filter((topic) => {
+    const levelData = levels[topic.file]
+
+    if (activeFilter === 'plan') return focusMap[topic.file]
+    if (activeFilter === 'core') return getPriority(priorityMap, topic.file) === 'core'
+    if (activeFilter === 'almost-there') return Boolean(levelData?.progress.almostThere)
+    if (activeFilter === 'needs-reinforcement') return levelData?.status === 'dropped'
+    return true
   })
 
   return (
@@ -363,12 +498,79 @@ export default function TopicsPage() {
         })}
       </div>
 
+      {plannedTopics.length > 0 && (
+        <div className="topics-plan">
+          <div className="topics-plan-header">
+            <div>
+              <h2 className="topics-plan-title">Interview Plan</h2>
+              <p className="topics-plan-subtitle">Focus these topics first for your next rounds.</p>
+            </div>
+            <span className="topics-plan-count">{plannedTopics.length} focused</span>
+          </div>
+          <div className="topics-plan-list">
+            {plannedTopics.map((topic) => {
+              const levelData = levels[topic.file]
+              const level = levelData?.level
+              return (
+                <div key={`plan-${topic.file}`} className="topics-plan-item">
+                  <div className="topics-plan-main">
+                    <div className="topics-plan-name">{topic.displayName}</div>
+                    <div className="topics-plan-meta">
+                      <span className="topics-plan-pill">Focus now</span>
+                      <span className={`topics-plan-priority priority-${getPriority(priorityMap, topic.file)}`}>
+                        {PRIORITY_LABELS[getPriority(priorityMap, topic.file)]}
+                      </span>
+                      {level !== undefined && <span className="topics-plan-level">L{level}</span>}
+                    </div>
+                  </div>
+                  {levelData && (
+                    <div className="topics-plan-side">
+                      {level !== undefined && <LevelBadge level={level} />}
+                      <TopicActionLauncher
+                        topicFile={topic.file}
+                        levelData={levelData}
+                        activeMenu={activeMenu}
+                        setActiveMenu={setActiveMenu}
+                        handleCopyPrompt={handleCopyPrompt}
+                        compact
+                      />
+                      {level !== undefined && <LadderRungs currentLevel={level} />}
+                      <div className="topics-plan-hint">
+                        {levelData.progress.almostThere
+                          ? getAlmostThereCopy(levelData)
+                          : levelData.nextLevelRequirement}
+                      </div>
+                      {getNoProgressCopy(levelData) && (
+                        <div className="topics-plan-why">
+                          {getNoProgressCopy(levelData)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="topics-filters">
+        {(['plan', 'core', 'almost-there', 'needs-reinforcement', 'all'] as const).map((filter) => (
+          <button
+            key={filter}
+            className={`topics-filter ${activeFilter === filter ? 'active' : ''}`}
+            onClick={() => setActiveFilter(filter)}
+          >
+            {FILTER_LABELS[filter]}
+          </button>
+        ))}
+      </div>
+
       <div className="topics-list">
-        {sortedTopics.map(topic => {
+        {visibleTopics.map(topic => {
           const levelData = levels[topic.file]
           const level = levelData?.level
           const appearance = level !== undefined ? getLevelAppearance(level) : null
-          const actions = levelData ? getTopicActions(levelData, topic.file) : []
 
           return (
             <div
@@ -379,35 +581,40 @@ export default function TopicsPage() {
               <div className="topic-card-main">
                 <div className="topic-name">{topic.displayName}</div>
                 <div className="topic-file-row">
-                  <button
-                    className="topic-file-button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setActiveMenu(prev => (prev === topic.file ? null : topic.file))
-                    }}
-                  >
-                    New Round
-                  </button>
-                  {levelData && activeMenu === topic.file && (
-                    <div className="topic-action-menu topic-action-menu-left" onClick={(event) => event.stopPropagation()}>
-                      <div className="topic-action-menu-title">Suggested commands</div>
-                      <code className="topic-action-topic">{topic.file}</code>
-                      {actions.map((action, index) => (
+                  <div className="topic-planning-row">
+                    <button
+                      className={`topic-focus-btn ${focusMap[topic.file] ? 'active' : ''}`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setFocusMap((prev) => ({ ...prev, [topic.file]: !prev[topic.file] }))
+                      }}
+                    >
+                      {focusMap[topic.file] ? 'Unfocus' : 'Focus now'}
+                    </button>
+                    <div className="topic-priority-group">
+                      {(['core', 'secondary', 'optional'] as const).map((priority) => (
                         <button
-                          key={action.key}
-                          className={`topic-action-item ${index === 0 ? 'recommended' : ''}`}
-                          onClick={() => handleCopyPrompt(topic.file, action)}
+                          key={priority}
+                          className={`topic-priority-btn ${getPriority(priorityMap, topic.file) === priority ? 'active' : ''}`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setPriorityMap((prev) => ({ ...prev, [topic.file]: priority }))
+                          }}
                         >
-                          <div className="topic-action-row">
-                            <span className="topic-action-label">{action.label}</span>
-                            {index === 0 && <span className="topic-action-badge">Recommended</span>}
-                          </div>
-                          <div className="topic-action-helper">{action.helper}</div>
-                          <code className="topic-action-prompt">{action.prompt}</code>
+                          {PRIORITY_LABELS[priority]}
                         </button>
                       ))}
                     </div>
-                  )}
+                    {levelData && (
+                      <TopicActionLauncher
+                        topicFile={topic.file}
+                        levelData={levelData}
+                        activeMenu={activeMenu}
+                        setActiveMenu={setActiveMenu}
+                        handleCopyPrompt={handleCopyPrompt}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -415,7 +622,6 @@ export default function TopicsPage() {
                 {level !== undefined && levelData ? <LevelBadge level={level} /> : <LevelSkeleton />}
                 {levelData && level !== undefined && (
                   <div className="topic-progress">
-                    <LadderRungs currentLevel={level} />
                     <div className="topic-progress-header">
                       <span className="topic-progress-title">{getProgressTitle(levelData)}</span>
                       <span className="topic-progress-meta">{levelData.progress.label}</span>
@@ -424,17 +630,9 @@ export default function TopicsPage() {
                       current={Math.min(levelData.progress.current, levelData.progress.required)}
                       required={levelData.progress.required}
                     />
-                    <div className="topic-next-step">
-                      {levelData.nextLevelRequirement}
-                    </div>
-                    {getAlmostThereCopy(levelData) && (
-                      <div className="topic-almost-there">
-                        {getAlmostThereCopy(levelData)}
-                      </div>
-                    )}
-                    {getNoProgressCopy(levelData) && (
-                      <div className="topic-why-stalled">
-                        {getNoProgressCopy(levelData)}
+                    {getCompactCardNote(levelData) && (
+                      <div className="topic-compact-note">
+                        {getCompactCardNote(levelData)}
                       </div>
                     )}
                   </div>
@@ -447,6 +645,9 @@ export default function TopicsPage() {
 
       {topics.length === 0 && (
         <div className="topics-empty">No knowledge files found.</div>
+      )}
+      {topics.length > 0 && visibleTopics.length === 0 && (
+        <div className="topics-empty">No topics match the current filter.</div>
       )}
 
       {activeToast && (

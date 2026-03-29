@@ -2,13 +2,14 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   assertState,
+  buildEndInterviewRecommendations,
   buildSummary,
   buildTranscript,
   calcAvgScore,
   generateFlashcards,
   mergeConceptsIntoGraph,
 } from "../interviewUtils.js";
-import type { Session, Evaluation, KnowledgeGraph, Concept } from "@mock-interview/shared";
+import type { Session, Evaluation, KnowledgeGraph, Concept, Mistake } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -42,6 +43,18 @@ function makeEvaluation(score: number, feedback = "Good answer."): Evaluation {
 
 function emptyGraph(): KnowledgeGraph {
   return { nodes: [], edges: [], sessions: [] };
+}
+
+function makeMistake(overrides: Partial<Mistake> = {}): Mistake {
+  return {
+    id: "mistake-1",
+    mistake: "Treating hooks as lifecycle aliases",
+    pattern: "Happens when explaining side effects from memory instead of from render semantics.",
+    fix: "Explain hooks in terms of render, commit, dependencies, and synchronization.",
+    topic: "React hooks",
+    createdAt: "2026-01-02T00:00:00.000Z",
+    ...overrides,
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -100,6 +113,54 @@ describe("assertState", () => {
       assert.equal(assertState(session, "get_session").ok, true, `get_session failed in ${state}`);
       assert.equal(assertState(session, "list_sessions").ok, true, `list_sessions failed in ${state}`);
     }
+  });
+});
+
+describe("buildEndInterviewRecommendations", () => {
+  test("returns drill and deep explanation recommendations for weak answers", () => {
+    const session = makeSession({
+      id: "session-42",
+      topic: "React hooks",
+      evaluations: [
+        {
+          questionIndex: 0,
+          question: "When should you use useEffect?",
+          answer: "For any logic after render.",
+          score: 2,
+          feedback: "Too broad. Missing synchronization with external systems and dependency tradeoffs.",
+          strongAnswer: "Use it to synchronize with systems outside React, not for pure derivation.",
+          needsFollowUp: true,
+        },
+      ],
+    });
+
+    const recommendations = buildEndInterviewRecommendations(session, [makeMistake()]);
+
+    assert.equal(recommendations.weakAreasDetected, true);
+    assert.deepEqual(recommendations.recommendedActions, ["start_drill", "deep_explanation"]);
+    assert.equal(recommendations.drill?.tool, "start_drill");
+    assert.equal(recommendations.drill?.args.sessionId, "session-42");
+    assert.equal(recommendations.deepExplanation?.mode, "deep_explanation");
+    assert.equal(recommendations.deepExplanation?.focusAreas.length, 1);
+    assert.equal(recommendations.deepExplanation?.mistakePatterns.length, 1);
+    assert.match(recommendations.deepExplanation?.prompt ?? "", /Explain React hooks in depth/);
+    assert.match(recommendations.deepExplanation?.prompt ?? "", /when to use it/i);
+  });
+
+  test("returns no recommendations when there are no weak answers or mistakes", () => {
+    const session = makeSession({
+      evaluations: [
+        makeEvaluation(4, "Solid answer."),
+        { ...makeEvaluation(5, "Great answer."), questionIndex: 1, question: "How does useMemo differ?" },
+      ],
+    });
+
+    const recommendations = buildEndInterviewRecommendations(session, []);
+
+    assert.equal(recommendations.weakAreasDetected, false);
+    assert.deepEqual(recommendations.recommendedActions, []);
+    assert.equal(recommendations.drill, null);
+    assert.equal(recommendations.deepExplanation, null);
   });
 });
 
