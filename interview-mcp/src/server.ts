@@ -24,6 +24,7 @@ import {
 import { persistFlashcard } from "./tools/createFlashcard.js";
 import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
+import { detectTopicLevel } from "./tools/getTopicLevel.js";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 import { normalizeConcepts } from "./graph/concepts.js";
@@ -157,6 +158,16 @@ async function extractConcepts(session: Session): Promise<Concept[]> {
 }
 
 async function finalizeSession(session: Session, sessions: Record<string, Session>) {
+  const previousSessions = Object.fromEntries(
+    Object.entries(sessions).filter(([id]) => id !== session.id)
+  );
+  const knowledgeTopic = knowledge.findByTopic(session.topic);
+  const hasWarmupContent =
+    knowledgeTopic != null &&
+    knowledgeTopic.warmupLevels != null &&
+    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+  const previousLevelSnapshot = detectTopicLevel(session.topic, previousSessions, hasWarmupContent);
+
   const concepts = normalizeConcepts(await extractConcepts(session)).map(({ word, cluster }) => ({
     word,
     cluster,
@@ -186,6 +197,18 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   if (savedCount > 0) {
     console.error(`[flashcards] added ${savedCount} card(s) for session ${session.id}`);
   }
+
+  const currentLevelSnapshot = detectTopicLevel(session.topic, sessions, hasWarmupContent);
+  const existingTopicPlan = repositories.topicPlans.list().find((plan) => plan.topic === session.topic);
+  const leveledUp = currentLevelSnapshot.level > previousLevelSnapshot.level;
+  repositories.topicPlans.upsert({
+    topic: session.topic,
+    focused: existingTopicPlan?.focused ?? false,
+    priority: existingTopicPlan?.priority ?? "secondary",
+    updatedAt: new Date().toISOString(),
+    lastLevelUpAt: leveledUp ? new Date().toISOString() : existingTopicPlan?.lastLevelUpAt,
+    lastUnlockedLevel: leveledUp ? currentLevelSnapshot.level : existingTopicPlan?.lastUnlockedLevel,
+  });
 
   return { summary, avgScore, concepts, reportFile, flashcardsGenerated: newCards.length };
 }

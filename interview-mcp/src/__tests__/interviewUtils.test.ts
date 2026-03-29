@@ -557,4 +557,34 @@ describe("generateFlashcards", () => {
       originalScore: 2,
     });
   });
+
+  test("skips flashcards for warm-up level 0 sessions", () => {
+    const session = makeSession({
+      sessionKind: "warmup",
+      questLevel: 0,
+      evaluations: [makeEval(2, 0)],
+    });
+
+    assert.deepEqual(generateFlashcards(session), []);
+  });
+
+  test("skips flashcards for warm-up level 1 sessions", () => {
+    const session = makeSession({
+      sessionKind: "warmup",
+      questLevel: 1,
+      evaluations: [makeEval(2, 0)],
+    });
+
+    assert.deepEqual(generateFlashcards(session), []);
+  });
+
+  test("still generates flashcards for warm-up level 2 sessions", () => {
+    const session = makeSession({
+      sessionKind: "warmup",
+      questLevel: 2,
+      evaluations: [makeEval(2, 0)],
+    });
+
+    assert.equal(generateFlashcards(session).length, 1);
+  });
 });

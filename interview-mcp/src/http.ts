@@ -16,6 +16,7 @@ import type {
   GraphInspectionResult,
   GraphInspectionSession,
   ProgressSessionKind,
+  TopicPlanPriority,
 } from "@mock-interview/shared";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
@@ -182,6 +183,31 @@ app.get("/api/topics/:topic/level", (req, res) => {
   const sessions = loadSessions();
   const { level, status, reason, nextLevelRequirement, progress } = detectTopicLevel(topic, sessions, hasWarmupContent);
   res.json({ topic, level, status, reason, nextLevelRequirement, hasWarmupContent, progress });
+});
+
+app.get("/api/topic-plans", (_req, res) => {
+  res.json(repositories.topicPlans.list());
+});
+
+app.put("/api/topic-plans/:topic", (req, res) => {
+  const topic = decodeURIComponent(req.params.topic);
+  const focused = typeof req.body?.focused === "boolean" ? req.body.focused : false;
+  const priority = req.body?.priority;
+  const existingPlan = repositories.topicPlans.list().find((plan) => plan.topic === topic);
+
+  if (priority !== "core" && priority !== "secondary" && priority !== "optional") {
+    res.status(400).json({ error: "priority must be one of: core, secondary, optional" });
+    return;
+  }
+
+  res.json(repositories.topicPlans.upsert({
+    topic,
+    focused,
+    priority: priority as TopicPlanPriority,
+    updatedAt: new Date().toISOString(),
+    lastLevelUpAt: existingPlan?.lastLevelUpAt,
+    lastUnlockedLevel: existingPlan?.lastUnlockedLevel,
+  }));
 });
 
 // API: Get the full knowledge graph

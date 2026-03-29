@@ -56,6 +56,17 @@ export interface SessionRewardSummary {
   whyNoProgress?: string
 }
 
+export type TopicPlanPriority = 'core' | 'secondary' | 'optional'
+
+export interface TopicPlan {
+  topic: string
+  focused: boolean
+  priority: TopicPlanPriority
+  updatedAt: string
+  lastLevelUpAt?: string
+  lastUnlockedLevel?: WarmUpLevel
+}
+
 /** Question format used in warm-up sessions. */
 export type QuestionFormat = 'mcq' | 'fill_blank' | 'guided' | 'open'
 
