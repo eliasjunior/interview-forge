@@ -13,7 +13,7 @@ Before answering the user's request, first state whether `interview-mcp` is conn
 
 A study project for learning MCP (Model Context Protocol) by building a mock interview system around two MCP servers, a shared SQLite data store, and a React dashboard.
 
-The system runs mock technical interviews through Claude, evaluates answers, builds a cumulative knowledge graph across sessions, generates per-session reports, and adds learning loops such as flashcards, mistake logging, and targeted drills.
+The system runs mock technical interviews through Claude, evaluates answers, builds a cumulative knowledge graph across sessions, generates per-session reports, and adds learning loops such as flashcards, mistake logging, targeted drills, and a simple reward system with level-ups and visible progress in the UI.
 
 ## Current Monorepo Structure
 
@@ -31,7 +31,7 @@ first-mcp/
 
 - `interview-mcp`: source of truth for sessions, graph data, reports, mistakes, flashcards, and the HTTP API on port `3001`
 - `report-mcp`: read-mostly analytics/report MCP server over the shared database
-- `ui`: React dashboard for sessions, reports, graph visualisation, and flashcard review
+- `ui`: React dashboard for sessions, reports, graph visualisation, flashcard review, and visible learner progress
 - `shared`: compile-time-only TypeScript types used by the other packages
 
 ## Core Features
@@ -44,6 +44,7 @@ first-mcp/
 - **Mistake Log**: persistent mistakes/patterns/fixes for deliberate practice
 - **Targeted Drills**: drill sessions generated from prior weak spots
 - **Scoped Interviews**: interviews generated from user-provided specs/docs without using the provider layer
+- **Rewards and Progress**: simple level-up system with progress indicators in the UI to reinforce continued practice
 
 ## Tech Stack
 
@@ -119,6 +120,19 @@ Primary session loop:
 `ASK_QUESTION -> WAIT_FOR_ANSWER -> EVALUATE_ANSWER -> FOLLOW_UP`
 
 This repeats per question and ends in `ENDED`.
+
+## Interview Content Sources
+
+- Standard interview topics come from curated knowledge files under `interview-mcp/data/knowledge/*.md`
+- Scoped interviews come from user-provided content such as a README, architecture doc, or project spec
+- Exercises live under `interview-mcp/data/knowledge/exercises/<topic>/` and can feed follow-up scoped interviews
+
+## Knowledge Content Structure
+
+- Knowledge files include a topic summary, interview questions, evaluation criteria, and concept clusters
+- Topics may also include `Warm-up Quests` as a lightweight quiz layer before the main interview questions
+- Interview questions are organized with explicit difficulty levels such as foundation, intermediate, and advanced so the app can present a clearer progression
+- Warm-up content uses simple level-based progression in the knowledge files, for example `Level 0`, before deeper interview questions
 
 ## Learning System Context
 

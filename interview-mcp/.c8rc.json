@@ -22,7 +22,16 @@
     "src/db/importJsonData.ts",
     "src/db/migrate.ts",
     "src/db/rebuildGraph.ts",
-    "src/db/rescheduleFlashcards.ts"
+    "src/db/rescheduleFlashcards.ts",
+    "src/knowledge/index.ts",
+    "src/knowledge/port.ts",
+    "src/repositories/exerciseRepository.ts",
+    "src/repositories/flashcardRepository.ts",
+    "src/repositories/graphRepository.ts",
+    "src/repositories/index.ts",
+    "src/repositories/mistakeRepository.ts",
+    "src/repositories/sessionRepository.ts",
+    "src/repositories/skillRepository.ts"
   ],
   "check-coverage": true,
   "lines": 50,

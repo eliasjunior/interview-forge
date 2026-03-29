@@ -9,7 +9,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema.js";
 import { createSqliteClient } from "../db/client.js";
 import { createSqliteRepositories } from "../db/repositories/createRepositories.js";
-import type { Flashcard, KnowledgeGraph, Session } from "@mock-interview/shared";
+import type { Exercise, Flashcard, KnowledgeGraph, Mistake, Session, Skill } from "@mock-interview/shared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.resolve(__dirname, "../../drizzle");
@@ -104,6 +104,61 @@ function makeGraph(): KnowledgeGraph {
       },
     ],
     sessions: ["session-1"],
+  };
+}
+
+function makeSkill(overrides: Partial<Skill> = {}): Skill {
+  return {
+    id: "skill-1",
+    name: "Thread Pool Sizing",
+    confidence: 2,
+    subSkills: [
+      { name: "CPU-bound sizing", confidence: 2 },
+      { name: "IO-bound sizing", confidence: 1 },
+    ],
+    relatedProblems: ["job queue saturation", "worker starvation"],
+    createdAt: "2026-03-01T10:12:00.000Z",
+    updatedAt: "2026-03-01T10:12:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeMistake(overrides: Partial<Mistake> = {}): Mistake {
+  return {
+    id: "mistake-1",
+    mistake: "Explained concurrency without separating CPU-bound and IO-bound work.",
+    pattern: "Happens when discussing thread pools or async throughput tuning.",
+    fix: "Classify the workload first, then size workers and queues with that model.",
+    topic: "Java concurrency",
+    createdAt: "2026-03-01T10:13:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
+  return {
+    id: "exercise-1",
+    name: "Thread Pool Capacity Lab",
+    slug: "thread-pool-capacity-lab",
+    topic: "java-concurrency",
+    language: "java",
+    difficulty: 3,
+    description: "Tune worker and queue settings for a background job processor.",
+    scenario: "A service processes email jobs under bursty traffic.",
+    problemMeaning: [
+      "Avoid throughput collapse under bursts.",
+      "Balance latency against queue growth.",
+    ],
+    tags: ["concurrency", "thread-pool", "capacity"],
+    prerequisites: [
+      {
+        name: "Producer Consumer Basics",
+        reason: "You need queue semantics before tuning throughput.",
+      },
+    ],
+    filePath: "java-concurrency/thread-pool-capacity-lab.md",
+    createdAt: "2026-03-01T10:14:00.000Z",
+    ...overrides,
   };
 }
 
@@ -240,6 +295,88 @@ describe("sqlite repositories", () => {
     }
   });
 
+  test("session repository saveMany upserts nested records and deleteById removes a session", () => {
+    const { sqlite, repositories } = setupRepositories();
+
+    try {
+      const original = makeSession({
+        id: "session-save-many-a",
+        topic: "Java concurrency",
+        questions: ["Original question"],
+        messages: [
+          { role: "interviewer", content: "Original prompt", timestamp: "2026-03-01T10:00:00.000Z" },
+        ],
+        evaluations: [
+          {
+            questionIndex: 0,
+            question: "Original question",
+            answer: "Original answer",
+            score: 2,
+            feedback: "Needs more detail.",
+            needsFollowUp: true,
+            followUpQuestion: "What would you change?",
+          },
+        ],
+        concepts: [{ word: "throughput", cluster: "performance" }],
+      });
+      const secondary = makeSession({
+        id: "session-save-many-b",
+        topic: "JVM internals",
+        createdAt: "2026-03-02T09:00:00.000Z",
+        endedAt: "2026-03-02T09:20:00.000Z",
+        messages: [],
+        evaluations: [],
+        concepts: [],
+      });
+
+      repositories.sessions.saveMany([original, secondary]);
+
+      const updatedOriginal = makeSession({
+        ...original,
+        topic: "Advanced Java concurrency",
+        currentQuestionIndex: 1,
+        questions: ["Updated question 1", "Updated question 2"],
+        messages: [
+          { role: "interviewer", content: "Updated prompt", timestamp: "2026-03-01T10:03:00.000Z" },
+          { role: "candidate", content: "Updated answer", timestamp: "2026-03-01T10:04:00.000Z" },
+        ],
+        evaluations: [
+          {
+            questionIndex: 1,
+            question: "Updated question 2",
+            answer: "Updated answer",
+            score: 4,
+            feedback: "Much clearer.",
+            needsFollowUp: false,
+            strongAnswer: "Tie sizing to workload characteristics.",
+          },
+        ],
+        concepts: [{ word: "backpressure", cluster: "reliability" }],
+        summary: "Updated summary",
+      });
+
+      repositories.sessions.saveMany([updatedOriginal]);
+
+      assert.deepEqual(
+        normalizeSession(repositories.sessions.getById(updatedOriginal.id)),
+        normalizeSession(updatedOriginal)
+      );
+      assert.deepEqual(
+        repositories.sessions.list().map((session) => normalizeSession(session)),
+        [updatedOriginal, secondary].map((session) => normalizeSession(session))
+      );
+      assert.equal(repositories.sessions.deleteById("missing-session"), false);
+      assert.equal(repositories.sessions.deleteById(secondary.id), true);
+      assert.equal(repositories.sessions.getById(secondary.id), null);
+      assert.deepEqual(
+        repositories.sessions.list().map((session) => normalizeSession(session)),
+        [updatedOriginal].map((session) => normalizeSession(session))
+      );
+    } finally {
+      sqlite.close();
+    }
+  });
+
   test("flashcard repository replaceAll removes old rows and keeps source mapping intact", () => {
     const { sqlite, repositories } = setupRepositories();
 
@@ -265,6 +402,190 @@ describe("sqlite repositories", () => {
       assert.deepEqual(
         repositories.flashcards.list().map((flashcard) => normalizeFlashcard(flashcard)),
         [newCard].map((flashcard) => normalizeFlashcard(flashcard))
+      );
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("flashcard repository saveMany upserts cards and deleteBySourceSessionId removes related rows", () => {
+    const { sqlite, repositories } = setupRepositories();
+
+    try {
+      const firstSession = makeSession({ id: "session-source-a" });
+      const secondSession = makeSession({
+        id: "session-source-b",
+        topic: "JVM internals",
+        createdAt: "2026-03-02T09:59:00.000Z",
+        endedAt: "2026-03-02T10:10:00.000Z",
+      });
+
+      repositories.sessions.save(firstSession);
+      repositories.sessions.save(secondSession);
+
+      const firstCard = makeFlashcard({
+        id: "fc-many-a",
+        tags: ["queues", "throughput"],
+        source: {
+          sessionId: firstSession.id,
+          questionIndex: 0,
+          originalScore: 2,
+        },
+      });
+      const secondCard = makeFlashcard({
+        id: "fc-many-b",
+        createdAt: "2026-03-01T10:12:00.000Z",
+        dueDate: "2026-03-03T10:12:00.000Z",
+        topic: "JVM internals",
+        tags: ["jvm", "memory"],
+        source: {
+          sessionId: secondSession.id,
+          questionIndex: 1,
+          originalScore: 3,
+        },
+      });
+
+      repositories.flashcards.saveMany([firstCard, secondCard]);
+
+      const updatedFirstCard = {
+        ...firstCard,
+        back: "Updated explanation with queue saturation details.",
+        tags: ["queues", "saturation"],
+        lastReviewedAt: "2026-03-02T08:00:00.000Z",
+      };
+
+      repositories.flashcards.saveMany([updatedFirstCard]);
+
+      assert.deepEqual(
+        normalizeFlashcard(repositories.flashcards.getById(updatedFirstCard.id)),
+        normalizeFlashcard(updatedFirstCard)
+      );
+      assert.equal(repositories.flashcards.deleteBySourceSessionId("missing-session"), 0);
+      assert.equal(repositories.flashcards.deleteBySourceSessionId(firstSession.id), 1);
+      assert.equal(repositories.flashcards.getById(updatedFirstCard.id), null);
+      assert.deepEqual(
+        repositories.flashcards.list().map((flashcard) => normalizeFlashcard(flashcard)),
+        [secondCard].map((flashcard) => normalizeFlashcard(flashcard))
+      );
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("skill repository lists, filters, finds, and updates persisted skills", () => {
+    const { sqlite, repositories } = setupRepositories();
+
+    try {
+      const lowerConfidence = makeSkill();
+      const higherConfidence = makeSkill({
+        id: "skill-2",
+        name: "Lock Contention Diagnostics",
+        confidence: 4,
+        subSkills: [{ name: "contention tracing", confidence: 4 }],
+        relatedProblems: ["deadlock debugging"],
+        createdAt: "2026-03-01T10:15:00.000Z",
+        updatedAt: "2026-03-01T10:15:00.000Z",
+      });
+
+      repositories.skills.insert(higherConfidence);
+      repositories.skills.insert(lowerConfidence);
+
+      assert.deepEqual(repositories.skills.list(), [lowerConfidence, higherConfidence]);
+      assert.deepEqual(repositories.skills.list(2), [lowerConfidence]);
+      assert.equal(repositories.skills.findByName("missing"), null);
+      assert.deepEqual(repositories.skills.findByName(lowerConfidence.name), lowerConfidence);
+
+      const updated = {
+        ...lowerConfidence,
+        confidence: 5,
+        subSkills: [{ name: "CPU-bound sizing", confidence: 5 }],
+        relatedProblems: ["bounded queues", "backpressure"],
+        updatedAt: "2026-03-02T08:00:00.000Z",
+      };
+
+      repositories.skills.update(updated);
+
+      assert.deepEqual(repositories.skills.findByName(updated.name), updated);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("mistake repository stores optional topics and filters by topic", () => {
+    const { sqlite, repositories } = setupRepositories();
+
+    try {
+      const concurrencyMistake = makeMistake();
+      const untaggedMistake = makeMistake({
+        id: "mistake-2",
+        topic: undefined,
+        createdAt: "2026-03-01T10:14:00.000Z",
+      });
+
+      repositories.mistakes.insert(untaggedMistake);
+      repositories.mistakes.insert(concurrencyMistake);
+
+      assert.deepEqual(repositories.mistakes.list(), [concurrencyMistake, untaggedMistake]);
+      assert.deepEqual(repositories.mistakes.list("Java concurrency"), [concurrencyMistake]);
+      assert.deepEqual(repositories.mistakes.list("missing-topic"), []);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("exercise repository finds records and applies difficulty, topic, and tag filters", () => {
+    const { sqlite, repositories } = setupRepositories();
+
+    try {
+      const mediumExercise = makeExercise();
+      const easyExercise = makeExercise({
+        id: "exercise-2",
+        name: "Producer Consumer Warmup",
+        slug: "producer-consumer-warmup",
+        difficulty: 2,
+        topic: "java-concurrency",
+        tags: ["concurrency", "queue"],
+        prerequisites: [],
+        filePath: "java-concurrency/producer-consumer-warmup.md",
+        createdAt: "2026-03-01T10:10:00.000Z",
+      });
+      const otherTopicExercise = makeExercise({
+        id: "exercise-3",
+        name: "LRU Cache Basics",
+        slug: "lru-cache-basics",
+        topic: "data-structures",
+        difficulty: 1,
+        tags: ["cache", "map"],
+        prerequisites: [],
+        filePath: "data-structures/lru-cache-basics.md",
+        createdAt: "2026-03-01T10:16:00.000Z",
+      });
+
+      repositories.exercises.insert(mediumExercise);
+      repositories.exercises.insert(easyExercise);
+      repositories.exercises.insert(otherTopicExercise);
+
+      assert.deepEqual(repositories.exercises.findByName(mediumExercise.name), mediumExercise);
+      assert.deepEqual(repositories.exercises.findBySlug(easyExercise.slug), easyExercise);
+      assert.equal(repositories.exercises.findByName("missing"), null);
+      assert.equal(repositories.exercises.findBySlug("missing"), null);
+      assert.deepEqual(
+        repositories.exercises.list(),
+        [otherTopicExercise, easyExercise, mediumExercise]
+      );
+      assert.deepEqual(repositories.exercises.list("java-concurrency"), [easyExercise, mediumExercise]);
+      assert.deepEqual(
+        repositories.exercises.list(undefined, 2),
+        [otherTopicExercise, easyExercise]
+      );
+      assert.deepEqual(repositories.exercises.list("java-concurrency", 2), [easyExercise]);
+      assert.deepEqual(
+        repositories.exercises.list(undefined, undefined, ["concurrency", "queue"]),
+        [easyExercise]
+      );
+      assert.deepEqual(
+        repositories.exercises.list("java-concurrency", undefined, ["concurrency", "capacity"]),
+        [mediumExercise]
       );
     } finally {
       sqlite.close();

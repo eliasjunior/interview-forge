@@ -9,6 +9,7 @@ export type {
   KnowledgeGraph,
   Flashcard,
   FlashcardDifficulty,
+  Mistake,
 } from "@mock-interview/shared";
 import type {
   InterviewState,
@@ -18,6 +19,7 @@ import type {
   KnowledgeGraph,
   Flashcard,
   FlashcardDifficulty,
+  Mistake,
 } from "@mock-interview/shared";
 import {
   canonicalizeConceptWord,
@@ -188,6 +190,134 @@ export function buildReport(session: Session): string {
   }
 
   return lines.join("\n");
+}
+
+const RECOMMENDATION_SCORE_THRESHOLD = 4;
+
+export interface EndInterviewRecommendations {
+  weakAreasDetected: boolean;
+  recommendedActions: string[];
+  drill: null | {
+    available: boolean;
+    tool: "start_drill";
+    args: {
+      topic: string;
+      sessionId: string;
+    };
+    weakQuestionCount: number;
+    reason: string;
+  };
+  deepExplanation: null | {
+    available: boolean;
+    mode: "deep_explanation";
+    reason: string;
+    focusAreas: Array<{
+      question: string;
+      score: number;
+      gap: string;
+      strongAnswer?: string;
+    }>;
+    mistakePatterns: Array<{
+      mistake: string;
+      pattern: string;
+      fix: string;
+    }>;
+    prompt: string;
+  };
+}
+
+function summarizeGap(feedback: string): string {
+  const normalized = feedback.replace(/\s+/g, " ").trim();
+  if (!normalized) return "Needs a deeper explanation of the underlying model and tradeoffs.";
+  return normalized.length <= 180 ? normalized : `${normalized.slice(0, 177)}...`;
+}
+
+function dedupeWeakEvaluations(session: Session): Evaluation[] {
+  const weakByIndex = new Map<number, Evaluation>();
+  for (const evaluation of session.evaluations) {
+    if (evaluation.score >= RECOMMENDATION_SCORE_THRESHOLD) continue;
+    const existing = weakByIndex.get(evaluation.questionIndex);
+    if (!existing || evaluation.score < existing.score) {
+      weakByIndex.set(evaluation.questionIndex, evaluation);
+    }
+  }
+  return Array.from(weakByIndex.values()).sort((a, b) => a.score - b.score);
+}
+
+export function buildEndInterviewRecommendations(
+  session: Session,
+  mistakes: Mistake[],
+): EndInterviewRecommendations {
+  const weakEvaluations = dedupeWeakEvaluations(session);
+  const focusAreas = weakEvaluations.slice(0, 3).map((evaluation) => ({
+    question: evaluation.question,
+    score: evaluation.score,
+    gap: summarizeGap(evaluation.feedback),
+    strongAnswer: evaluation.strongAnswer,
+  }));
+  const mistakePatterns = mistakes.slice(0, 3).map((mistake) => ({
+    mistake: mistake.mistake,
+    pattern: mistake.pattern,
+    fix: mistake.fix,
+  }));
+
+  const recommendedActions: string[] = [];
+  if (weakEvaluations.length > 0) recommendedActions.push("start_drill");
+  if (focusAreas.length > 0 || mistakePatterns.length > 0) recommendedActions.push("deep_explanation");
+
+  const deepExplanationPromptParts = [
+    `Explain ${session.topic} in depth for interview preparation.`,
+    "For each weak area, cover the mental model, why it matters, tradeoffs, common mistakes, and when to use it.",
+  ];
+
+  if (focusAreas.length > 0) {
+    deepExplanationPromptParts.push(
+      `Weak areas:\n${focusAreas.map((item, index) =>
+        `${index + 1}. Question: ${item.question}\n   Gap: ${item.gap}${
+          item.strongAnswer ? `\n   Strong answer: ${item.strongAnswer}` : ""
+        }`
+      ).join("\n")}`
+    );
+  }
+
+  if (mistakePatterns.length > 0) {
+    deepExplanationPromptParts.push(
+      `Known mistake patterns:\n${mistakePatterns.map((item, index) =>
+        `${index + 1}. Mistake: ${item.mistake}\n   Pattern: ${item.pattern}\n   Fix: ${item.fix}`
+      ).join("\n")}`
+    );
+  }
+
+  return {
+    weakAreasDetected: weakEvaluations.length > 0 || mistakePatterns.length > 0,
+    recommendedActions,
+    drill: weakEvaluations.length > 0
+      ? {
+          available: true,
+          tool: "start_drill",
+          args: {
+            topic: session.topic,
+            sessionId: session.id,
+          },
+          weakQuestionCount: weakEvaluations.length,
+          reason:
+            weakEvaluations.length === 1
+              ? "One weak answer was detected. A drill can revisit it immediately."
+              : `${weakEvaluations.length} weak answers were detected. A drill can target them directly.`,
+        }
+      : null,
+    deepExplanation: focusAreas.length > 0 || mistakePatterns.length > 0
+      ? {
+          available: true,
+          mode: "deep_explanation",
+          reason:
+            "The candidate showed gaps that would benefit from a teaching pass focused on mental models, tradeoffs, and when to use the subject correctly.",
+          focusAreas,
+          mistakePatterns,
+          prompt: deepExplanationPromptParts.join("\n\n"),
+        }
+      : null,
+  };
 }
 
 // ─────────────────────────────────────────────

@@ -28,15 +28,28 @@ const LEVEL_LABEL: Record<WarmUpLevel, string> = {
   4: "Jedi Ready",
 };
 
+const POOL_EXHAUSTED_PREAMBLE =
+  "IMPORTANT: Check `freshQuestionsSelected` in this response before presenting any question. " +
+  "If it is 0, ALL questions are repeats from a previous session — do NOT silently proceed. " +
+  "Pause and tell the candidate: 'All questions at this level have already been asked in a previous session.' " +
+  "Then offer three options: " +
+  "(1) Proceed anyway with the repeat questions, " +
+  "(2) Advance to the next level with start_warm_up { topic, level: <current+1> }, " +
+  "(3) Jump straight to a full interview with start_interview { topic }. " +
+  "Wait for the candidate's choice before calling ask_question. ";
+
 const LEVEL_INSTRUCTION: Record<0 | 1 | 2, string> = {
-  0: "Present each MCQ question with its choices. Wait for the candidate to pick an option letter (A/B/C/D). " +
+  0: POOL_EXHAUSTED_PREAMBLE +
+     "Present each MCQ question with its choices. Wait for the candidate to pick an option letter (A/B/C/D). " +
      "After they answer, call evaluate_answer — it will auto-score based on the correct answer. " +
      "Encourage the candidate; frame errors as learning moments, not failures.",
-  1: "Present each advanced MCQ question with its choices. Some questions may have multiple correct answers. " +
+  1: POOL_EXHAUSTED_PREAMBLE +
+     "Present each advanced MCQ question with its choices. Some questions may have multiple correct answers. " +
      "Ask the candidate to answer with option letters like A or A,C, or use ALL / NONE when appropriate. " +
      "Call evaluate_answer — it will auto-score based on the authored answer key. " +
      "Keep the tone calm, but make the candidate justify subtle distinctions when they miss one.",
-  2: "Present each guided question along with its scaffolding hint. " +
+  2: POOL_EXHAUSTED_PREAMBLE +
+     "Present each guided question along with its scaffolding hint. " +
      "Encourage the candidate to use the provided structure. " +
      "Call evaluate_answer with your assessment of how well they followed the structure and hit the key concepts. " +
      "Score range: 1 (blank) → 3 (partial) → 5 (structured and complete).",
@@ -56,18 +69,19 @@ function shuffled<T>(arr: T[]): T[] {
 function selectWarmupQuestions(
   items: import("../knowledge/port.js").WarmUpQuestion[],
   pastAskCounts: Map<string, number>,
+  recentSet: Set<string>,
   maxQuestions = MAX_WARMUP_QUESTIONS,
 ): import("../knowledge/port.js").WarmUpQuestion[] {
-  if (items.length <= maxQuestions) return items;
-
   const candidates = items.map((item, index) => ({
     item,
     index,
     timesAsked: pastAskCounts.get(item.question) ?? 0,
+    recentlyAsked: recentSet.has(item.question),
   }));
 
-  // Least-asked first; shuffle ties so the subset varies across sessions
+  // Recently-asked last; then least-asked first; shuffle ties so the subset varies
   candidates.sort((a, b) => {
+    if (a.recentlyAsked !== b.recentlyAsked) return a.recentlyAsked ? 1 : -1;
     if (a.timesAsked !== b.timesAsked) return a.timesAsked - b.timesAsked;
     return Math.random() - 0.5;
   });
@@ -228,7 +242,8 @@ export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {
 
       const id = deps.generateId();
       const format = FORMAT_BY_LEVEL[narrowedLevel];
-      const qs = selectWarmupQuestions(levelContent.questions, pastAskCounts);
+      const recentSet = new Set(previouslyAskedQuestions);
+      const qs = selectWarmupQuestions(levelContent.questions, pastAskCounts, recentSet);
 
       const session: Session = {
         id,
@@ -253,6 +268,9 @@ export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {
       sessions[id] = session;
       deps.saveSessions(sessions);
 
+      const freshQuestionsSelected = qs.filter((q) => !pastAskCounts.has(q.question)).length;
+      const poolExhausted = freshQuestionsSelected === 0;
+
       return {
         content: [{
           type: "text" as const,
@@ -265,7 +283,13 @@ export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {
             totalQuestions: qs.length,
             state: session.state,
             previouslyAskedQuestions: previouslyAskedQuestions.length > 0 ? previouslyAskedQuestions : undefined,
-            freshQuestionsSelected: qs.filter((q) => !pastAskCounts.has(q.question)).length,
+            freshQuestionsSelected,
+            poolExhausted,
+            ...(poolExhausted && {
+              warning:
+                `All ${qs.length} questions at Level ${narrowedLevel} (${LEVEL_LABEL[narrowedLevel]}) have already been asked in a previous session. ` +
+                `Offer the candidate: (1) proceed with repeats, (2) advance to Level ${narrowedLevel + 1} warm-up, or (3) start a full interview.`,
+            }),
             instruction: LEVEL_INSTRUCTION[narrowedLevel],
             nextTool: "ask_question",
           }),
