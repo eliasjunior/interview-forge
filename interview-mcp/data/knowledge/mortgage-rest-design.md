@@ -1,114 +1,141 @@
 # REST API Design & Mortgage Service (Java + Spring Boot)
 
 ## Summary
-This exercise evaluates the ability to design and implement a simple RESTful service using Java and Spring Boot, focusing on API design, in-memory data modeling, and applying business rules. The system exposes two endpoints: one for retrieving mortgage interest rates and another for checking mortgage feasibility.
-
-The application initializes a list of mortgage rates in memory at startup. The `GET /api/interest-rates` endpoint returns available rates, while `POST /api/mortgage-check` evaluates whether a mortgage is feasible based on business constraints and calculates monthly costs.
-
-Key aspects include proper REST design, input validation, domain modeling, separation of concerns (controller/service), and handling financial calculations accurately. Advanced questions probe scalability, versioning, observability, resilience, and distributed-system concerns.
-
----
+This topic evaluates whether a senior backend engineer can reason clearly about a deliberately simple but production-minded Spring Boot service. A strong candidate should be able to explain why the current design is readable and maintainable, defend choices like layered responsibilities, `BigDecimal`, immutable records, and explicit exception handling, and also identify where an MVP should evolve next without over-engineering the first version.
 
 ## Questions
+1. The README treats `MortgageRateProvider` as the main seam in the system. Why is that a good design choice here, and what would you watch out for if the in-memory provider were replaced by an external service?
 
-1. How would you design a Spring Boot application exposing:
-   - `GET /api/interest-rates`
-   - `POST /api/mortgage-check`?
+   ```java
+   public interface MortgageRateProvider {
+       List<MortgageRate> getRates();
+   }
+   ```
 
-2. How would you model the domain objects for:
-   - MortgageRate
-   - MortgageCheckRequest
-   - MortgageCheckResponse?
+   ```java
+   @Component
+   public class InMemoryMortgageRateProvider implements MortgageRateProvider {
+       @Override
+       public List<MortgageRate> getRates() {
+           return rates;
+       }
+   }
+   ```
 
-3. How do you initialize in-memory data on application startup in Spring Boot?
+2. Review the mortgage calculation below. What is correct about this implementation for an MVP, what assumptions is it making, and how would you explain the gap between this formula and a real mortgage amortization model?
 
-4. Walk me through how you would implement the mortgage feasibility logic.
+   ```java
+   private BigDecimal calculateMonthlyCosts(BigDecimal loanValue, BigDecimal annualRatePercent) {
+       return loanValue
+               .multiply(annualRatePercent)
+               .divide(HUNDRED.multiply(MONTHS_IN_YEAR), 2, RoundingMode.HALF_UP);
+   }
+   ```
 
-5. How would you calculate monthly mortgage costs?
+3. The API returns `200 OK` for an infeasible mortgage, but `422` when there is no interest rate for the requested maturity period. Do you agree with that contract? Explain the distinction between business outcomes, validation failures, and domain errors in this service.
 
-6. How would you validate incoming request data in Spring Boot?
+4. Evaluate the request model and error handling choices in this code. What is good, what is still too loose for a robust backend, and what would you change first?
 
-7. How would you structure the application layers (controller, service, etc.)?
+   ```java
+   public record MortgageCheckRequest(
+           @NotNull @Positive BigDecimal income,
+           @NotNull @Positive Integer maturityPeriod,
+           @NotNull @Positive BigDecimal loanValue,
+           @NotNull @Positive BigDecimal homeValue
+   ) {}
+   ```
 
-8. What edge cases or failure scenarios would you handle?
+   ```java
+   @ExceptionHandler(MaturityPeriodNotFoundException.class)
+   public ResponseEntity<ProblemDetail> handleMaturityPeriodNotFound(
+           MaturityPeriodNotFoundException ex, HttpServletRequest request) {
+       ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+       problem.setTitle("Maturity Period Not Found");
+       problem.setInstance(URI.create(request.getRequestURI()));
+       problem.setProperty("timestamp", Instant.now());
+       return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+               .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+               .body(problem);
+   }
+   ```
 
-9. How would you design the API contract so it remains maintainable as new mortgage rules, fields, and response details are introduced over time?
+5. The README emphasizes "solve the problem clearly, nothing more" while still documenting future evolution points like caching, circuit breakers, auth, rate limiting, and DTOs. How do you decide what belongs in the first version of a backend service versus what should remain an explicit future concern?
 
-10. How would you structure the code so business rules, calculation logic, and transport concerns can evolve independently without creating a tightly coupled service?
+6. Look at the controller and service split below. Is the separation of responsibilities good enough for this service? What signals would tell you the controller layer is becoming too thin, too smart, or unnecessarily ceremonial?
 
-11. If this service becomes heavily used by multiple clients, what changes would you make to improve scalability, reliability, and operational robustness?
+   ```java
+   @PostMapping("/mortgage-check")
+   public ResponseEntity<MortgageCheckResponse> checkMortgage(@Valid @RequestBody MortgageCheckRequest request) {
+       return ResponseEntity.ok(mortgageService.check(request));
+   }
+   ```
 
-12. How would you approach versioning and backward compatibility for this API once external consumers depend on it?
+   ```java
+   public MortgageCheckResponse check(MortgageCheckRequest request) {
+       MortgageRate rate = interestRateService.findByMaturityPeriod(request.maturityPeriod());
+       boolean feasible = isFeasible(request);
+       BigDecimal monthlyCosts = feasible
+               ? calculateMonthlyCosts(request.loanValue(), rate.interestRate())
+               : BigDecimal.ZERO;
+       return new MortgageCheckResponse(feasible, monthlyCosts);
+   }
+   ```
 
-13. What observability would you add to diagnose production issues in mortgage checks without exposing sensitive financial data?
+7. `InterestRateService.findByMaturityPeriod()` currently streams over the provider list and throws a typed exception if nothing matches. For this application, is that the right implementation? When would you keep it, and when would you redesign it?
 
-14. How would you test this service to give confidence in correctness, regression safety, and long-term maintainability as the codebase grows?
+   ```java
+   public MortgageRate findByMaturityPeriod(int maturityPeriod) {
+       return provider.getRates().stream()
+               .filter(r -> r.maturityPeriod() == maturityPeriod)
+               .findFirst()
+               .orElseThrow(() -> new MaturityPeriodNotFoundException(maturityPeriod));
+   }
+   ```
 
-15. What concurrency concerns would you evaluate if mortgage rates can be updated while requests are being processed, and how would you keep calculations consistent?
+8. Suppose the mortgage rates are moved to an external upstream that is slow, occasionally unavailable, and rate-limited. Design the next version of this component. Where would you put caching, retry behavior, circuit breaking, timeouts, observability, and fallback logic, and what failure modes would you expose to API consumers?
 
-16. How would you design this service to remain resilient if a downstream dependency, such as a rate source or audit system, becomes slow or unavailable?
+9. The README calls out several security and operational gaps: open endpoints, no rate limiting, permissive validation boundaries, and actuator exposure. If this service were going live next month, what would you prioritize first, and why? Be specific about risk, implementation order, and what you would defer.
 
-17. How would you implement centralized error handling so clients receive consistent error responses while the code stays maintainable?
+10. Right now the domain records are also used as HTTP contract models. Imagine the business now asks for API versioning, an external rate source, auditability, and a more realistic payment calculation, while keeping current clients stable. How would you evolve this codebase without losing the simplicity that makes it maintainable today?
 
-18. What failure modes would you expect under load, and how would you protect the service from cascading failures or resource exhaustion?
+11. The README says the current `monthlyCosts` formula is an explicit assumption and that only `MortgageService.calculateMonthlyCosts()` should need to change when the business clarifies the rule. How would you validate whether that boundary is still good enough once amortization, fees, insurance, or country-specific lending rules are introduced?
 
-19. If multiple instances of this service are deployed, what design decisions become important to preserve correctness, predictability, and operability?
+12. The README intentionally delays a DTO layer until the API and domain no longer match. Walk through the decision point where you would introduce `controller/dto` classes here. What concrete changes in requirements would justify that move, and how would you add DTOs without creating unnecessary mapping ceremony?
 
-20. How would you decide which errors should be retried, which should fail fast, and which should be surfaced as business validation errors?
-
----
+13. The `Known Evolution Points` section says resilience concerns like caching and circuit breaking should be added directly to the external provider implementation. Do you agree with that placement? Explain how you would keep resilience close to the integration boundary without leaking infrastructure behavior into the domain and service layers.
 
 ## Difficulty
-
 - Question 1: foundation
-- Question 2: foundation
-- Question 3: foundation
-- Question 4: foundation
-- Question 5: foundation
+- Question 2: intermediate
+- Question 3: intermediate
+- Question 4: advanced
+- Question 5: advanced
 - Question 6: intermediate
 - Question 7: intermediate
-- Question 8: intermediate
-- Question 9: intermediate
-- Question 10: intermediate
-- Question 11: intermediate
-- Question 12: intermediate
-- Question 13: intermediate
-- Question 14: intermediate
-- Question 15: intermediate
-- Question 16: advanced
-- Question 17: advanced
-- Question 18: advanced
-- Question 19: advanced
-- Question 20: advanced
-
----
+- Question 8: advanced
+- Question 9: advanced
+- Question 10: advanced
+- Question 11: advanced
+- Question 12: advanced
+- Question 13: advanced
 
 ## Evaluation Criteria
-
-- Question 1: Must define GET /api/interest-rates returning a list of rates and POST /api/mortgage-check accepting a request body and returning a result. Should follow REST conventions (resource naming, HTTP verbs, status codes). Bonus: versioning (/api/v1/...). Weak: unclear endpoint responsibilities or logic in the controller.
-- Question 2: Must define MortgageRate (maturityPeriod int, interestRate BigDecimal, lastUpdate timestamp), MortgageCheckRequest (income, maturityPeriod, loanValue, homeValue), MortgageCheckResponse (feasible boolean, monthlyCosts BigDecimal). Should prefer BigDecimal for monetary values. Weak: using double for money without justification.
-- Question 3: Must mention @PostConstruct, CommandLineRunner, or ApplicationRunner to initialize in-memory data (List or Map) at startup. Bonus: immutability or thread-safety. Weak: hardcoding in controller or lazy initialization.
-- Question 4: Must implement feasibility rules — loanValue <= 4 × income AND loanValue <= homeValue — and return feasible=false if any rule fails. Logic must live in the service layer. Bonus: extensible rule design (strategy pattern, validators). Weak: logic in controller or non-reusable.
-- Question 5: Must use an annuity-based mortgage formula considering interest rate and maturity period in months. Bonus: awareness of BigDecimal precision and rounding modes. Weak: naive division ignoring interest.
-- Question 6: Must use @Valid, @NotNull, @Positive on request fields and return 400 for invalid input. Bonus: custom validator annotations. Weak: no validation or manual if-checks scattered everywhere.
-- Question 7: Must define clear layers — Controller (HTTP handling), Service (business logic), optional Repository (not needed for in-memory). Should emphasize separation of concerns. Weak: fat controller or god-class service.
-- Question 8: Must consider zero/negative income, missing interest rate for given maturity, extremely large values (overflow), and rounding issues. Bonus: fallback/default strategy when no rate is found. Weak: no error handling for missing rate.
-- Question 9: Must mention versioned DTOs (separate request/response from domain), avoid leaking internal model to API, and design for additive changes. Bonus: API changelog or deprecation strategy. Weak: domain objects used directly as DTOs, changes break existing clients.
-- Question 10: Must propose separating business rules into a dedicated module or strategy, calculation logic into a pure function or value object, and keep controllers thin. Bonus: hexagonal/ports-and-adapters framing. Weak: all logic in the service or controller without clear seams.
-- Question 11: Must address statelessness (since data is in-memory), caching for rate lookups, load balancing, and rate limit considerations. Bonus: mentions distributed caching if persistence is added. Weak: just says "add more instances" without addressing shared state or in-memory rate consistency.
-- Question 12: Must mention URI versioning (/v1/, /v2/) or header-based versioning, maintaining old endpoints during a deprecation window, and communication strategy for consumers. Bonus: semantic versioning distinction between additive vs breaking changes. Weak: no plan for existing clients or no deprecation window.
-- Question 13: Must mention structured logging (MDC for correlation IDs), metrics (request count, latency, error rate), and masking of sensitive fields (income, loan values) in logs. Bonus: distributed tracing (Micrometer, OpenTelemetry). Weak: logging raw financial data or no structured log format.
-- Question 14: Must cover unit tests for business rules (feasibility, calculation), integration tests for endpoints (MockMvc or @SpringBootTest), and contract tests if external consumers exist. Bonus: parameterized tests for edge cases, mutation testing. Weak: only happy-path tests or no separation between unit and integration tests.
-- Question 15: Must identify the race condition between rate reads and updates on a shared in-memory list, and propose synchronization (ReadWriteLock, ConcurrentHashMap, immutable snapshots, or copy-on-write). Bonus: lock-free approaches or compare-and-swap. Weak: no awareness of thread safety or suggesting synchronized on the service method without justification.
-- Question 16: Must mention circuit breakers (Resilience4j), timeouts, fallback strategies (cached rates, degraded mode), and bulkhead patterns. Bonus: distinction between read and write paths and different resilience strategies for each. Weak: no timeout or fallback — just let requests hang.
-- Question 17: Must define a @ControllerAdvice / @ExceptionHandler returning a standardized error body (timestamp, status, message, path). Bonus: error code enum for machine-readable errors. Weak: inconsistent error formats per endpoint or exceptions leaking stack traces to clients.
-- Question 18: Must identify thread-pool exhaustion, connection pool saturation, and memory pressure from large request volumes. Propose bulkheads (thread pool isolation), rate limiting (Bucket4j, API gateway), and graceful degradation. Bonus: backpressure and queue bounding. Weak: no awareness of resource exhaustion or just scaling horizontally without protecting the service.
-- Question 19: Must address shared-nothing architecture for stateless paths, sticky session or distributed cache if any state must be shared, and health-check endpoints for load balancer integration. Bonus: distributed tracing across instances. Weak: assuming in-memory state is safe across instances without acknowledging the problem.
-- Question 20: Must distinguish retriable errors (transient network, 503 with Retry-After), fail-fast errors (invalid input, missing rate — 400/404), and business validation errors surfaced as 422 with details. Bonus: idempotency keys for retried mortgage checks. Weak: retrying on 400s or not distinguishing client vs server errors.
+- Question 1: A strong answer explains dependency inversion, stable service boundaries, testability, and how the provider isolates data-source changes from controllers and business logic. It should mention likely follow-ups for an external dependency such as timeouts, retries, caching, circuit breaking, monitoring, and failure semantics. A weak answer only says "interfaces are good" without tying the abstraction to this codebase. Bonus points for explaining why this seam is justified while broader abstractions would not be.
+- Question 2: A strong answer recognizes that `BigDecimal` and explicit rounding are correct for financial calculations, but also calls out that the current formula computes simple monthly interest rather than a full amortized payment. It should explain that the README intentionally documents this as an assumption and that only one method needs to change when the business clarifies the real rule. A weak answer either blindly accepts the formula as "the mortgage payment" or rejects it without acknowledging MVP scope. Bonus points for discussing precision, rounding policy ownership, and test cases around edge values.
+- Question 3: A strong answer distinguishes invalid input (`400`), unsupported but syntactically valid domain requests (`422`), and valid business outcomes (`200` with `feasible: false`). It should explain why infeasibility is part of normal business behavior, not a transport error. A weak answer collapses all failures into `400` or `500`, or treats every negative outcome as an exception. Bonus points for discussing API consumer ergonomics and contract clarity.
+- Question 4: A strong answer praises immutable request models, Bean Validation, and RFC 7807 problem responses, then identifies missing constraints such as realistic upper bounds, tighter maturity period limits, and possibly DTO separation if the API and domain diverge. It should also mention that robust systems need consistent error shapes, explicit media types, and careful exposure of details. A weak answer only repeats that validation exists without noticing current gaps. Bonus points for discussing versioning pressure, domain leakage, and why records are a good fit here.
+- Question 5: A strong answer shows judgment under uncertainty: keep the first version simple when requirements are stable and local, but document clear seams for scaling, resilience, and security as they become necessary. It should explain how to defer complexity responsibly rather than ignore it, using the README's evolution points as examples of intentional boundaries. A weak answer either over-engineers the MVP with speculative infrastructure or dismisses production concerns entirely. Bonus points for framing decisions in terms of cost of change, operational risk, and signal from actual requirements.
+- Question 6: A strong answer explains that the current controller is appropriately thin because HTTP concerns stay in the controller and business rules stay in the service. It should also recognize the failure modes on both sides: controllers that become orchestration-heavy and services that become dumping grounds for transport logic. A weak answer argues from dogma rather than this specific codebase. Bonus points for discussing when a separate application service, mapper, or DTO layer becomes justified.
+- Question 7: A strong answer says the current list scan is acceptable for a tiny fixed in-memory dataset, especially because readability beats premature optimization here. It should also explain the redesign triggers: larger datasets, repeated upstream calls, stricter latency goals, duplicate maturity periods, or a provider contract that should offer direct lookup semantics. A weak answer either overreacts to O(n) in a five-item list or ignores how the design would change under scale. Bonus points for discussing normalization, uniqueness guarantees, and whether lookup responsibility belongs in the provider or service.
+- Question 8: A strong answer places resilience primarily at the external integration boundary, not spread across controllers and core business logic. It should cover connection and read timeouts, bounded retries only for safe failure classes, caching with explicit TTLs, circuit breaking, metrics, structured logs, and clear API behavior when the upstream is unavailable or stale data is used. A weak answer throws infrastructure buzzwords at the problem without explaining ownership or failure semantics. Bonus points for discussing cache invalidation, startup behavior, and whether stale-but-recent data is acceptable.
+- Question 9: A strong answer prioritizes by concrete risk: authentication and authorization, endpoint exposure, rate limiting, and input hardening ahead of lower-value refinements. It should give an implementation order that reflects delivery reality and explain what can still safely wait. A weak answer treats every listed issue as equally urgent or proposes a broad platform rewrite. Bonus points for distinguishing application-layer controls from gateway or infrastructure controls.
+- Question 10: A strong answer proposes incremental evolution: introduce DTOs when API and domain diverge, preserve existing contracts, isolate new payment logic behind a dedicated policy or calculator, keep the provider seam intact, and add tests around compatibility boundaries. It should show how to change one axis at a time without turning the codebase into a framework. A weak answer jumps straight to a large rewrite or leaves everything coupled and hopes it holds. Bonus points for discussing migration strategy, contract tests, and where audit concerns should live.
+- Question 11: A strong answer explains that the current boundary is good because the calculation is isolated, but also tests whether new requirements would overload a single service method. It should describe when to extract a dedicated calculator or policy abstraction, how to preserve contract stability, and how to separate business rules from financial formulas as complexity grows. A weak answer either keeps everything in one method forever or introduces a full pricing engine prematurely. Bonus points for discussing test strategy around regulatory variants, rounding ownership, and backward compatibility.
+- Question 12: A strong answer identifies concrete triggers for DTOs: hidden internal fields, renamed public fields, multiple API versions, or divergent validation and serialization needs. It should propose a measured introduction where mapping happens at the edge and domain code remains clean, rather than spreading translation logic everywhere. A weak answer says DTOs are always required or never required. Bonus points for discussing mapper scope, compatibility testing, and how to avoid duplicating business validation across layers.
+- Question 13: A strong answer agrees that resilience belongs near the external dependency boundary because that is where latency, retryability, stale data, and fallback semantics are known. It should explain how to expose clean domain-level failures upward while keeping annotations, clients, caches, and circuit breakers out of core business logic. A weak answer either scatters resilience across the whole stack or ignores the need to localize integration concerns. Bonus points for discussing how provider contracts change when stale or fallback data is allowed.
 
 ## Concepts
-
-- core concepts: rest-api, spring-boot, controller, service-layer, domain-modeling, validation, dependency-injection
-- practical usage: commandlinerunner, postconstruct, bean-lifecycle, requestbody, responseentity, bigdecimal, exception-handling
-- tradeoffs: in-memory-vs-persistent-storage, precision-vs-performance, simplicity-vs-extensibility, stateless-vs-stateful, retry-vs-fail-fast
-- best practices: separation-of-concerns, validate-input, use-bigdecimal-for-money, keep-controllers-thin, design-for-testability, version-your-api, mask-sensitive-data-in-logs, circuit-breaker-pattern
+- core concepts: layered architecture, dependency inversion, domain boundaries, immutability, financial precision, API contracts, evolutionary design
+- practical usage: Spring Boot, Bean Validation, Problem Details, provider abstraction, service orchestration, resilience patterns, edge mapping
+- tradeoffs: MVP scope, abstraction cost, simple interest vs amortization, direct domain exposure, open endpoints, lookup design, DTO timing
+- best practices: explicit contracts, typed exceptions, coverage gates, narrow seams, documented evolution points, incremental hardening, localized integration concerns

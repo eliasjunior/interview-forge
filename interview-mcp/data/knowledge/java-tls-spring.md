@@ -139,17 +139,17 @@ Answer: D
 
 1. Which statements about Java keystores and truststores are correct?
 A) A keystore is about local identity material
-B) A truststore is about what peers are trusted
+B) A truststore is only needed by outbound HTTP clients
 C) An mTLS server may need both
 D) They serve exactly the same purpose
-Answer: A,B,C
+Answer: A,C
 
 2. Which statements about PKCS12 and JKS are correct?
 A) Both are store formats
 B) PKCS12 is broadly interoperable beyond Java
-C) JKS is the only valid modern choice
+C) JKS is still supported in many existing Java deployments
 D) Teams often prefer PKCS12 today
-Answer: A,B,D
+Answer: A,B,C,D
 
 3. Which `keytool` tasks are useful for a backend engineer?
 A) Listing aliases and certificates
@@ -162,8 +162,8 @@ Answer: A,B,C
 A) Inbound server TLS and outbound client TLS are separate configuration concerns
 B) `server.ssl.*` mainly covers inbound server behavior
 C) mTLS usually requires client-auth configuration
-D) One property automatically fixes both inbound and outbound TLS for all cases
-Answer: A,B,C
+D) Outbound Java clients often need their own TLS configuration beyond `server.ssl.*`
+Answer: A,B,C,D
 
 5. Which statements about Java certificate validation are correct?
 A) Java tries to build a chain to trusted CA material
@@ -175,37 +175,37 @@ Answer: A,B,C
 6. Which statements about debugging are correct?
 A) `openssl s_client -showcerts` helps inspect what the peer actually serves
 B) `curl -v` can help test the handshake path
-C) Disabling validation is the best first diagnostic step
+C) JVM TLS debug logs can show which certificate chain or trust decision caused the failure
 D) JVM debug logs help reveal Java-specific trust decisions
-Answer: A,B,D
+Answer: A,B,C,D
 
 7. Which statements about mTLS clients are correct?
 A) They need to trust the server certificate chain
-B) They can ignore alias and store-type mismatches
+B) Alias or store-type mismatches can stop the client from presenting the intended certificate correctly
 C) They should usually keep verification enabled
 D) They need their own identity material to present
-Answer: A,C,D
+Answer: A,B,C,D
 
 8. Which statements about rotation are correct?
 A) New trust material may need to be rolled out before a new cert is used
-B) Rotation is only about replacing one file on disk
+B) Rotation often involves coordinated changes to identity material, trust material, and reload behavior
 C) Java applications may need a reload or restart strategy depending on how secrets are consumed
 D) Overlapping validity reduces risk
-Answer: A,C,D
+Answer: A,B,C,D
 
 9. Which statements about common Java TLS mistakes are correct?
-A) The JVM default truststore always contains internal enterprise CAs
+A) The JVM default truststore often does not contain internal enterprise CAs
 B) Forgetting intermediate CAs is common
 C) Disabling hostname verification is risky
 D) Importing the wrong certificate into the wrong store is common
-Answer: B,C,D
+Answer: A,B,C,D
 
 10. Which statements about app-level TLS versus mesh/gateway TLS are correct?
-A) One approach is always correct for every Java system
+A) The right termination point depends on trust boundaries and operational ownership
 B) Mesh or gateway termination can centralize operational responsibility
 C) Zero-trust requirements may push teams toward stronger internal mTLS
 D) App-level TLS gives the application direct control over certificates
-Answer: B,C,D
+Answer: A,B,C,D
 
 ### Level 2
 

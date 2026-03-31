@@ -367,6 +367,10 @@ function buildFlashcardBack(e: Evaluation): string {
  * Returns an empty array if there are no weak evaluations.
  */
 export function generateFlashcards(session: Session): Flashcard[] {
+  if (session.sessionKind === "warmup" && (session.questLevel === 0 || session.questLevel === 1)) {
+    return [];
+  }
+
   // Deduplicate by questionIndex — keep the evaluation with the lowest score
   const weakByIndex = new Map<number, Evaluation>();
   for (const e of session.evaluations) {

@@ -114,6 +114,10 @@ function createSpyRepositories() {
       findBySlug: () => null,
       insert: () => undefined,
     },
+    topicPlans: {
+      list: () => [],
+      upsert: (plan) => plan,
+    },
   };
 
   return { repositories, calls };

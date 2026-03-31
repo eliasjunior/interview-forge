@@ -71,6 +71,20 @@
       "when": 1774694800000,
       "tag": "0009_warmup_session_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1774782000000,
+      "tag": "0010_topic_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1774869600000,
+      "tag": "0011_topic_plan_level_up_meta",
+      "breakpoints": true
     }
   ]
 }

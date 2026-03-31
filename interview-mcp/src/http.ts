@@ -16,6 +16,7 @@ import type {
   GraphInspectionResult,
   GraphInspectionSession,
   ProgressSessionKind,
+  TopicPlanPriority,
 } from "@mock-interview/shared";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
@@ -30,7 +31,8 @@ const REPORTS_DIR = path.join(DATA_DIR, "reports");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
 const KNOWLEDGE_DIR = path.join(DATA_DIR, "knowledge");
 
-const PORT = process.env.PORT ?? 3001;
+const PORT = Number(process.env.PORT ?? 3001);
+const HOST = process.env.HOST ?? "127.0.0.1";
 const db = createDb();
 const repositories = createSqliteRepositories(db);
 
@@ -67,6 +69,28 @@ function parseProgressSessionKind(value: unknown): ProgressSessionKind {
     return value;
   }
   return "interview";
+}
+
+function listKnowledgeTopics() {
+  if (!fs.existsSync(KNOWLEDGE_DIR)) return [] as Array<{ file: string; displayName: string }>;
+  return fs.readdirSync(KNOWLEDGE_DIR)
+    .filter((file) => file.endsWith(".md"))
+    .map((file) => {
+      const content = fs.readFileSync(path.join(KNOWLEDGE_DIR, file), "utf8");
+      const match = content.match(/^#\s+(.+)/m);
+      return {
+        file: file.replace(".md", ""),
+        displayName: match ? match[1].trim() : file.replace(".md", ""),
+      };
+    });
+}
+
+function normalizeTopicPlanKey(topic: string) {
+  const normalizedTopic = topic.trim().toLowerCase();
+  const match = listKnowledgeTopics().find((entry) =>
+    entry.file.toLowerCase() === normalizedTopic || entry.displayName.toLowerCase() === normalizedTopic
+  );
+  return match?.file ?? topic;
 }
 
 function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult {
@@ -155,18 +179,7 @@ function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult 
 
 // API: List available interview topics from knowledge files
 app.get("/api/topics", (_req, res) => {
-  if (!fs.existsSync(KNOWLEDGE_DIR)) {
-    res.json([]);
-    return;
-  }
-  const files = fs.readdirSync(KNOWLEDGE_DIR).filter(f => f.endsWith(".md"));
-  const topics = files.map(f => {
-    const content = fs.readFileSync(path.join(KNOWLEDGE_DIR, f), "utf8");
-    const match = content.match(/^#\s+(.+)/m);
-    const displayName = match ? match[1].trim() : f.replace(".md", "");
-    return { file: f.replace(".md", ""), displayName };
-  });
-  res.json(topics);
+  res.json(listKnowledgeTopics());
 });
 
 // API: Get the recommended warm-up level for a topic
@@ -182,6 +195,36 @@ app.get("/api/topics/:topic/level", (req, res) => {
   const sessions = loadSessions();
   const { level, status, reason, nextLevelRequirement, progress } = detectTopicLevel(topic, sessions, hasWarmupContent);
   res.json({ topic, level, status, reason, nextLevelRequirement, hasWarmupContent, progress });
+});
+
+app.get("/api/topic-plans", (_req, res) => {
+  res.json(
+    repositories.topicPlans.list().map((plan) => ({
+      ...plan,
+      topic: normalizeTopicPlanKey(plan.topic),
+    }))
+  );
+});
+
+app.put("/api/topic-plans/:topic", (req, res) => {
+  const topic = normalizeTopicPlanKey(decodeURIComponent(req.params.topic));
+  const focused = typeof req.body?.focused === "boolean" ? req.body.focused : false;
+  const priority = req.body?.priority;
+  const existingPlan = repositories.topicPlans.list().find((plan) => normalizeTopicPlanKey(plan.topic) === topic);
+
+  if (priority !== "core" && priority !== "secondary" && priority !== "optional") {
+    res.status(400).json({ error: "priority must be one of: core, secondary, optional" });
+    return;
+  }
+
+  res.json(repositories.topicPlans.upsert({
+    topic,
+    focused,
+    priority: priority as TopicPlanPriority,
+    updatedAt: new Date().toISOString(),
+    lastLevelUpAt: existingPlan?.lastLevelUpAt,
+    lastUnlockedLevel: existingPlan?.lastUnlockedLevel,
+  }));
 });
 
 // API: Get the full knowledge graph
@@ -344,6 +387,7 @@ registerWeakReportRoutes(app, {
   fsLike: fs,
 });
 
-app.listen(PORT, () => {
-  console.log(`Neural map server running at http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
+  console.log(`Neural map server running at http://${displayHost}:${PORT} (bound to ${HOST})`);
 });
