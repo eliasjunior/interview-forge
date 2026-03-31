@@ -133,9 +133,9 @@ Answer: D
 1. Which statements about REST idempotency are correct?
 A) GET is idempotent and safe
 B) PUT is idempotent but not necessarily safe
-C) POST is idempotent by design
+C) POST can still be made retry-safe with an explicit idempotency-key strategy, even though POST itself is not idempotent by definition
 D) DELETE is idempotent
-Answer: A,B,D
+Answer: A,B,C,D
 
 2. Which statements about `@Transactional` rollback are correct?
 A) RuntimeExceptions trigger rollback by default
@@ -146,10 +146,10 @@ Answer: A,B,C
 
 3. Which statements about the N+1 problem are correct?
 A) It can cause severe database pressure on large datasets
-B) Global EAGER loading is a reliable solution for all cases
+B) It often appears when lazy associations are loaded one parent at a time
 C) JOIN FETCH in JPQL can reduce multiple queries to one
 D) It can be detected with Hibernate statistics logging
-Answer: A,C,D
+Answer: A,B,C,D
 
 4. Which statements about pagination are correct?
 A) Pagination adds no complexity and is always the same to implement
@@ -160,10 +160,10 @@ Answer: B,C,D
 
 5. Which statements about `@Cacheable` are correct?
 A) It caches method return values keyed by parameters
-B) Caching always prevents all data consistency issues
+B) Cache correctness still depends on invalidation or expiry strategy
 C) A cached value can become stale if underlying data changes without eviction
 D) @CacheEvict helps keep the cache consistent after writes
-Answer: A,C,D
+Answer: A,B,C,D
 
 6. Which statements about Spring Security in the request lifecycle are correct?
 A) It runs as a servlet filter before the DispatcherServlet
@@ -173,18 +173,18 @@ D) Spring Security always runs after the controller returns the response
 Answer: A,B,C
 
 7. Which statements about `@Async` are correct?
-A) @Async always fails silently with no diagnostic available
+A) `@Async` works through a proxy and can be bypassed by self-invocation
 B) Calling @Async from within the same bean bypasses the proxy
 C) The default SimpleAsyncTaskExecutor creates unbounded threads
 D) Calling .get() on a Future from @Async blocks the calling thread
-Answer: B,C,D
+Answer: A,B,C,D
 
 8. Which statements about optimistic locking with `@Version` are correct?
 A) No row lock is held between the read and the write
-B) Optimistic locking is identical to SELECT FOR UPDATE
+B) It detects conflicting concurrent writes at update time instead of blocking all readers up front
 C) An OptimisticLockException is thrown when a concurrent update conflicts
 D) The version field is updated automatically by JPA on each write
-Answer: A,C,D
+Answer: A,B,C,D
 
 9. Which statements about HikariCP connection pool exhaustion are correct?
 A) Pool exhaustion causes requests to wait or time out for a connection

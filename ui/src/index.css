@@ -1557,6 +1557,18 @@ html, body, #root {
   background: rgba(9, 16, 30, 0.75);
 }
 
+.topics-plan-item-recent-level-up {
+  border-color: rgba(250, 204, 21, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(250, 204, 21, 0.18),
+    0 0 0 2px rgba(250, 204, 21, 0.06),
+    0 0 22px rgba(250, 204, 21, 0.09);
+  background:
+    radial-gradient(circle at top right, rgba(250, 204, 21, 0.1), transparent 34%),
+    radial-gradient(circle at center left, rgba(250, 204, 21, 0.08), transparent 28%),
+    rgba(9, 16, 30, 0.82);
+}
+
 .topics-plan-main {
   min-width: 0;
 }
@@ -1587,7 +1599,6 @@ html, body, #root {
   margin-top: 8px;
 }
 
-.topics-plan-pill,
 .topics-plan-priority,
 .topics-plan-level {
   display: inline-flex;
@@ -1596,12 +1607,6 @@ html, body, #root {
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
-}
-
-.topics-plan-pill {
-  color: var(--accent);
-  background: rgba(24, 58, 68, 0.5);
-  border: 1px solid rgba(79, 209, 197, 0.24);
 }
 
 .topics-plan-priority.priority-core {
@@ -1636,6 +1641,21 @@ html, body, #root {
   text-align: right;
 }
 
+.topics-plan-progress-block {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.topics-plan-progress-title {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
+}
+
 .topics-plan-why {
   max-width: 280px;
   font-size: 0.74rem;
@@ -1661,11 +1681,14 @@ html, body, #root {
   transition: border-color 0.15s, box-shadow 0.2s, transform 0.2s;
 }
 .topic-card-recent-level-up {
+  border-color: rgba(250, 204, 21, 0.3);
   box-shadow:
-    0 0 0 1px rgba(250, 204, 21, 0.18),
-    0 0 26px rgba(250, 204, 21, 0.08);
+    0 0 0 1px rgba(250, 204, 21, 0.2),
+    0 0 0 2px rgba(250, 204, 21, 0.07),
+    0 0 26px rgba(250, 204, 21, 0.1);
   background:
     radial-gradient(circle at top right, rgba(250, 204, 21, 0.12), transparent 36%),
+    radial-gradient(circle at center left, rgba(250, 204, 21, 0.09), transparent 30%),
     linear-gradient(180deg, rgba(18, 28, 49, 0.98), rgba(17, 26, 46, 0.96));
 }
 .topic-card-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -1818,6 +1841,10 @@ html, body, #root {
   border-color: rgba(79, 209, 197, 0.42);
   background: rgba(24, 58, 68, 0.55);
   color: #d9fffb;
+}
+.topics-plan-focus-btn {
+  padding: 3px 8px;
+  font-size: 0.72rem;
 }
 .topic-priority-group {
   display: inline-flex;

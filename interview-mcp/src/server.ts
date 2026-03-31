@@ -56,6 +56,26 @@ function ensureDataDir() {
   if (!fs.existsSync(EXERCISES_DIR)) fs.mkdirSync(EXERCISES_DIR, { recursive: true });
 }
 
+function resolveTopicPlanKey(topic: string): string {
+  const knowledgeDir = path.join(DATA_DIR, "knowledge");
+  if (!fs.existsSync(knowledgeDir)) return topic;
+
+  const files = fs.readdirSync(knowledgeDir).filter((file) => file.endsWith(".md"));
+  const normalizedTopic = topic.trim().toLowerCase();
+
+  for (const file of files) {
+    const fullPath = path.join(knowledgeDir, file);
+    const content = fs.readFileSync(fullPath, "utf8");
+    const match = content.match(/^#\s+(.+)/m);
+    const displayName = match ? match[1].trim() : file.replace(".md", "");
+    if (displayName.toLowerCase() === normalizedTopic || file.replace(".md", "").toLowerCase() === normalizedTopic) {
+      return file.replace(".md", "");
+    }
+  }
+
+  return topic;
+}
+
 function loadSessions(): Record<string, Session> {
   return Object.fromEntries(
     repositories.sessions.list().map((session) => [session.id, session])
@@ -199,10 +219,11 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   }
 
   const currentLevelSnapshot = detectTopicLevel(session.topic, sessions, hasWarmupContent);
-  const existingTopicPlan = repositories.topicPlans.list().find((plan) => plan.topic === session.topic);
+  const topicPlanKey = resolveTopicPlanKey(session.topic);
+  const existingTopicPlan = repositories.topicPlans.list().find((plan) => plan.topic === topicPlanKey || plan.topic === session.topic);
   const leveledUp = currentLevelSnapshot.level > previousLevelSnapshot.level;
   repositories.topicPlans.upsert({
-    topic: session.topic,
+    topic: topicPlanKey,
     focused: existingTopicPlan?.focused ?? false,
     priority: existingTopicPlan?.priority ?? "secondary",
     updatedAt: new Date().toISOString(),

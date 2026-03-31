@@ -195,9 +195,9 @@ Answer: A,C
 2. Which statements about `count++` on a shared `volatile int` are correct?
 A) It is still a read-modify-write sequence
 B) Two threads can still lose updates
-C) `volatile` makes the whole increment atomic
+C) Two threads can still read the same old value before either writes back
 D) Visibility alone is not enough to make it correct
-Answer: A,B,D
+Answer: A,B,C,D
 
 3. Which statements about `ConcurrentHashMap` are correct?
 A) Individual map operations are thread-safe
@@ -210,8 +210,8 @@ Answer: A,B,D
 A) `AtomicInteger` is often better when you need a single exact value at each instant
 B) `LongAdder` reduces write contention by spreading updates across internal cells
 C) `LongAdder` is usually preferred for metrics-style counters under heavy concurrency
-D) `LongAdder` is always a drop-in replacement for rate-limiting correctness
-Answer: A,B,C
+D) `LongAdder` is usually a poor fit when correctness depends on one exact instant-by-instant shared value
+Answer: A,B,C,D
 
 5. Which statements about `ReentrantLock` are correct?
 A) It supports `tryLock`
@@ -245,15 +245,15 @@ Answer: A,C,D
 A) Producers can block when the queue is full
 B) Consumers can block when the queue is empty
 C) It is a natural fit for producer-consumer coordination
-D) It removes the need to think about capacity and overload behavior
-Answer: A,B,C
+D) Queue capacity choices still matter because they determine overload behavior and backpressure
+Answer: A,B,C,D
 
 10. Which statements about happens-before are correct?
 A) A monitor unlock happens-before a later lock on the same monitor
 B) A `volatile` write happens-before a later `volatile` read of the same variable
 C) Thread start and join establish happens-before relationships
 D) Without happens-before, another thread may observe stale or reordered effects
-Answer: ALL
+Answer: A,B,C,D
 
 ### Level 2
 

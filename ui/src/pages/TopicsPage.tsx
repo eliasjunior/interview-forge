@@ -512,15 +512,29 @@ export default function TopicsPage() {
             {plannedTopics.map((topic) => {
               const levelData = levels[topic.file]
               const level = levelData?.level
+              const recentLevelUp = topicPlans[topic.file]?.lastLevelUpAt
+                ? now - new Date(topicPlans[topic.file].lastLevelUpAt!).getTime() < LEVEL_HIGHLIGHT_WINDOW_MS
+                : false
               return (
-                <div key={`plan-${topic.file}`} className="topics-plan-item">
+                <div key={`plan-${topic.file}`} className={`topics-plan-item ${recentLevelUp ? 'topics-plan-item-recent-level-up' : ''}`}>
                   <div className="topics-plan-main">
                     <div className="topics-plan-title-row">
                       <div className="topics-plan-name">{topic.displayName}</div>
                       {level !== undefined && <LevelBadge level={level} />}
                     </div>
                     <div className="topics-plan-meta">
-                      <span className="topics-plan-pill">Focus now</span>
+                      <button
+                        className={`topic-focus-btn topics-plan-focus-btn ${focusMap[topic.file] ? 'active' : ''}`}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handlePlanUpdate(topic.file, {
+                            focused: !focusMap[topic.file],
+                            priority: getPriority(priorityMap, topic.file),
+                          })
+                        }}
+                      >
+                        {focusMap[topic.file] ? 'Unfocus' : 'Focus now'}
+                      </button>
                       <span className={`topics-plan-priority priority-${getPriority(priorityMap, topic.file)}`}>
                         {PRIORITY_LABELS[getPriority(priorityMap, topic.file)]}
                       </span>
@@ -529,6 +543,11 @@ export default function TopicsPage() {
                   </div>
                   {levelData && (
                     <div className="topics-plan-side">
+                      {recentLevelUp && topicPlans[topic.file]?.lastUnlockedLevel !== undefined && (
+                        <div className="topic-level-up-pill">
+                          Recently reached L{topicPlans[topic.file].lastUnlockedLevel}
+                        </div>
+                      )}
                       <TopicActionLauncher
                         topicFile={topic.file}
                         levelData={levelData}
@@ -538,10 +557,15 @@ export default function TopicsPage() {
                         compact
                       />
                       {level !== undefined && <LadderRungs currentLevel={level} />}
+                      <div className="topics-plan-progress-block">
+                        <div className="topics-plan-progress-title">{getProgressTitle(levelData)}</div>
+                        <ProgressPips
+                          current={Math.min(levelData.progress.current, levelData.progress.required)}
+                          required={levelData.progress.required}
+                        />
+                      </div>
                       <div className="topics-plan-hint">
-                        {levelData.progress.almostThere
-                          ? getAlmostThereCopy(levelData)
-                          : levelData.nextLevelRequirement}
+                        {levelData.progress.label}
                       </div>
                       {getNoProgressCopy(levelData) && (
                         <div className="topics-plan-why">

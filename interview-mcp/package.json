@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "dev:http": "tsx watch src/http.ts",
+    "dev:http:network": "HOST=0.0.0.0 tsx watch src/http.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "start:http": "node dist/http.js",

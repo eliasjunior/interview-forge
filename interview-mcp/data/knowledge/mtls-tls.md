@@ -154,22 +154,22 @@ Answer: C
 A) TLS provides encryption in transit
 B) mTLS adds client certificate authentication
 C) mTLS is common for service-to-service trust inside zero-trust environments
-D) Plain TLS already proves the client's identity to the server
-Answer: A,B,C
+D) Plain TLS still requires the client to validate the server certificate
+Answer: A,B,C,D
 
 2. Which statements about Keystore and Truststore are correct?
 A) A keystore is about your presented identity
 B) A truststore is about who you trust
 C) An mTLS client typically needs both
-D) They are interchangeable files with different names only
-Answer: A,B,C
+D) In Java, a truststore does not contain your private key used for client authentication
+Answer: A,B,C,D
 
 3. Which statements about X.509 validation are correct?
 A) The certificate chain must lead to a trusted root or intermediate policy accepted by the truststore
 B) Expiration dates matter during validation
 C) Key usage / extended key usage can matter
-D) Validation ignores the issuer if the subject CN looks correct
-Answer: A,B,C
+D) Hostname matching alone is not enough if chain trust fails
+Answer: A,B,C,D
 
 4. Which statements about the TLS handshake are correct?
 A) The private key should never cross the network
@@ -188,9 +188,9 @@ Answer: A,B,C
 6. Which statements about TLS session resumption are correct?
 A) It reduces CPU and handshake latency on reconnect
 B) TLS 1.3 can support 0-RTT resumption with replay caveats
-C) It means certificates no longer need validation
+C) It can still coexist with normal certificate-based trust establishment
 D) Session tickets allow the server to avoid storing per-session state centrally
-Answer: A,B,D
+Answer: A,B,C,D
 
 7. Which statements about revocation are correct?
 A) CRLs can become large and stale between updates
@@ -203,8 +203,8 @@ Answer: A,B,C
 A) Edge termination decrypts at the load balancer
 B) End-to-end or re-encrypted TLS is usually stronger for zero-trust service communication
 C) Edge termination alone means traffic inside the cluster may be plain HTTP
-D) TLS passthrough allows the load balancer to inspect decrypted HTTP headers
-Answer: A,B,C
+D) TLS passthrough limits L7 inspection because the backend keeps the encrypted session
+Answer: A,B,C,D
 
 9. Which statements about debugging TLS failures are correct?
 A) `openssl s_client` is useful before debugging Java-specific config
@@ -217,8 +217,8 @@ Answer: A,B,C
 A) Short-lived certificates reduce blast radius
 B) Automated rotation is essential at scale
 C) Service identity is stronger when bound to workload identity rather than IP address alone
-D) mTLS removes the need for authorization policy entirely
-Answer: A,B,C
+D) mTLS authenticates workloads, but authorization policy is still needed
+Answer: A,B,C,D
 
 ### Level 2
 
