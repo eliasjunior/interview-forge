@@ -173,6 +173,21 @@ describe("flashcard and end-interview tools", () => {
     assert.match(empty.hint, /No cards are due right now/);
   });
 
+  test("get_due_flashcards ignores archived cards even if they are due", async () => {
+    const { deps } = makeDeps({
+      loadFlashcards: () => [
+        makeFlashcard({ id: "active-due", dueDate: "2026-03-28T09:00:00.000Z" }),
+        makeFlashcard({ id: "archived-due", dueDate: "2026-03-28T08:00:00.000Z", archivedAt: "2026-03-28T10:05:00.000Z" }),
+      ],
+    });
+    const handlers = captureTool(registerGetDueFlashcardsTool, deps);
+
+    const payload = parse(await handlers.get("get_due_flashcards")!({}));
+    assert.equal(payload.total, 2);
+    assert.equal(payload.due, 1);
+    assert.deepEqual(payload.cards.map((card: { id: string }) => card.id), ["active-due"]);
+  });
+
   test("end_interview returns stateError for missing or already ended sessions", async () => {
     const { deps } = makeDeps();
     const handlers = captureTool(registerEndInterviewTool, deps);

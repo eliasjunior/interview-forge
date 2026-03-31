@@ -105,13 +105,17 @@ export const getGraph = (): Promise<KnowledgeGraph> => req(`${BASE}/graph`)
 export const inspectGraphNodes = (nodeIds: string[]): Promise<GraphInspectionResult> =>
   post(`${BASE}/graph/inspect`, { nodeIds })
 
-export const getFlashcards = (): Promise<Flashcard[]> => req(`${BASE}/flashcards`)
+export const getFlashcards = (includeArchived = false): Promise<Flashcard[]> =>
+  req(`${BASE}/flashcards${includeArchived ? '?includeArchived=true' : ''}`)
 
 export const getMistakes = (topic?: string): Promise<Mistake[]> =>
   req(`${BASE}/mistakes${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`)
 
 export const reviewFlashcard = (id: string, rating: ReviewRating): Promise<Flashcard> =>
   post(`${BASE}/flashcards/${encodeURIComponent(id)}/review`, { rating })
+
+export const dismissFlashcard = (id: string): Promise<Flashcard> =>
+  post(`${BASE}/flashcards/${encodeURIComponent(id)}/archive`, {})
 
 export interface ReportUiQuestion {
   questionNumber: number

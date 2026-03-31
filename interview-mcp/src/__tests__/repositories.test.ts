@@ -195,6 +195,7 @@ function normalizeFlashcard(flashcard: Flashcard | null) {
     ...flashcard,
     tags: [...flashcard.tags].sort((a, b) => a.localeCompare(b)),
     lastReviewedAt: flashcard.lastReviewedAt,
+    archivedAt: flashcard.archivedAt,
   };
 }
 

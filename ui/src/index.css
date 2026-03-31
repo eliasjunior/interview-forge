@@ -1025,6 +1025,51 @@ html, body, #root {
 }
 .fc-start-btn:hover { background: #1f4f58; }
 
+.fc-dismiss-btn {
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid rgba(233, 128, 116, 0.45);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fc-dismiss-btn:hover:not(:disabled) {
+  background: rgba(233, 128, 116, 0.08);
+}
+
+.fc-dismiss-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.fc-dismiss-inline {
+  margin-bottom: 4px;
+}
+
+.fc-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fc-view-switch {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.fc-archived-badge {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .fc-section-label {
   font-size: 0.78rem;
   text-transform: uppercase;

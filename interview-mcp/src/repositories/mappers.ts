@@ -214,6 +214,7 @@ export function mapFlashcardToNormalizedRecord(flashcard: Flashcard): Normalized
       easeFactor: flashcard.easeFactor,
       repetitions: flashcard.repetitions,
       lastReviewedAt: flashcard.lastReviewedAt,
+      archivedAt: flashcard.archivedAt ?? null,
       sourceSessionId: flashcard.source?.sessionId ?? null,
       sourceQuestionIndex: flashcard.source?.questionIndex ?? null,
       sourceOriginalScore: flashcard.source?.originalScore ?? null,
@@ -250,6 +251,7 @@ export function mapFlashcardAggregateToDomain(rows: FlashcardAggregateRows): Fla
     easeFactor: rows.flashcard.easeFactor,
     repetitions: rows.flashcard.repetitions,
     lastReviewedAt: rows.flashcard.lastReviewedAt ?? undefined,
+    archivedAt: rows.flashcard.archivedAt ?? undefined,
   };
 }
 

@@ -320,20 +320,34 @@ app.get("/api/mistakes", (req, res) => {
   res.json(repositories.mistakes.list(topic));
 });
 
-app.get("/api/flashcards", (_req, res) => {
-  res.json(loadFlashcards());
+app.get("/api/flashcards", (req, res) => {
+  const includeArchived = req.query.includeArchived === "true";
+  const cards = loadFlashcards();
+  res.json(includeArchived ? cards : cards.filter((card) => !card.archivedAt));
 });
 
 app.post("/api/flashcards/:id/review", (req, res) => {
   const cards = loadFlashcards();
   const idx = cards.findIndex(c => c.id === req.params.id);
   if (idx === -1) { res.status(404).json({ error: "Card not found" }); return; }
+  if (cards[idx]?.archivedAt) { res.status(409).json({ error: "Card is archived" }); return; }
 
   const rating = Number(req.body.rating) as ReviewRating;
   if (![1, 2, 3, 4].includes(rating)) { res.status(400).json({ error: "rating must be 1–4" }); return; }
 
   const srs = applySM2(cards[idx], rating);
   cards[idx] = { ...cards[idx], ...srs, lastReviewedAt: new Date().toISOString() };
+  saveFlashcards(cards);
+  res.json(cards[idx]);
+});
+
+app.post("/api/flashcards/:id/archive", (req, res) => {
+  const cards = loadFlashcards();
+  const idx = cards.findIndex(c => c.id === req.params.id);
+  if (idx === -1) { res.status(404).json({ error: "Card not found" }); return; }
+
+  const archivedAt = cards[idx]?.archivedAt ?? new Date().toISOString();
+  cards[idx] = { ...cards[idx], archivedAt };
   saveFlashcards(cards);
   res.json(cards[idx]);
 });

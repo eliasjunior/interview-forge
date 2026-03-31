@@ -21,6 +21,7 @@ export function registerGetDueFlashcardsTool(server: McpServer, deps: ToolDeps) 
       const all = deps.loadFlashcards();
 
       const due = all
+        .filter((c) => !c.archivedAt)
         .filter((c) => isDue(c, now))
         .filter((c) => !topic || c.topic.toLowerCase() === topic.toLowerCase())
         .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());

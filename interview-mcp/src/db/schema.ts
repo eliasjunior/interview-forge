@@ -93,6 +93,7 @@ export const flashcards = sqliteTable("flashcards", {
   easeFactor: real("ease_factor").notNull(),
   repetitions: integer("repetitions").notNull(),
   lastReviewedAt: text("last_reviewed_at"),
+  archivedAt: text("archived_at"),
   sourceSessionId: text("source_session_id"),
   sourceQuestionIndex: integer("source_question_index"),
   sourceOriginalScore: integer("source_original_score"),
