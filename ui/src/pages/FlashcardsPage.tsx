@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { Flashcard, ReviewRating } from '@mock-interview/shared'
-import { dismissFlashcard, getFlashcards, reviewFlashcard } from '../api'
+import { dismissFlashcard, getFlashcards, restoreFlashcard, reviewFlashcard } from '../api'
 
 // ── Rating config ────────────────────────────────────────────────────────────
 
@@ -124,6 +124,7 @@ export default function FlashcardsPage() {
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState<string | null>(null)
   const [topicFilter, setTopicFilter] = useState('All')
+  const [topicQuery, setTopicQuery] = useState('')
   const [viewMode, setViewMode]     = useState<'active' | 'archived'>('active')
 
   // Review mode state
@@ -145,14 +146,38 @@ export default function FlashcardsPage() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (!reviewing) return
+    if (queue.length === 0) {
+      setDone(true)
+      return
+    }
+    if (cursor >= queue.length) {
+      setCursor(Math.max(0, queue.length - 1))
+    }
+  }, [reviewing, queue, cursor])
+
   if (loading) return <div className="loading">Loading flashcards…</div>
   if (error)   return <div className="error-msg">Failed to load flashcards: {error}</div>
 
   const activeCards = cards.filter(c => !c.archivedAt)
   const archivedCards = cards.filter(c => c.archivedAt)
   const visibleCards = viewMode === 'active' ? activeCards : archivedCards
+  const dueCountByTopic = new Map<string, number>()
+  for (const card of activeCards) {
+    if (!isDue(card)) continue
+    dueCountByTopic.set(card.topic, (dueCountByTopic.get(card.topic) ?? 0) + 1)
+  }
   const topics = ['All', ...Array.from(new Set(visibleCards.map(c => c.topic))).sort()]
-  const filtered = topicFilter === 'All' ? visibleCards : visibleCards.filter(c => c.topic === topicFilter)
+  const normalizedTopicQuery = topicQuery.trim().toLowerCase()
+  const topicOptions = normalizedTopicQuery
+    ? topics.filter(topic => topic.toLowerCase().includes(normalizedTopicQuery))
+    : topics
+  const selectedTopicVisible = topicOptions.includes(topicFilter)
+  const effectiveTopicFilter = selectedTopicVisible ? topicFilter : 'All'
+  const filtered = effectiveTopicFilter === 'All'
+    ? visibleCards
+    : visibleCards.filter(c => c.topic === effectiveTopicFilter)
   const dueCards = filtered.filter(isDue)
 
   // ── Start review ────────────────────────────────────────────────────────────
@@ -172,9 +197,9 @@ export default function FlashcardsPage() {
     load()
   }
 
-  const removeCardEverywhere = (cardId: string) => {
+  const updateCardArchiveState = (cardId: string, archived: boolean) => {
     setCards(prev => prev.map(card => (
-      card.id === cardId ? { ...card, archivedAt: new Date().toISOString() } : card
+      card.id === cardId ? { ...card, archivedAt: archived ? new Date().toISOString() : undefined } : card
     )))
     setQueue(prev => prev.filter(card => card.id !== cardId))
   }
@@ -184,9 +209,23 @@ export default function FlashcardsPage() {
     setBusyCardId(cardId)
     try {
       await dismissFlashcard(cardId)
-      removeCardEverywhere(cardId)
+      updateCardArchiveState(cardId, true)
     } catch (e) {
       console.error('dismiss error', e)
+      setError(String(e))
+    } finally {
+      setBusyCardId(null)
+    }
+  }
+
+  const handleRestore = async (cardId: string) => {
+    if (busyCardId) return
+    setBusyCardId(cardId)
+    try {
+      await restoreFlashcard(cardId)
+      updateCardArchiveState(cardId, false)
+    } catch (e) {
+      console.error('restore error', e)
       setError(String(e))
     } finally {
       setBusyCardId(null)
@@ -215,17 +254,6 @@ export default function FlashcardsPage() {
       }
     }, 400)
   }
-
-  useEffect(() => {
-    if (!reviewing) return
-    if (queue.length === 0) {
-      setDone(true)
-      return
-    }
-    if (cursor >= queue.length) {
-      setCursor(Math.max(0, queue.length - 1))
-    }
-  }, [reviewing, queue, cursor])
 
   // ── Review: all done ─────────────────────────────────────────────────────────
 
@@ -365,6 +393,7 @@ export default function FlashcardsPage() {
           onClick={() => {
             setViewMode('active')
             setTopicFilter('All')
+            setTopicQuery('')
           }}
         >
           Active
@@ -374,6 +403,7 @@ export default function FlashcardsPage() {
           onClick={() => {
             setViewMode('archived')
             setTopicFilter('All')
+            setTopicQuery('')
           }}
         >
           Archived
@@ -403,17 +433,31 @@ export default function FlashcardsPage() {
       </div>
 
       {/* Topic filter */}
-      {topics.length > 2 && (
-        <div className="tabs">
-          {topics.map(t => (
-            <button
-              key={t}
-              className={`tab-btn${topicFilter === t ? ' active' : ''}`}
-              onClick={() => setTopicFilter(t)}
-            >
-              {t}
-            </button>
-          ))}
+      {topics.length > 1 && (
+        <div className="fc-topic-filter">
+          <input
+            className="fc-topic-search"
+            type="text"
+            value={topicQuery}
+            onChange={(e) => setTopicQuery(e.target.value)}
+            placeholder="Search topics"
+          />
+          <select
+            className="fc-topic-select"
+            value={effectiveTopicFilter}
+            onChange={(e) => setTopicFilter(e.target.value)}
+          >
+            {!selectedTopicVisible && topicFilter !== 'All' && (
+              <option value="All">All</option>
+            )}
+            {topicOptions.map(topic => (
+              <option key={topic} value={topic}>
+                {topic === 'All'
+                  ? `All${viewMode === 'active' && totalDue > 0 ? ` (${totalDue})` : ''}`
+                  : `${topic}${viewMode === 'active' && (dueCountByTopic.get(topic) ?? 0) > 0 ? ` (${dueCountByTopic.get(topic)})` : ''}`}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -470,7 +514,7 @@ export default function FlashcardsPage() {
                     key={card.id}
                     card={card}
                     isDue={false}
-                    onDismiss={handleDismiss}
+                    onDismiss={handleRestore}
                     dismissing={busyCardId === card.id}
                     archived
                   />
@@ -515,7 +559,16 @@ function FlashcardRow(
             </button>
           )}
           {archived && (
-            <span className="fc-archived-badge">Archived</span>
+            <button
+              className="fc-dismiss-btn fc-dismiss-inline"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDismiss(card.id)
+              }}
+              disabled={dismissing}
+            >
+              {dismissing ? 'Restoring…' : 'Put Back'}
+            </button>
           )}
           <span className="tag" style={{ borderColor: diffColor(card.difficulty), color: diffColor(card.difficulty) }}>
             {card.difficulty}

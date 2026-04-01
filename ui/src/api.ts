@@ -117,6 +117,9 @@ export const reviewFlashcard = (id: string, rating: ReviewRating): Promise<Flash
 export const dismissFlashcard = (id: string): Promise<Flashcard> =>
   post(`${BASE}/flashcards/${encodeURIComponent(id)}/archive`, {})
 
+export const restoreFlashcard = (id: string): Promise<Flashcard> =>
+  post(`${BASE}/flashcards/${encodeURIComponent(id)}/unarchive`, {})
+
 export interface ReportUiQuestion {
   questionNumber: number
   subject?: string

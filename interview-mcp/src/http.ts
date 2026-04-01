@@ -30,7 +30,8 @@ const REPORTS_DIR = path.join(DATA_DIR, "reports");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
 const KNOWLEDGE_DIR = path.join(DATA_DIR, "knowledge");
 
-const PORT = process.env.PORT ?? 3001;
+const PORT = Number(process.env.PORT ?? 3001);
+const HOST = process.env.HOST ?? "127.0.0.1";
 const db = createDb();
 const repositories = createSqliteRepositories(db);
 
@@ -352,12 +353,23 @@ app.post("/api/flashcards/:id/archive", (req, res) => {
   res.json(cards[idx]);
 });
 
+app.post("/api/flashcards/:id/unarchive", (req, res) => {
+  const cards = loadFlashcards();
+  const idx = cards.findIndex(c => c.id === req.params.id);
+  if (idx === -1) { res.status(404).json({ error: "Card not found" }); return; }
+
+  cards[idx] = { ...cards[idx], archivedAt: undefined };
+  saveFlashcards(cards);
+  res.json(cards[idx]);
+});
+
 registerWeakReportRoutes(app, {
   generatedUiDir: GENERATED_UI_DIR,
   loadSessions,
   fsLike: fs,
 });
 
-app.listen(PORT, () => {
-  console.log(`Neural map server running at http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
+  console.log(`Neural map server running at http://${displayHost}:${PORT} (bound to ${HOST})`);
 });
