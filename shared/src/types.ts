@@ -231,6 +231,8 @@ export interface Flashcard {
   /** How many times reviewed successfully in a row */
   repetitions: number
   lastReviewedAt?: string
+  /** When set, the card is archived and should no longer appear in active review flows */
+  archivedAt?: string
 }
 
 /** Rating passed to review_flashcard — mirrors SM-2 quality 1–4 */

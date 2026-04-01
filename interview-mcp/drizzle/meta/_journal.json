@@ -85,6 +85,13 @@
       "when": 1774869600000,
       "tag": "0011_topic_plan_level_up_meta",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1774915200000,
+      "tag": "0012_flashcard_archive",
+      "breakpoints": true
     }
   ]
 }

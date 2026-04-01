@@ -26,6 +26,9 @@ export function registerReviewFlashcardTool(server: McpServer, deps: ToolDeps) {
       }
 
       const card = cards[idx];
+      if (card.archivedAt) {
+        return deps.stateError(`Flashcard '${cardId}' is archived.`);
+      }
       const srs  = applySM2(card, rating as ReviewRating);
 
       cards[idx] = {

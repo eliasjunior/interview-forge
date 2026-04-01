@@ -123,3 +123,78 @@ Run a backup before:
 - cleanup scripts
 - manual SQL updates or deletes
 - any one-off data repair work
+
+### Daily cron backup
+
+If you want the operating system to create one backup per day automatically, use the repo wrapper script:
+
+```bash
+/Users/eliasjunior/Projects/ai-projects/interview-forge/scripts/daily-db-backup.sh
+```
+
+It changes into the repo root, ensures the backup directory exists, and runs:
+
+```bash
+npm run db:backup -w interview-mcp
+```
+
+Install it with `crontab -e` and add one line like this:
+
+```bash
+0 2 * * * /Users/eliasjunior/Projects/ai-projects/interview-forge/scripts/daily-db-backup.sh >> /Users/eliasjunior/Projects/ai-projects/interview-forge/tmp/daily-db-backup.log 2>&1
+```
+
+That example runs every day at `02:00` and appends output to:
+
+```text
+tmp/daily-db-backup.log
+```
+
+Cron notes:
+
+- use the absolute script path
+- keep the repo dependencies installed (`npm install`)
+- prefer logging stdout/stderr so backup failures are visible
+- if you want more retained backups, set `DB_BACKUP_KEEP` inside the cron line, for example:
+
+```bash
+0 2 * * * DB_BACKUP_KEEP=20 /Users/eliasjunior/Projects/ai-projects/interview-forge/scripts/daily-db-backup.sh >> /Users/eliasjunior/Projects/ai-projects/interview-forge/tmp/daily-db-backup.log 2>&1
+```
+
+### Daily macOS `launchd` backup
+
+For a personal Mac, `launchd` is usually a better fit than `cron`.
+
+This repo includes a ready-to-install LaunchAgent plist:
+
+```text
+scripts/com.eliasjunior.interview-forge.db-backup.plist
+```
+
+It runs the same backup wrapper every day at `18:00` and also runs once when the agent is loaded:
+
+```text
+/Users/eliasjunior/Projects/ai-projects/interview-forge/scripts/daily-db-backup.sh
+```
+
+Install it with:
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+cp /Users/eliasjunior/Projects/ai-projects/interview-forge/scripts/com.eliasjunior.interview-forge.db-backup.plist ~/Library/LaunchAgents/
+launchctl unload ~/Library/LaunchAgents/com.eliasjunior.interview-forge.db-backup.plist 2>/dev/null || true
+launchctl load ~/Library/LaunchAgents/com.eliasjunior.interview-forge.db-backup.plist
+```
+
+Useful checks:
+
+```bash
+launchctl list | grep interview-forge
+cat /Users/eliasjunior/Projects/ai-projects/interview-forge/tmp/daily-db-backup.log
+```
+
+Notes:
+
+- `RunAtLoad` means a backup runs once when you load the agent or log in
+- if the Mac is fully powered off, nothing runs until it is on again
+- `launchd` is still local-machine scheduling, not cloud scheduling

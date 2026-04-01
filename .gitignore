@@ -11,6 +11,8 @@ node_modules/
 interview-mcp/data/*.db
 interview-mcp/data/*.db-shm
 interview-mcp/data/*.db-wal
+interview-mcp/data/*.bak
+interview-mcp/data/app.db.*
 interview-mcp/data/backups/
 
 # macOS metadata
