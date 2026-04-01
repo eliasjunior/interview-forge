@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { Topic, TopicLevel } from '../api'
 
-import { getTopics, getTopicLevel } from '../api'
+import { getTopicPlans, getTopics, getTopicLevel, updateTopicPlan } from '../api'
+import type { TopicPlan, TopicPlanPriority } from '@mock-interview/shared'
 
 const LEVEL_STORAGE_KEY = 'topics-level-snapshot'
-const TOPIC_FOCUS_STORAGE_KEY = 'topics-focus-plan'
-const TOPIC_PRIORITY_STORAGE_KEY = 'topics-priority-plan'
+const LEVEL_HIGHLIGHT_WINDOW_MS = 24 * 60 * 60 * 1000
 
 // ── Level config ──────────────────────────────────────────────────────────────
 
@@ -131,17 +131,7 @@ function getStoredLevels() {
   }
 }
 
-function getStoredFocusMap() {
-  try {
-    const raw = window.localStorage.getItem(TOPIC_FOCUS_STORAGE_KEY)
-    if (!raw) return {} as Record<string, boolean>
-    return JSON.parse(raw) as Record<string, boolean>
-  } catch {
-    return {} as Record<string, boolean>
-  }
-}
-
-type TopicPriority = 'core' | 'secondary' | 'optional'
+type TopicPriority = TopicPlanPriority
 type TopicFilter = 'plan' | 'core' | 'almost-there' | 'needs-reinforcement' | 'all'
 
 const PRIORITY_LABELS: Record<TopicPriority, string> = {
@@ -162,16 +152,6 @@ const FILTER_LABELS: Record<TopicFilter, string> = {
   'almost-there': 'Almost there',
   'needs-reinforcement': 'Needs reinforcement',
   all: 'All',
-}
-
-function getStoredPriorityMap() {
-  try {
-    const raw = window.localStorage.getItem(TOPIC_PRIORITY_STORAGE_KEY)
-    if (!raw) return {} as Record<string, TopicPriority>
-    return JSON.parse(raw) as Record<string, TopicPriority>
-  } catch {
-    return {} as Record<string, TopicPriority>
-  }
 }
 
 function getPriority(priorityMap: Record<string, TopicPriority>, file: string): TopicPriority {
@@ -296,12 +276,13 @@ function TopicActionLauncher({
 export default function TopicsPage() {
   const [topics, setTopics] = useState<Topic[]>([])
   const [levels, setLevels] = useState<Record<string, TopicLevel>>({})
+  const [topicPlans, setTopicPlans] = useState<Record<string, TopicPlan>>({})
   const [celebrating, setCelebrating] = useState<Record<string, true>>({})
   const [toastQueue, setToastQueue] = useState<Array<{ id: string; message: string; level: 0 | 1 | 2 | 3 | 4 }>>([])
   const [activeToast, setActiveToast] = useState<{ id: string; message: string; level: 0 | 1 | 2 | 3 | 4 } | null>(null)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
-  const [focusMap, setFocusMap] = useState<Record<string, boolean>>(() => getStoredFocusMap())
-  const [priorityMap, setPriorityMap] = useState<Record<string, TopicPriority>>(() => getStoredPriorityMap())
+  const [focusMap, setFocusMap] = useState<Record<string, boolean>>({})
+  const [priorityMap, setPriorityMap] = useState<Record<string, TopicPriority>>({})
   const [activeFilter, setActiveFilter] = useState<TopicFilter>('all')
   const [loading, setLoading] = useState(true)
   const pageRef = useRef<HTMLDivElement | null>(null)
@@ -316,8 +297,11 @@ export default function TopicsPage() {
       if (showLoading) setLoading(true)
 
       try {
-        const data = await getTopics()
+        const [data, plans] = await Promise.all([getTopics(), getTopicPlans()])
         setTopics(data)
+        setTopicPlans(Object.fromEntries(plans.map((plan) => [plan.topic, plan])))
+        setFocusMap(Object.fromEntries(plans.map((plan) => [plan.topic, plan.focused])))
+        setPriorityMap(Object.fromEntries(plans.map((plan) => [plan.topic, plan.priority])))
 
         const entries = await Promise.all(
           data.map(async (t) => {
@@ -389,14 +373,6 @@ export default function TopicsPage() {
   }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(TOPIC_FOCUS_STORAGE_KEY, JSON.stringify(focusMap))
-  }, [focusMap])
-
-  useEffect(() => {
-    window.localStorage.setItem(TOPIC_PRIORITY_STORAGE_KEY, JSON.stringify(priorityMap))
-  }, [priorityMap])
-
-  useEffect(() => {
     if (activeToast || toastQueue.length === 0) return
     const [nextToast, ...rest] = toastQueue
     setActiveToast(nextToast)
@@ -444,6 +420,30 @@ export default function TopicsPage() {
     }
   }
 
+  async function handlePlanUpdate(topic: string, next: { focused: boolean; priority: TopicPriority }) {
+    const previousFocused = focusMap[topic] ?? false
+    const previousPriority = getPriority(priorityMap, topic)
+
+    setFocusMap((prev) => ({ ...prev, [topic]: next.focused }))
+    setPriorityMap((prev) => ({ ...prev, [topic]: next.priority }))
+
+    try {
+      const updated = await updateTopicPlan(topic, next)
+      setTopicPlans((prev) => ({ ...prev, [topic]: updated }))
+    } catch {
+      setFocusMap((prev) => ({ ...prev, [topic]: previousFocused }))
+      setPriorityMap((prev) => ({ ...prev, [topic]: previousPriority }))
+      setToastQueue(prev => [
+        ...prev,
+        {
+          id: `${topic}-plan-update-failed`,
+          message: `Could not save plan changes for ${topic}.`,
+          level: 0,
+        },
+      ])
+    }
+  }
+
   if (loading) return <div className="page-loading">Loading...</div>
 
   const sortedTopics = [...topics].sort((a, b) => {
@@ -459,6 +459,7 @@ export default function TopicsPage() {
     return a.displayName.localeCompare(b.displayName)
   })
   const plannedTopics = sortedTopics.filter((topic) => focusMap[topic.file])
+  const now = Date.now()
   const visibleTopics = sortedTopics.filter((topic) => {
     const levelData = levels[topic.file]
 
@@ -511,12 +512,29 @@ export default function TopicsPage() {
             {plannedTopics.map((topic) => {
               const levelData = levels[topic.file]
               const level = levelData?.level
+              const recentLevelUp = topicPlans[topic.file]?.lastLevelUpAt
+                ? now - new Date(topicPlans[topic.file].lastLevelUpAt!).getTime() < LEVEL_HIGHLIGHT_WINDOW_MS
+                : false
               return (
-                <div key={`plan-${topic.file}`} className="topics-plan-item">
+                <div key={`plan-${topic.file}`} className={`topics-plan-item ${recentLevelUp ? 'topics-plan-item-recent-level-up' : ''}`}>
                   <div className="topics-plan-main">
-                    <div className="topics-plan-name">{topic.displayName}</div>
+                    <div className="topics-plan-title-row">
+                      <div className="topics-plan-name">{topic.displayName}</div>
+                      {level !== undefined && <LevelBadge level={level} />}
+                    </div>
                     <div className="topics-plan-meta">
-                      <span className="topics-plan-pill">Focus now</span>
+                      <button
+                        className={`topic-focus-btn topics-plan-focus-btn ${focusMap[topic.file] ? 'active' : ''}`}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handlePlanUpdate(topic.file, {
+                            focused: !focusMap[topic.file],
+                            priority: getPriority(priorityMap, topic.file),
+                          })
+                        }}
+                      >
+                        {focusMap[topic.file] ? 'Unfocus' : 'Focus now'}
+                      </button>
                       <span className={`topics-plan-priority priority-${getPriority(priorityMap, topic.file)}`}>
                         {PRIORITY_LABELS[getPriority(priorityMap, topic.file)]}
                       </span>
@@ -525,7 +543,11 @@ export default function TopicsPage() {
                   </div>
                   {levelData && (
                     <div className="topics-plan-side">
-                      {level !== undefined && <LevelBadge level={level} />}
+                      {recentLevelUp && topicPlans[topic.file]?.lastUnlockedLevel !== undefined && (
+                        <div className="topic-level-up-pill">
+                          Recently reached L{topicPlans[topic.file].lastUnlockedLevel}
+                        </div>
+                      )}
                       <TopicActionLauncher
                         topicFile={topic.file}
                         levelData={levelData}
@@ -535,10 +557,15 @@ export default function TopicsPage() {
                         compact
                       />
                       {level !== undefined && <LadderRungs currentLevel={level} />}
+                      <div className="topics-plan-progress-block">
+                        <div className="topics-plan-progress-title">{getProgressTitle(levelData)}</div>
+                        <ProgressPips
+                          current={Math.min(levelData.progress.current, levelData.progress.required)}
+                          required={levelData.progress.required}
+                        />
+                      </div>
                       <div className="topics-plan-hint">
-                        {levelData.progress.almostThere
-                          ? getAlmostThereCopy(levelData)
-                          : levelData.nextLevelRequirement}
+                        {levelData.progress.label}
                       </div>
                       {getNoProgressCopy(levelData) && (
                         <div className="topics-plan-why">
@@ -571,11 +598,14 @@ export default function TopicsPage() {
           const levelData = levels[topic.file]
           const level = levelData?.level
           const appearance = level !== undefined ? getLevelAppearance(level) : null
+          const recentLevelUp = topicPlans[topic.file]?.lastLevelUpAt
+            ? now - new Date(topicPlans[topic.file].lastLevelUpAt!).getTime() < LEVEL_HIGHLIGHT_WINDOW_MS
+            : false
 
           return (
             <div
               key={topic.file}
-              className={`topic-card ${celebrating[topic.file] ? 'topic-card-leveled-up' : ''}`}
+              className={`topic-card ${celebrating[topic.file] ? 'topic-card-leveled-up' : ''} ${recentLevelUp ? 'topic-card-recent-level-up' : ''}`}
               style={appearance ? appearance.cardBorderStyle : { borderLeft: '3px solid var(--line)' }}
             >
               <div className="topic-card-main">
@@ -586,7 +616,10 @@ export default function TopicsPage() {
                       className={`topic-focus-btn ${focusMap[topic.file] ? 'active' : ''}`}
                       onClick={(event) => {
                         event.stopPropagation()
-                        setFocusMap((prev) => ({ ...prev, [topic.file]: !prev[topic.file] }))
+                        void handlePlanUpdate(topic.file, {
+                          focused: !focusMap[topic.file],
+                          priority: getPriority(priorityMap, topic.file),
+                        })
                       }}
                     >
                       {focusMap[topic.file] ? 'Unfocus' : 'Focus now'}
@@ -598,7 +631,10 @@ export default function TopicsPage() {
                           className={`topic-priority-btn ${getPriority(priorityMap, topic.file) === priority ? 'active' : ''}`}
                           onClick={(event) => {
                             event.stopPropagation()
-                            setPriorityMap((prev) => ({ ...prev, [topic.file]: priority }))
+                            void handlePlanUpdate(topic.file, {
+                              focused: Boolean(focusMap[topic.file]),
+                              priority,
+                            })
                           }}
                         >
                           {PRIORITY_LABELS[priority]}
@@ -620,6 +656,11 @@ export default function TopicsPage() {
 
               <div className="topic-card-right">
                 {level !== undefined && levelData ? <LevelBadge level={level} /> : <LevelSkeleton />}
+                {recentLevelUp && topicPlans[topic.file]?.lastUnlockedLevel !== undefined && (
+                  <div className="topic-level-up-pill">
+                    Recently reached L{topicPlans[topic.file].lastUnlockedLevel}
+                  </div>
+                )}
                 {levelData && level !== undefined && (
                   <div className="topic-progress">
                     <div className="topic-progress-header">

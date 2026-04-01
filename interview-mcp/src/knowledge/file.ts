@@ -29,12 +29,23 @@ function extractSection(md: string, heading: string): string {
 }
 
 function parseQuestions(section: string): string[] {
-  return section
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => /^\d+\./.test(l))           // lines starting with "1.", "2.", …
-    .map((l) => l.replace(/^\d+\.\s*/, "").trim())
-    .filter(Boolean);
+  const questions: string[] = [];
+  let current: string[] = [];
+
+  for (const line of section.split("\n")) {
+    if (/^\d+\./.test(line)) {
+      // Start of a new numbered item — flush the previous one
+      if (current.length) questions.push(current.join(" ").replace(/\s+/g, " ").trim());
+      current = [line.replace(/^\d+\.\s*/, "").trim()];
+    } else if (current.length > 0) {
+      // Continuation line (indented bullets, extra text) — belongs to current question
+      const trimmed = line.trim();
+      if (trimmed) current.push(trimmed);
+    }
+  }
+  if (current.length) questions.push(current.join(" ").replace(/\s+/g, " ").trim());
+
+  return questions.filter(Boolean);
 }
 
 function parseCriteria(section: string): string[] {

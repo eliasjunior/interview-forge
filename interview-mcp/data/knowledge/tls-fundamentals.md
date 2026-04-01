@@ -141,22 +141,22 @@ Answer: B
 A) It provides confidentiality in transit
 B) It helps detect tampering
 C) It can authenticate the server
-D) It automatically decides whether an authenticated user is authorized for a business action
-Answer: A,B,C
+D) It does not replace application-level authorization decisions
+Answer: A,B,C,D
 
 2. Which statements about certificates are correct?
-A) They must include the private key
+A) They bind an identity to a public key
 B) They include validity dates
 C) They are signed by an issuer
 D) They include a public key
-Answer: B,C,D
+Answer: A,B,C,D
 
 3. Which statements about mTLS are correct?
 A) Both sides authenticate with certificates
 B) It is common for service-to-service communication
-C) It removes the need for trust stores
+C) Each side still needs trust material to validate the other certificate chain
 D) It can strengthen identity in zero-trust environments
-Answer: A,B,D
+Answer: A,B,C,D
 
 4. Which statements about PKIX validation are correct?
 A) The chain must lead to trusted CA material
@@ -169,15 +169,15 @@ Answer: A,C,D
 A) Client and server negotiate mutually supported algorithms
 B) TLS 1.3 reduces dangerous legacy options
 C) The handshake is partly about agreeing how to protect the connection
-D) Cipher suites only matter after the handshake finishes
-Answer: A,B,C
+D) Cipher suite choice affects both handshake behavior and later protected traffic
+Answer: A,B,C,D
 
 6. Which statements about forward secrecy are correct?
 A) It limits damage if a long-term private key is later leaked
 B) ECDHE is relevant to it
-C) It means certificates are no longer needed
+C) It protects old captured sessions even if the server key is compromised later
 D) It is a major security improvement in modern TLS
-Answer: A,B,D
+Answer: A,B,C,D
 
 7. Which statements about certificate rotation are correct?
 A) Trust rollout order matters
@@ -188,17 +188,17 @@ Answer: A,B,C
 
 8. Which statements about revocation are correct?
 A) CRLs can be stale
-B) Revocation makes expiration irrelevant
+B) Revocation and expiration solve different trust problems
 C) OCSP stapling can reduce client-side revocation lookups
 D) OCSP may add runtime dependency and latency
-Answer: A,C,D
+Answer: A,B,C,D
 
 9. Which statements about pinning are correct?
-A) It is always the right default for every service
+A) Pinning narrows what trust material a client is willing to accept
 B) It can improve trust in tightly controlled environments
 C) It can make rotation harder
 D) It narrows what certificates are accepted
-Answer: B,C,D
+Answer: A,B,C,D
 
 10. Which statements about TLS termination are correct?
 A) Edge termination can simplify operations

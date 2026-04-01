@@ -24,6 +24,7 @@ import {
 import { persistFlashcard } from "./tools/createFlashcard.js";
 import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
+import { detectTopicLevel } from "./tools/getTopicLevel.js";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 import { normalizeConcepts } from "./graph/concepts.js";
@@ -53,6 +54,26 @@ const repositories = createSqliteRepositories(db);
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(EXERCISES_DIR)) fs.mkdirSync(EXERCISES_DIR, { recursive: true });
+}
+
+function resolveTopicPlanKey(topic: string): string {
+  const knowledgeDir = path.join(DATA_DIR, "knowledge");
+  if (!fs.existsSync(knowledgeDir)) return topic;
+
+  const files = fs.readdirSync(knowledgeDir).filter((file) => file.endsWith(".md"));
+  const normalizedTopic = topic.trim().toLowerCase();
+
+  for (const file of files) {
+    const fullPath = path.join(knowledgeDir, file);
+    const content = fs.readFileSync(fullPath, "utf8");
+    const match = content.match(/^#\s+(.+)/m);
+    const displayName = match ? match[1].trim() : file.replace(".md", "");
+    if (displayName.toLowerCase() === normalizedTopic || file.replace(".md", "").toLowerCase() === normalizedTopic) {
+      return file.replace(".md", "");
+    }
+  }
+
+  return topic;
 }
 
 function loadSessions(): Record<string, Session> {
@@ -157,6 +178,16 @@ async function extractConcepts(session: Session): Promise<Concept[]> {
 }
 
 async function finalizeSession(session: Session, sessions: Record<string, Session>) {
+  const previousSessions = Object.fromEntries(
+    Object.entries(sessions).filter(([id]) => id !== session.id)
+  );
+  const knowledgeTopic = knowledge.findByTopic(session.topic);
+  const hasWarmupContent =
+    knowledgeTopic != null &&
+    knowledgeTopic.warmupLevels != null &&
+    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+  const previousLevelSnapshot = detectTopicLevel(session.topic, previousSessions, hasWarmupContent);
+
   const concepts = normalizeConcepts(await extractConcepts(session)).map(({ word, cluster }) => ({
     word,
     cluster,
@@ -186,6 +217,19 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   if (savedCount > 0) {
     console.error(`[flashcards] added ${savedCount} card(s) for session ${session.id}`);
   }
+
+  const currentLevelSnapshot = detectTopicLevel(session.topic, sessions, hasWarmupContent);
+  const topicPlanKey = resolveTopicPlanKey(session.topic);
+  const existingTopicPlan = repositories.topicPlans.list().find((plan) => plan.topic === topicPlanKey || plan.topic === session.topic);
+  const leveledUp = currentLevelSnapshot.level > previousLevelSnapshot.level;
+  repositories.topicPlans.upsert({
+    topic: topicPlanKey,
+    focused: existingTopicPlan?.focused ?? false,
+    priority: existingTopicPlan?.priority ?? "secondary",
+    updatedAt: new Date().toISOString(),
+    lastLevelUpAt: leveledUp ? new Date().toISOString() : existingTopicPlan?.lastLevelUpAt,
+    lastUnlockedLevel: leveledUp ? currentLevelSnapshot.level : existingTopicPlan?.lastUnlockedLevel,
+  });
 
   return { summary, avgScore, concepts, reportFile, flashcardsGenerated: newCards.length };
 }

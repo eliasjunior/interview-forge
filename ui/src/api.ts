@@ -11,6 +11,8 @@ import type {
   ProgressOverview,
   ProgressSessionKind,
   SessionRewardSummary,
+  TopicPlan,
+  TopicPlanPriority,
 } from '@mock-interview/shared'
 
 const BASE = '/api'
@@ -43,6 +45,16 @@ export interface Topic {
 }
 
 export const getTopics = (): Promise<Topic[]> => req(`${BASE}/topics`)
+export const getTopicPlans = (): Promise<TopicPlan[]> => req(`${BASE}/topic-plans`)
+export const updateTopicPlan = (topic: string, plan: { focused: boolean; priority: TopicPlanPriority }): Promise<TopicPlan> =>
+  fetch(`${BASE}/topic-plans/${encodeURIComponent(topic)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(plan),
+  }).then(async (res) => {
+    if (!res.ok) throw new Error(`Request failed: ${res.status} ${BASE}/topic-plans/${encodeURIComponent(topic)}`)
+    return res.json() as Promise<TopicPlan>
+  })
 
 export interface TopicLevel {
   topic: string

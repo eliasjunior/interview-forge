@@ -204,6 +204,15 @@ export const mistakes = sqliteTable("mistakes", {
   createdAt: text("created_at").notNull(),
 });
 
+export const topicPlans = sqliteTable("topic_plans", {
+  topic: text("topic").primaryKey(),
+  focused: integer("focused", { mode: "boolean" }).notNull().default(false),
+  priority: text("priority").notNull().default("secondary"),
+  updatedAt: text("updated_at").notNull(),
+  lastLevelUpAt: text("last_level_up_at"),
+  lastUnlockedLevel: integer("last_unlocked_level"),
+});
+
 export const sessionsRelations = relations(sessions, ({ many }) => ({
   questions: many(sessionQuestions),
   messages: many(sessionMessages),

@@ -157,10 +157,10 @@ Answer: A
 
 1. Which statements about concurrency and parallelism are correct?
 A) Concurrency does not require literal simultaneous execution
-B) Parallelism implies overlapping execution in real time
+B) Parallelism always requires separate processes rather than threads
 C) Concurrency and parallelism are always the same thing
 D) A single-core system can still exhibit concurrency
-Answer: A,B,D
+Answer: A,D
 
 2. Which statements about shared state are correct?
 A) Shared state is always safe if the variable type is primitive
@@ -171,28 +171,28 @@ Answer: B,C,D
 
 3. Which statements about visibility and atomicity are correct?
 A) An operation can be visible without being atomic
-B) Visibility and atomicity are exactly the same property
+B) Atomicity by itself says nothing about whether another thread observes the latest write
 C) An operation can be atomic yet still need ordering guarantees with other actions
 D) Correct concurrent code often needs to reason about both
-Answer: A,C,D
+Answer: A,B,C,D
 
 4. Which statements about stale reads are correct?
 A) A thread may observe an old value if no synchronization rule forces visibility
 B) CPU caches and registers are part of why stale reads happen
-C) Reordering and visibility are related concerns
+C) Reordering matters only for performance, not correctness
 D) Stale reads are impossible on modern multi-core hardware
-Answer: A,B,C
+Answer: A,B
 
 5. Which statements about happens-before are correct?
 A) It is a formal visibility/ordering guarantee, not just a timing guess
 B) Without happens-before, another thread may legally observe older or reordered effects
 C) Thread start and thread join are examples of happens-before rules
-D) Happens-before only matters for performance tuning
-Answer: A,B,C
+D) A happens-before edge can exist without using a traditional lock
+Answer: A,B,C,D
 
 6. Which statements about a shared stop flag are correct?
 A) Without synchronization, another thread might not notice the flag change promptly
-B) The stop flag case is the same as making a counter increment atomic
+B) The stop flag case always requires mutual exclusion around every read
 C) A visibility-only mechanism can be enough when the problem is just "see the latest value"
 D) The stop flag is fundamentally a visibility problem
 Answer: A,C,D
@@ -201,14 +201,14 @@ Answer: A,C,D
 A) It is a read-modify-write sequence
 B) Two threads can both read the same old value and both write back the same next value
 C) Lost updates are the core failure mode
-D) Visibility alone is sufficient to make it correct
-Answer: A,B,C
+D) `count++` becomes safe only if increments happen sequentially or are made atomic as one operation
+Answer: A,B,C,D
 
 8. Which statements about deadlock prevention are correct?
 A) Consistent global lock ordering helps prevent circular wait
 B) Reducing the time locks are held can help reduce risk
 C) Acquiring locks in arbitrary order is safe if code is small
-D) Avoiding unnecessary nested locking is usually helpful
+D) If a lock pair is ever acquired in opposite orders, deadlock risk increases
 Answer: A,B,D
 
 9. Which statements correctly distinguish starvation and livelock?
@@ -221,9 +221,9 @@ Answer: B,C,D
 10. Which statements about `synchronized` and `volatile` are correct?
 A) `volatile` is about visibility/ordering for a variable access
 B) `synchronized` also provides mutual exclusion for a critical section
-C) `volatile` makes compound state changes atomic
+C) `volatile` is enough for simple publication/visibility cases but not for arbitrary compound updates
 D) `synchronized` can protect invariants across multiple reads/writes
-Answer: A,B,D
+Answer: A,B,C,D
 
 ### Level 2
 

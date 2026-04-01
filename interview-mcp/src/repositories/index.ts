@@ -4,6 +4,7 @@ import type { MistakeRepository } from "./mistakeRepository.js";
 import type { SessionRepository } from "./sessionRepository.js";
 import type { SkillRepository } from "./skillRepository.js";
 import type { ExerciseRepository } from "./exerciseRepository.js";
+import type { TopicPlanRepository } from "./topicPlanRepository.js";
 
 export type { SessionRepository } from "./sessionRepository.js";
 export type { FlashcardRepository } from "./flashcardRepository.js";
@@ -11,6 +12,7 @@ export type { GraphRepository } from "./graphRepository.js";
 export type { MistakeRepository } from "./mistakeRepository.js";
 export type { SkillRepository } from "./skillRepository.js";
 export type { ExerciseRepository } from "./exerciseRepository.js";
+export type { TopicPlanRepository } from "./topicPlanRepository.js";
 
 export interface AppRepositories {
   sessions: SessionRepository;
@@ -19,4 +21,5 @@ export interface AppRepositories {
   mistakes: MistakeRepository;
   skills: SkillRepository;
   exercises: ExerciseRepository;
+  topicPlans: TopicPlanRepository;
 }
