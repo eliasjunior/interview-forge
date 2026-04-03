@@ -129,6 +129,32 @@ html, body, #root {
 }
 
 /* ── Sessions grid ─────────────────────────────────────────────────────────── */
+.sessions-section-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+.session-day-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.session-day-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session-day-heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 .sessions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
