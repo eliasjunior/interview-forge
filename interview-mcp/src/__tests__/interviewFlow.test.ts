@@ -196,6 +196,18 @@ describe("selectQuestions — pure function", () => {
     assert.equal(selected.length, 1);
     assert.equal(selected[0].difficulty, "intermediate");
   });
+
+  test("redistributes unused tier slots when all questions fall into one tier", () => {
+    const selected = selectQuestions(
+      ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"],
+      ["c1", "c2", "c3", "c4", "c5", "c6"],
+      [],   // every question defaults to intermediate
+      new Map(),
+      5
+    );
+    assert.equal(selected.length, 5);
+    assert.ok(selected.every((c) => c.difficulty === "intermediate"));
+  });
 });
 
 // ─── startInterview — question selection ─────────────────────────────────────
@@ -209,6 +221,24 @@ describe("startInterview — question selection", () => {
     const res = parse(await start({ topic: TOPIC, maxQuestions: 3 }));
     assert.ok(res.sessionId);
     assert.equal(res.totalQuestions, 3);
+  });
+
+  test("fills to maxQuestions even when the topic has no authored difficulty metadata", async () => {
+    const store = makeSessionStore();
+    const difficultyFreeEntry: KnowledgeTopic = {
+      ...MOCK_ENTRY,
+      topic: "Difficulty Free Topic",
+      questionDifficulties: [],
+    };
+    const deps = makeDeps(store, {
+      findByTopic: (topic: string) => topic === difficultyFreeEntry.topic ? difficultyFreeEntry : null,
+      listTopics: () => [difficultyFreeEntry.topic],
+    });
+    const start = captureHandler(registerStartInterviewTool, deps);
+
+    const res = parse(await start({ topic: difficultyFreeEntry.topic, maxQuestions: 5 }));
+    assert.equal(res.totalQuestions, 5);
+    assert.equal(store.get(res.sessionId).questions.length, 5);
   });
 
   test("session.questionCriteria is populated and same length as questions", async () => {

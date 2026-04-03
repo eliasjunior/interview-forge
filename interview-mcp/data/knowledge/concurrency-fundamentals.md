@@ -227,12 +227,12 @@ Answer: A,B,C,D
 
 ### Level 2
 
-1. Explain the difference between concurrency and parallelism, and why concurrency problems can still exist even on a single-core machine.
-Hint: Focus on interleaving and shared-state correctness, not just CPU count.
+1. Explain the difference between concurrency and parallelism, and why concurrency problems can still exist even on a single-core machine. Consider this scenario: two threads share a counter variable and both execute `counter++`. What could go wrong, and why can it happen even with a single CPU core?
+Hint: Focus on interleaving and shared-state correctness, not just CPU count. Think about what `counter++` actually compiles down to at the instruction level.
 Answer: Concurrency is about multiple tasks making progress during overlapping periods, while parallelism is about tasks actually running at the same instant on separate execution resources. Concurrency bugs do not require multiple cores, because even on a single-core machine the scheduler can interleave operations from different threads in ways that break shared-state assumptions. If correctness depends on uninterrupted execution of a compound operation, interleaving alone is enough to create races.
 
-2. Explain why shared mutable state is the core source of many concurrency problems.
-Hint: Mention races, broken invariants, and why "each thread's code looks fine alone" is not enough.
+2. Explain why shared mutable state is the core source of many concurrency problems. Use the counter++ example to illustrate.
+Hint: Define shared mutable state, show how two threads can produce a wrong result (race condition / lost update), and explain why each thread's code can look correct in isolation.
 Answer: Shared mutable state means multiple threads can read and write the same data over time, so correctness depends on their interactions rather than on one thread in isolation. That creates risks like race conditions, lost updates, and broken invariants across related fields. The difficulty is that each code path may look locally correct, but the combined interleavings can still produce invalid states unless visibility, ordering, and mutual exclusion are handled explicitly.
 
 3. Explain the difference between visibility and atomicity using a shared stop flag and a shared counter.
@@ -240,8 +240,9 @@ Hint: One case is mostly "see the latest value"; the other is a compound update.
 Answer: Visibility is about whether one thread can observe another thread's write. A shared stop flag is mainly a visibility problem: one thread writes `false` or `true`, and another thread must reliably see that new value. Atomicity is about an operation appearing indivisible. A shared counter increment is a read-modify-write sequence, so even if each read/write is visible, two threads can still interleave and lose updates unless the entire sequence is protected atomically.
 
 4. Explain what a memory model is and why application developers should care about it.
-Hint: Connect it to reordering, visibility, and what guarantees code can rely on.
+Hint: Think about visibility (can thread B see thread A's write?) and atomicity (is the operation indivisible?). What rules does the language give you to guarantee those?
 Answer: A memory model defines the legal rules for visibility and ordering of reads/writes between threads. Developers need it because modern CPUs and compilers reorder operations and use caches aggressively, so intuitive "source order" reasoning is not enough for concurrent code. The memory model tells you which synchronization actions create reliable guarantees and which observations are legal or illegal across threads.
+FollowUp: If the candidate describes visibility and atomicity correctly but does not name the memory model or mention happens-before, ask: "You've described the problems well — does the language give you a formal name or specification for these guarantees? What is it called in Java?"
 
 5. Explain happens-before in practical terms and give two examples of how it is established.
 Hint: Use examples like monitor boundaries, volatile write/read, thread start, or thread join.

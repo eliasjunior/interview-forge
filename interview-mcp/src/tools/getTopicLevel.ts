@@ -10,9 +10,6 @@ import type { Session, SessionRewardSummary, TopicLevelSnapshot, TopicStatus, Wa
 /** Score threshold (out of 5) required to advance to the next warm-up level. */
 const ADVANCE_THRESHOLD = 4.0;
 
-/** Full interview avg score below this triggers a drop back to warm-up. */
-const DROP_THRESHOLD = 2.5;
-
 /** Real interview readiness requires repeated strong full-interview performance. */
 const JEDI_READY_THRESHOLD = 4.0;
 
@@ -155,23 +152,6 @@ export function detectTopicLevel(
       };
     }
 
-    if (avg !== null && avg < DROP_THRESHOLD) {
-      return {
-        level: 1,
-        status: 'dropped' as TopicStatus,
-        reason: `Last full interview avg score ${avg.toFixed(1)} — needs reinforcement. Warm-up recommended before next interview.`,
-        nextLevelRequirement: `Pass Level 1 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to return to full interview.`,
-        progress: {
-          current: 0,
-          required: REQUIRED_WARMUP_PASSES,
-          targetLevel: 3,
-          variant: 'warmup',
-          label: `0 / ${REQUIRED_WARMUP_PASSES} passes`,
-          attempted: true,
-          almostThere: false,
-        },
-      };
-    }
   }
 
   if (!hasWarmupContent) {

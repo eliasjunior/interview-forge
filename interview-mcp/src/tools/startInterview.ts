@@ -32,6 +32,19 @@ function shuffled<T>(arr: T[]): T[] {
   return out;
 }
 
+function orderTierCandidates(candidates: Candidate[]): Candidate[] {
+  const byTimesAsked = new Map<number, Candidate[]>();
+  for (const candidate of candidates) {
+    const group = byTimesAsked.get(candidate.timesAsked) ?? [];
+    group.push(candidate);
+    byTimesAsked.set(candidate.timesAsked, group);
+  }
+
+  return [...byTimesAsked.keys()]
+    .sort((a, b) => a - b)
+    .flatMap((timesAsked) => shuffled(byTimesAsked.get(timesAsked) ?? []));
+}
+
 interface Candidate {
   index: number;        // original index in knowledge file
   question: string;
@@ -66,13 +79,7 @@ export function selectQuestions(
 
   // Sort within each tier: least-asked first, shuffle ties
   for (const [tier, candidates] of byTier) {
-    byTier.set(
-      tier,
-      candidates.sort((a, b) => {
-        if (a.timesAsked !== b.timesAsked) return a.timesAsked - b.timesAsked;
-        return Math.random() - 0.5;
-      })
-    );
+    byTier.set(tier, orderTierCandidates(candidates));
   }
 
   // Allocate slots per tier proportionally to maxQuestions
@@ -89,10 +96,26 @@ export function selectQuestions(
 
   // Pick from each tier in order
   const selected: Candidate[] = [];
+  const selectedIndexes = new Set<number>();
   for (const tier of TIER_ORDER) {
     const slots = tierSlots[tier];
     const picks = byTier.get(tier)!.slice(0, slots);
     selected.push(...picks);
+    for (const pick of picks) selectedIndexes.add(pick.index);
+  }
+
+  // Redistribute unused slots to remaining questions in tier order so topics
+  // with sparse or missing difficulty metadata still produce a full interview.
+  if (selected.length < maxQuestions) {
+    for (const tier of TIER_ORDER) {
+      const leftovers = byTier.get(tier)!.filter((candidate) => !selectedIndexes.has(candidate.index));
+      for (const candidate of leftovers) {
+        if (selected.length >= maxQuestions) break;
+        selected.push(candidate);
+        selectedIndexes.add(candidate.index);
+      }
+      if (selected.length >= maxQuestions) break;
+    }
   }
 
   return selected;

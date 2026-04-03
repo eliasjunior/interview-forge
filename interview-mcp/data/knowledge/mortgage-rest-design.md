@@ -4,7 +4,7 @@
 This topic evaluates whether a senior backend engineer can reason clearly about a deliberately simple but production-minded Spring Boot service. A strong candidate should be able to explain why the current design is readable and maintainable, defend choices like layered responsibilities, `BigDecimal`, immutable records, and explicit exception handling, and also identify where an MVP should evolve next without over-engineering the first version.
 
 ## Questions
-1. The README treats `MortgageRateProvider` as the main seam in the system. Why is that a good design choice here, and what would you watch out for if the in-memory provider were replaced by an external service?
+1. This is a Spring Boot mortgage-check service. The service layer calls `InterestRateService`, which delegates rate lookups to a `MortgageRateProvider`. Right now the only implementation holds rates in memory, but the system was designed so a future implementation could fetch rates from an external HTTP endpoint instead — without changing the service layer.
 
    ```java
    public interface MortgageRateProvider {
@@ -22,6 +22,8 @@ This topic evaluates whether a senior backend engineer can reason clearly about 
    }
    ```
 
+   Two questions: (a) Why is introducing this interface a good design decision — what principle is it applying and what does it buy you? (b) If you replaced `InMemoryMortgageRateProvider` with an `HttpMortgageRateProvider` that calls an external service, what new production concerns would you need to address?
+
 2. Review the mortgage calculation below. What is correct about this implementation for an MVP, what assumptions is it making, and how would you explain the gap between this formula and a real mortgage amortization model?
 
    ```java
@@ -34,34 +36,9 @@ This topic evaluates whether a senior backend engineer can reason clearly about 
 
 3. The API returns `200 OK` for an infeasible mortgage, but `422` when there is no interest rate for the requested maturity period. Do you agree with that contract? Explain the distinction between business outcomes, validation failures, and domain errors in this service.
 
-4. Evaluate the request model and error handling choices in this code. What is good, what is still too loose for a robust backend, and what would you change first?
+4. The README emphasizes "solve the problem clearly, nothing more" while still documenting future evolution points like caching, circuit breakers, auth, rate limiting, and DTOs. How do you decide what belongs in the first version of a backend service versus what should remain an explicit future concern?
 
-   ```java
-   public record MortgageCheckRequest(
-           @NotNull @Positive BigDecimal income,
-           @NotNull @Positive Integer maturityPeriod,
-           @NotNull @Positive BigDecimal loanValue,
-           @NotNull @Positive BigDecimal homeValue
-   ) {}
-   ```
-
-   ```java
-   @ExceptionHandler(MaturityPeriodNotFoundException.class)
-   public ResponseEntity<ProblemDetail> handleMaturityPeriodNotFound(
-           MaturityPeriodNotFoundException ex, HttpServletRequest request) {
-       ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
-       problem.setTitle("Maturity Period Not Found");
-       problem.setInstance(URI.create(request.getRequestURI()));
-       problem.setProperty("timestamp", Instant.now());
-       return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-               .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-               .body(problem);
-   }
-   ```
-
-5. The README emphasizes "solve the problem clearly, nothing more" while still documenting future evolution points like caching, circuit breakers, auth, rate limiting, and DTOs. How do you decide what belongs in the first version of a backend service versus what should remain an explicit future concern?
-
-6. Look at the controller and service split below. Is the separation of responsibilities good enough for this service? What signals would tell you the controller layer is becoming too thin, too smart, or unnecessarily ceremonial?
+6. Look at the controller and service split below.
 
    ```java
    @PostMapping("/mortgage-check")
@@ -81,7 +58,11 @@ This topic evaluates whether a senior backend engineer can reason clearly about 
    }
    ```
 
-7. `InterestRateService.findByMaturityPeriod()` currently streams over the provider list and throws a typed exception if nothing matches. For this application, is that the right implementation? When would you keep it, and when would you redesign it?
+   (a) The controller passes `MortgageCheckRequest` — a class annotated with Bean Validation and designed as an HTTP request model — directly into the service. Is that a problem today? What would make you change it?
+
+   (b) `MortgageService` is a concrete class injected directly into the controller. What are your thoughts on that?
+
+7. `InterestRateService.findByMaturityPeriod()` currently calls `provider.getRates()` — which returns an in-memory list — and then streams over it to find a match. Right now the list has around 5–10 fixed entries.
 
    ```java
    public MortgageRate findByMaturityPeriod(int maturityPeriod) {
@@ -91,6 +72,12 @@ This topic evaluates whether a senior backend engineer can reason clearly about 
                .orElseThrow(() -> new MaturityPeriodNotFoundException(maturityPeriod));
    }
    ```
+
+   Evaluate this implementation. Is it acceptable as-is? Then consider each of the following changes and explain what you would redesign and why:
+
+   - **Data grows:** the list goes from 10 entries to 100,000 mortgage rate records.
+   - **External source:** `getRates()` is replaced by an HTTP call to an upstream service — every invocation of `findByMaturityPeriod` now goes over the wire and fetches the full list before filtering.
+   - **Duplicate maturity periods:** the upstream starts returning multiple `MortgageRate` entries with the same `maturityPeriod` value (e.g. different products for the same term). What does the current code do, and is that acceptable?
 
 8. Suppose the mortgage rates are moved to an external upstream that is slow, occasionally unavailable, and rate-limited. Design the next version of this component. Where would you put caching, retry behavior, circuit breaking, timeouts, observability, and fallback logic, and what failure modes would you expose to API consumers?
 
@@ -109,7 +96,6 @@ This topic evaluates whether a senior backend engineer can reason clearly about 
 - Question 2: intermediate
 - Question 3: intermediate
 - Question 4: advanced
-- Question 5: advanced
 - Question 6: intermediate
 - Question 7: intermediate
 - Question 8: advanced
@@ -123,8 +109,7 @@ This topic evaluates whether a senior backend engineer can reason clearly about 
 - Question 1: A strong answer explains dependency inversion, stable service boundaries, testability, and how the provider isolates data-source changes from controllers and business logic. It should mention likely follow-ups for an external dependency such as timeouts, retries, caching, circuit breaking, monitoring, and failure semantics. A weak answer only says "interfaces are good" without tying the abstraction to this codebase. Bonus points for explaining why this seam is justified while broader abstractions would not be.
 - Question 2: A strong answer recognizes that `BigDecimal` and explicit rounding are correct for financial calculations, but also calls out that the current formula computes simple monthly interest rather than a full amortized payment. It should explain that the README intentionally documents this as an assumption and that only one method needs to change when the business clarifies the real rule. A weak answer either blindly accepts the formula as "the mortgage payment" or rejects it without acknowledging MVP scope. Bonus points for discussing precision, rounding policy ownership, and test cases around edge values.
 - Question 3: A strong answer distinguishes invalid input (`400`), unsupported but syntactically valid domain requests (`422`), and valid business outcomes (`200` with `feasible: false`). It should explain why infeasibility is part of normal business behavior, not a transport error. A weak answer collapses all failures into `400` or `500`, or treats every negative outcome as an exception. Bonus points for discussing API consumer ergonomics and contract clarity.
-- Question 4: A strong answer praises immutable request models, Bean Validation, and RFC 7807 problem responses, then identifies missing constraints such as realistic upper bounds, tighter maturity period limits, and possibly DTO separation if the API and domain diverge. It should also mention that robust systems need consistent error shapes, explicit media types, and careful exposure of details. A weak answer only repeats that validation exists without noticing current gaps. Bonus points for discussing versioning pressure, domain leakage, and why records are a good fit here.
-- Question 5: A strong answer shows judgment under uncertainty: keep the first version simple when requirements are stable and local, but document clear seams for scaling, resilience, and security as they become necessary. It should explain how to defer complexity responsibly rather than ignore it, using the README's evolution points as examples of intentional boundaries. A weak answer either over-engineers the MVP with speculative infrastructure or dismisses production concerns entirely. Bonus points for framing decisions in terms of cost of change, operational risk, and signal from actual requirements.
+- Question 4: A strong answer shows judgment under uncertainty: keep the first version simple when requirements are stable and local, but document clear seams for scaling, resilience, and security as they become necessary. It should explain how to defer complexity responsibly rather than ignore it, using the README's evolution points as examples of intentional boundaries. A weak answer either over-engineers the MVP with speculative infrastructure or dismisses production concerns entirely. Bonus points for framing decisions in terms of cost of change, operational risk, and signal from actual requirements.
 - Question 6: A strong answer explains that the current controller is appropriately thin because HTTP concerns stay in the controller and business rules stay in the service. It should also recognize the failure modes on both sides: controllers that become orchestration-heavy and services that become dumping grounds for transport logic. A weak answer argues from dogma rather than this specific codebase. Bonus points for discussing when a separate application service, mapper, or DTO layer becomes justified.
 - Question 7: A strong answer says the current list scan is acceptable for a tiny fixed in-memory dataset, especially because readability beats premature optimization here. It should also explain the redesign triggers: larger datasets, repeated upstream calls, stricter latency goals, duplicate maturity periods, or a provider contract that should offer direct lookup semantics. A weak answer either overreacts to O(n) in a five-item list or ignores how the design would change under scale. Bonus points for discussing normalization, uniqueness guarantees, and whether lookup responsibility belongs in the provider or service.
 - Question 8: A strong answer places resilience primarily at the external integration boundary, not spread across controllers and core business logic. It should cover connection and read timeouts, bounded retries only for safe failure classes, caching with explicit TTLs, circuit breaking, metrics, structured logs, and clear API behavior when the upstream is unavailable or stale data is used. A weak answer throws infrastructure buzzwords at the problem without explaining ownership or failure semantics. Bonus points for discussing cache invalidation, startup behavior, and whether stale-but-recent data is acceptable.
