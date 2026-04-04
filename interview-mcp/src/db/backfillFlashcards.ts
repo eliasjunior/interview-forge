@@ -1,6 +1,6 @@
 import { createDb } from "./client.js";
 import { createSqliteRepositories } from "./repositories/createRepositories.js";
-import { generateFlashcards } from "../interviewUtils.js";
+import { generateFlashcards } from "../flashcardUtils.js";
 
 const db = createDb();
 const repositories = createSqliteRepositories(db);

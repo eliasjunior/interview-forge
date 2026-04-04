@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import type { Concept, Exercise, Flashcard, KnowledgeGraph, Mistake, Session, Skill } from "@mock-interview/shared";
 import type { KnowledgeStore, KnowledgeTopic } from "../knowledge/port.js";
 import type { ToolDeps } from "../tools/deps.js";
-import { assertState, buildSummary, calcAvgScore } from "../interviewUtils.js";
+import { assertState } from "../stateUtils.js";
+import { buildSummary, calcAvgScore } from "../sessionUtils.js";
 import { registerStartWarmUpTool } from "../tools/startWarmUp.js";
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }>;

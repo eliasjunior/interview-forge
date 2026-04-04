@@ -15,6 +15,7 @@ import { registerListTopicsTool } from "./listTopics.js";
 import { registerGetDueFlashcardsTool } from "./getDueFlashcards.js";
 import { registerReviewFlashcardTool } from "./reviewFlashcard.js";
 import { registerCreateFlashcardTool } from "./createFlashcard.js";
+import { registerPrepareFlashcardsTool } from "./prepareFlashcards.js";
 import { registerStartScopedInterviewTool } from "./startScopedInterview.js";
 import { registerLogMistakeTool } from "./logMistake.js";
 import { registerListMistakesTool } from "./listMistakes.js";
@@ -46,6 +47,7 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerListSessionsTool(server, deps);
   registerListTopicsTool(server, deps);
   registerGetDueFlashcardsTool(server, deps);
+  registerPrepareFlashcardsTool(server, deps);
   registerCreateFlashcardTool(server, deps);
   registerReviewFlashcardTool(server, deps);
   registerLogMistakeTool(server, deps);

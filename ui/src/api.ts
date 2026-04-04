@@ -80,6 +80,31 @@ export const getTopicLevel = (topic: string): Promise<TopicLevel> =>
 
 export const getSessions = (): Promise<Session[]> => req(`${BASE}/sessions`)
 
+export interface ScopedInterviewStartRequest {
+  topic: string
+  content: string
+  focus?: string
+}
+
+export interface ScopedInterviewStartResponse {
+  sessionId: string
+  state: Session['state']
+  topic: string
+  focusArea: string
+  source: string
+  parsed:
+    | { contentType: 'algorithm' }
+    | { contentType: 'api'; endpoints: string[]; models: string[]; rules: string[]; gaps: string[] }
+  totalQuestions: number
+  previewQuestions: string[]
+  normalizedContent: string
+  detectedContentType: 'algorithm' | 'api'
+  nextTool: 'ask_question'
+}
+
+export const createScopedInterview = (body: ScopedInterviewStartRequest): Promise<ScopedInterviewStartResponse> =>
+  post(`${BASE}/scoped-interviews`, body)
+
 
 export interface ProgressQuery {
   sessionKind?: ProgressSessionKind
@@ -104,6 +129,16 @@ export const getSession = async (id: string): Promise<Session | null> => {
 
 export const getSessionRewardSummary = (id: string): Promise<SessionRewardSummary> =>
   req(`${BASE}/sessions/${encodeURIComponent(id)}/reward-summary`)
+
+export interface SessionLaunchPrompt {
+  sessionId: string
+  title: string
+  prompt: string
+  nextTool: 'get_session'
+}
+
+export const getSessionLaunchPrompt = (id: string): Promise<SessionLaunchPrompt> =>
+  req(`${BASE}/sessions/${encodeURIComponent(id)}/launch-prompt`)
 
 export const getSessionDeletePreview = (id: string): Promise<SessionDeletionPreview> =>
   req(`${BASE}/sessions/${encodeURIComponent(id)}/delete-preview`)
@@ -150,9 +185,26 @@ export interface ReportUiDataset {
   questions: ReportUiQuestion[]
 }
 
+export interface ReportUiResponseReady {
+  ready: true
+  sessionId: string
+  state: Session['state']
+  dataset: ReportUiDataset
+}
+
+export interface ReportUiResponsePending {
+  ready: false
+  sessionId: string
+  state: Session['state']
+  message: string
+}
+
+export type ReportUiResponse = ReportUiResponseReady | ReportUiResponsePending
+
 export async function getGeneratedReportUi(id: string): Promise<ReportUiDataset | null> {
-  const res = await fetch(`/generated/${encodeURIComponent(id)}-report-ui.json`)
+  const res = await fetch(`${BASE}/sessions/${encodeURIComponent(id)}/report-ui`)
   if (res.status === 404) return null
-  if (!res.ok) throw new Error(`Request failed: ${res.status} /generated/${id}-report-ui.json`)
-  return res.json() as Promise<ReportUiDataset>
+  if (!res.ok) throw new Error(`Request failed: ${res.status} ${BASE}/sessions/${encodeURIComponent(id)}/report-ui`)
+  const payload = await res.json() as ReportUiResponse
+  return payload.ready ? payload.dataset : null
 }

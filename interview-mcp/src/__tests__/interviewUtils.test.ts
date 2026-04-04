@@ -1,14 +1,9 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import {
-  assertState,
-  buildEndInterviewRecommendations,
-  buildSummary,
-  buildTranscript,
-  calcAvgScore,
-  generateFlashcards,
-  mergeConceptsIntoGraph,
-} from "../interviewUtils.js";
+import { assertState } from "../stateUtils.js";
+import { buildEndInterviewRecommendations, buildSummary, buildTranscript, calcAvgScore } from "../sessionUtils.js";
+import { generateFlashcards } from "../flashcardUtils.js";
+import { mergeConceptsIntoGraph } from "../graphUtils.js";
 import type { Session, Evaluation, KnowledgeGraph, Concept, Mistake } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────
@@ -483,7 +478,7 @@ describe("generateFlashcards", () => {
     const session = makeSession({ evaluations: [makeEval(3)] });
     const cards = generateFlashcards(session);
     assert.equal(cards.length, 1);
-    assert.equal(cards[0].front, "What is useEffect?");
+    assert.match(cards[0].front, /^What is useEffect\?/);
     assert.equal(cards[0].topic, session.topic);
   });
 
@@ -538,6 +533,80 @@ describe("generateFlashcards", () => {
       evaluations: [makeEval(2, 0, { deeperDive: "- Study invariant conditions" })],
     });
     assert.ok(generateFlashcards(session)[0].back.includes("Study invariant conditions"));
+  });
+
+  test("non-code cards include anchors on the front and a retrieval route on the back", () => {
+    const session = makeSession({
+      topic: "Observability",
+      evaluations: [makeEval(2, 0, {
+        question: "Which statements about observability are correct?",
+        answer: "A, B",
+        feedback: [
+          "Not quite — the correct answer is",
+          "",
+          "A) Structured logs with a request or trace ID help correlate events across a single request",
+          "B) Metrics such as error rate and latency per dependency help identify where a failure originated",
+          "D) Knowing whether an issue is in the app, the database, or LendingAPI requires signals from all three layers.",
+        ].join("\n"),
+      })],
+    });
+
+    const card = generateFlashcards(session)[0];
+    assert.match(card.front, /Anchors:/);
+    assert.match(card.front, /correlate request/);
+    assert.match(card.back, /## Correct/);
+    assert.match(card.back, /A, B, D/);
+    assert.match(card.back, /## Route/);
+    assert.match(card.back, /dependency metrics -> Metrics such as error rate and latency per dependency/);
+    assert.match(card.back, /isolate layer -> Knowing whether an issue is in the app, the database, or LendingAPI requires signals from all three layers/);
+  });
+
+  test("open-ended cards include stronger answer guidance when available", () => {
+    const session = makeSession({
+      evaluations: [makeEval(2, 0, {
+        feedback: "Too broad. Explain synchronization, not general post-render logic.",
+        strongAnswer: "Use useEffect to synchronize React with external systems such as subscriptions, timers, or imperative APIs.",
+      })],
+    });
+
+    const card = generateFlashcards(session)[0];
+    assert.match(card.front, /Anchors:/);
+    assert.match(card.back, /## Stronger answer/);
+    assert.match(card.back, /synchronize React with external systems/);
+    assert.match(card.back, /## Route/);
+  });
+
+  test("code exercise cards prefer a code-first front and back", () => {
+    const session = makeSession({
+      topic: "2D index transformations",
+      sessionKind: "drill",
+      focusArea: "Micro-skill drill: layer boundaries",
+      evaluations: [makeEval(2, 0, {
+        question: "Explain layer boundaries for a square matrix from first principles.",
+        answer: "Track the first and last index for the ring.",
+        feedback: "Missing the generalized first=k, last=n-1-k formula and the stop condition.",
+      })],
+    });
+
+    const card = generateFlashcards(session)[0];
+    assert.match(card.front, /TypeScript/i);
+    assert.match(card.back, /## Code example/);
+    assert.match(card.back, /getLayerBounds/);
+    assert.match(card.back, /Original weak answer/);
+  });
+
+  test("exercise-backed sessions prefer code-first flashcards", () => {
+    const session = makeSession({
+      topic: "Caching kata",
+      sourcePath: "/tmp/data/knowledge/exercises/caching/cacheprimer.md",
+      evaluations: [makeEval(2, 0, {
+        question: "How would you implement the cache invalidation step?",
+      })],
+    });
+
+    const card = generateFlashcards(session)[0];
+    assert.match(card.front, /Turn this weak spot into code:/);
+    assert.match(card.back, /```ts/);
   });
 
   test("card has correct SM-2 initial values and is due immediately", () => {

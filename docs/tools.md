@@ -22,7 +22,7 @@ This server drives the interview session from start to finish.
 | `evaluate_answer` | Scores the answer (1–5), writes feedback and a model answer. Advances to `FOLLOW_UP`. |
 | `ask_followup` | Generates and asks a follow-up question based on the candidate's answer. |
 | `next_question` | Moves to the next question, or ends the session if all questions are done. |
-| `end_interview` | Ends the session, builds the Markdown report, merges concepts into the graph, generates flashcards for weak answers. |
+| `end_interview` | Ends the session, builds the Markdown report, merges concepts into the graph, and returns the next flashcard-preparation step when weak answers exist. |
 | `get_session` | Returns the full session record (state, questions, evaluations, graph). |
 | `list_sessions` | Lists all sessions with summary metadata. |
 
@@ -31,9 +31,10 @@ This server drives the interview session from start to finish.
 | Tool | What it does |
 |---|---|
 | `get_due_flashcards` | Returns flashcards due for review today, sorted most-overdue first. Supports optional topic filter. |
+| `prepare_flashcards` | Builds ready-to-submit `create_flashcard` payloads for weak answers in a completed session. |
 | `review_flashcard` | Submits a recall rating and applies SM-2 to schedule the next review. |
 | `generate_flashcard_variation` | Returns card context plus a variation angle so the orchestrator can ask the same concept from a fresh perspective. |
-| `create_flashcard` | Creates a flashcard directly from supplied front/back content without needing an interview session. |
+| `create_flashcard` | Persists a flashcard from plain front/back content or from a guided draft with anchors, route steps, and source linkage. |
 
 ### Mistake log
 

@@ -25,7 +25,7 @@ const LEVEL_LABEL: Record<WarmUpLevel, string> = {
   1: "Padawan",
   2: "Forge",
   3: "Ranger",
-  4: "Jedi Ready",
+  4: "Jedi Master",
 };
 
 const POOL_EXHAUSTED_PREAMBLE =
@@ -99,7 +99,7 @@ export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {
     {
       description:
         "Start a warm-up quest session for a topic. " +
-        "Levels: 0 = Spark (MCQ), 1 = Padawan (advanced MCQ with possible multi-answer keys), 2 = Forge (guided answer), 3 = Ranger (redirects to start_interview), 4 = Jedi Ready (redirects to start_interview). " +
+        "Levels: 0 = Spark (MCQ), 1 = Padawan (advanced MCQ with possible multi-answer keys), 2 = Forge (guided answer), 3 = Ranger (redirects to start_interview), 4 = Jedi Master (redirects to start_interview). " +
         "Warm-up sessions are capped at 5 questions even when more are authored. " +
         "If level is omitted, auto-detects the appropriate level from session history. " +
         "Use after get_topic_level to route candidates correctly.",

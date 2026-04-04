@@ -1,15 +1,29 @@
-abcd p1(pointer 1) cdab (p2)
+Good. First ill try to draw some  examples. tunderstand the pattern
 
 
-while p1 < len 
+for example
 
-compare s1 to s2, search for s1[0] in s2, incr p2
-find it,  p1 = 0 p2 = 2. check check s1[p1] == s2[p2]
- foundIndex = 2
- calculate rotation Index(ri) = length - foundIndex, ri= 2;
+aabbc -> bbcaa
 
- p2 = p2 < len ? p2++ : 0
- p1++
+accca -> cccac
+
+
+
+I need to find the split index(break point), a pseudo code would be
+
+lets get 'accca' -> 'cccac'
+
+lets find the candidate, first would be 'c' index 3 in S1
+
+so substring here 'ca' == 'cc' in S2 
+
+next will be 'cca' == 'cca' YES, found split, 'ccc + ac'
+
+so S1 -> cca + ac, the pointers here are:
+last index -> p1, and p1 + 1 to 0, cca + ac
+
+
+
 
 
 

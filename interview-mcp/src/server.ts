@@ -10,18 +10,9 @@ import { fileURLToPath } from "url";
 import type { AIProvider } from "./ai/index.js";
 import { createKnowledgeStore, type KnowledgeStore } from "./knowledge/index.js";
 import type { Session, Concept, KnowledgeGraph, Flashcard, Mistake, Skill, Exercise } from "@mock-interview/shared";
-import {
-  assertState,
-  generateId,
-  findLast,
-  calcAvgScore,
-  buildSummary,
-  buildReport,
-  buildTranscript,
-  mergeConceptsIntoGraph,
-  generateFlashcards,
-} from "./interviewUtils.js";
-import { persistFlashcard } from "./tools/createFlashcard.js";
+import { assertState } from "./stateUtils.js";
+import { generateId, findLast, calcAvgScore, buildSummary, buildReport, buildTranscript } from "./sessionUtils.js";
+import { mergeConceptsIntoGraph } from "./graphUtils.js";
 import { registerAllTools } from "./tools/registerAllTools.js";
 import type { ToolDeps } from "./tools/deps.js";
 import { detectTopicLevel } from "./tools/getTopicLevel.js";
@@ -206,18 +197,6 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   saveGraph(mergeConceptsIntoGraph(graph, concepts, session.id));
   const reportFile = saveReport(session);
 
-  // Generate flashcards for any question scored below the threshold.
-  // Delegates to persistFlashcard (create_flashcard tool) — single place that
-  // knows how to save a card idempotently.
-  const newCards = generateFlashcards(session);
-  let savedCount = 0;
-  for (const card of newCards) {
-    if (persistFlashcard(deps, card)) savedCount++;
-  }
-  if (savedCount > 0) {
-    console.error(`[flashcards] added ${savedCount} card(s) for session ${session.id}`);
-  }
-
   const currentLevelSnapshot = detectTopicLevel(session.topic, sessions, hasWarmupContent);
   const topicPlanKey = resolveTopicPlanKey(session.topic);
   const existingTopicPlan = repositories.topicPlans.list().find((plan) => plan.topic === topicPlanKey || plan.topic === session.topic);
@@ -231,7 +210,7 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
     lastUnlockedLevel: leveledUp ? currentLevelSnapshot.level : existingTopicPlan?.lastUnlockedLevel,
   });
 
-  return { summary, avgScore, concepts, reportFile, flashcardsGenerated: newCards.length };
+  return { summary, avgScore, concepts, reportFile };
 }
 
 const server = new McpServer({

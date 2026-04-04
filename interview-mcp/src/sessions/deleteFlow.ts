@@ -1,5 +1,5 @@
 import type { Flashcard, KnowledgeGraph, Session } from "@mock-interview/shared";
-import { mergeConceptsIntoGraph } from "../interviewUtils.js";
+import { mergeConceptsIntoGraph } from "../graphUtils.js";
 
 export interface SessionArtifactStatus {
   markdownReport: boolean;

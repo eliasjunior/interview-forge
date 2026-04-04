@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Topic, TopicLevel } from '../api'
 
-import { getTopicPlans, getTopics, getTopicLevel, updateTopicPlan } from '../api'
+import { createScopedInterview, getTopicPlans, getTopics, getTopicLevel, updateTopicPlan } from '../api'
 import type { TopicPlan, TopicPlanPriority } from '@mock-interview/shared'
 
 const LEVEL_STORAGE_KEY = 'topics-level-snapshot'
@@ -22,7 +23,7 @@ const LEVEL_CONFIG: Record<0 | 1 | 2 | 3 | 4, {
   1: { color: '#2dd4bf', bg: '#0f3d3660', text: '#ccfbf1', label: 'L1', desc: 'Padawan', semantic: 'Assisted recall with guidance' },
   2: { color: '#3b82f6', bg: '#0d1a3a60', text: '#bfdbfe', label: 'L2', desc: 'Forge', semantic: 'Shaping structured answers' },
   3: { color: '#f97316', bg: '#31130460', text: '#fdba74', label: 'L3', desc: 'Ranger', semantic: 'Capable in full mock interviews' },
-  4: { color: '#c084fc', bg: '#3b076460', text: '#f3e8ff', label: 'L4', desc: 'Jedi Ready', semantic: 'Sustained real-interview readiness' },
+  4: { color: '#c084fc', bg: '#3b076460', text: '#f3e8ff', label: 'L4', desc: 'Jedi Master', semantic: 'Sustained real-interview readiness' },
 }
 
 function getLevelAppearance(level: keyof typeof LEVEL_CONFIG) {
@@ -165,6 +166,12 @@ type TopicAction = {
   helper: string
 }
 
+type CustomInterviewDraft = {
+  topic: string
+  focus: string
+  content: string
+}
+
 function getRecommendedAction(levelData: TopicLevel, topicFile: string): TopicAction {
   if (levelData.status === 'dropped') {
     return {
@@ -271,9 +278,85 @@ function TopicActionLauncher({
   )
 }
 
+function CustomInterviewModal({
+  draft,
+  busy,
+  error,
+  onClose,
+  onChange,
+  onSubmit,
+}: {
+  draft: CustomInterviewDraft
+  busy: boolean
+  error: string | null
+  onClose: () => void
+  onChange: (next: CustomInterviewDraft) => void
+  onSubmit: () => void
+}) {
+  return (
+    <div className="graph-modal-backdrop" onClick={onClose}>
+      <div className="custom-interview-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="graph-modal-header">
+          <div>
+            <h2 className="topics-plan-title">Start Interview With Content</h2>
+            <p className="topics-plan-subtitle">Paste an algorithm prompt, project spec, or architecture note. The backend will normalize it into scoped interview context before creating the session.</p>
+          </div>
+          <button className="btn-back" onClick={onClose}>✕ Close</button>
+        </div>
+
+        <div className="custom-interview-form">
+          <label className="custom-interview-field">
+            <span className="custom-interview-label">Topic</span>
+            <input
+              className="custom-interview-input"
+              value={draft.topic}
+              onChange={(event) => onChange({ ...draft, topic: event.target.value })}
+              placeholder="String Rotation"
+              disabled={busy}
+            />
+          </label>
+
+          <label className="custom-interview-field">
+            <span className="custom-interview-label">Focus</span>
+            <input
+              className="custom-interview-input"
+              value={draft.focus}
+              onChange={(event) => onChange({ ...draft, focus: event.target.value })}
+              placeholder="algorithmic reasoning, edge cases, and complexity trade-offs"
+              disabled={busy}
+            />
+          </label>
+
+          <label className="custom-interview-field">
+            <span className="custom-interview-label">Content</span>
+            <textarea
+              className="custom-interview-textarea"
+              value={draft.content}
+              onChange={(event) => onChange({ ...draft, content: event.target.value })}
+              placeholder="Paste the problem statement or spec here."
+              rows={12}
+              disabled={busy}
+            />
+          </label>
+
+          {error && <div className="error-msg">{error}</div>}
+
+          <div className="custom-interview-actions">
+            <button className="btn-back" onClick={onClose} disabled={busy}>Cancel</button>
+            <button className="btn-secondary" onClick={onSubmit} disabled={busy || draft.topic.trim().length === 0 || draft.content.trim().length < 20}>
+              {busy ? 'Creating…' : 'Create session'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function TopicsPage() {
+  const navigate = useNavigate()
   const [topics, setTopics] = useState<Topic[]>([])
   const [levels, setLevels] = useState<Record<string, TopicLevel>>({})
   const [topicPlans, setTopicPlans] = useState<Record<string, TopicPlan>>({})
@@ -284,6 +367,9 @@ export default function TopicsPage() {
   const [focusMap, setFocusMap] = useState<Record<string, boolean>>({})
   const [priorityMap, setPriorityMap] = useState<Record<string, TopicPriority>>({})
   const [activeFilter, setActiveFilter] = useState<TopicFilter>('all')
+  const [customInterviewDraft, setCustomInterviewDraft] = useState<CustomInterviewDraft | null>(null)
+  const [customInterviewBusy, setCustomInterviewBusy] = useState(false)
+  const [customInterviewError, setCustomInterviewError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const pageRef = useRef<HTMLDivElement | null>(null)
   const refreshInFlightRef = useRef(false)
@@ -444,6 +530,44 @@ export default function TopicsPage() {
     }
   }
 
+  function openCustomInterview(topic = '') {
+    setCustomInterviewDraft({
+      topic,
+      focus: 'algorithmic reasoning, edge cases, and complexity trade-offs',
+      content: '',
+    })
+    setCustomInterviewError(null)
+    setActiveMenu(null)
+  }
+
+  async function handleCreateCustomInterview() {
+    if (!customInterviewDraft || customInterviewBusy) return
+
+    try {
+      setCustomInterviewBusy(true)
+      setCustomInterviewError(null)
+      const created = await createScopedInterview({
+        topic: customInterviewDraft.topic,
+        focus: customInterviewDraft.focus,
+        content: customInterviewDraft.content,
+      })
+      setToastQueue(prev => [
+        ...prev,
+        {
+          id: `${created.sessionId}-created`,
+          message: `Created ${created.detectedContentType} interview: ${created.topic}`,
+          level: 1,
+        },
+      ])
+      setCustomInterviewDraft(null)
+      navigate(`/sessions/${created.sessionId}`)
+    } catch (error) {
+      setCustomInterviewError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setCustomInterviewBusy(false)
+    }
+  }
+
   if (loading) return <div className="page-loading">Loading...</div>
 
   const sortedTopics = [...topics].sort((a, b) => {
@@ -479,7 +603,12 @@ export default function TopicsPage() {
             Each topic has a progressive warm-up ladder before the full interview.
           </p>
         </div>
-        <span className="topics-count">{topics.length} topics</span>
+        <div className="topics-header-actions">
+          <button className="btn-secondary" onClick={() => openCustomInterview()}>
+            Start With Content
+          </button>
+          <span className="topics-count">{topics.length} topics</span>
+        </div>
       </div>
 
       <div className="topics-level-legend">
@@ -698,6 +827,21 @@ export default function TopicsPage() {
         >
           {activeToast.message}
         </div>
+      )}
+
+      {customInterviewDraft && (
+        <CustomInterviewModal
+          draft={customInterviewDraft}
+          busy={customInterviewBusy}
+          error={customInterviewError}
+          onClose={() => {
+            if (customInterviewBusy) return
+            setCustomInterviewDraft(null)
+            setCustomInterviewError(null)
+          }}
+          onChange={setCustomInterviewDraft}
+          onSubmit={() => void handleCreateCustomInterview()}
+        />
       )}
     </div>
   )

@@ -22,7 +22,9 @@ import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 import { canonicalizeConceptWord } from "./graph/concepts.js";
 import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sessions/admin.js";
+import { buildSessionLaunchPrompt } from "./sessions/launchPrompt.js";
 import { buildProgressOverview } from "./progress.js";
+import { createScopedInterviewSession, DEFAULT_FOCUS } from "./scopedInterview/session.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -261,6 +263,48 @@ app.get("/api/sessions", (_req, res) => {
   res.json(repositories.sessions.list());
 });
 
+app.post("/api/scoped-interviews", (req, res) => {
+  const topic = typeof req.body?.topic === "string" ? req.body.topic.trim() : "";
+  const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+  const focus = typeof req.body?.focus === "string" && req.body.focus.trim().length > 0
+    ? req.body.focus.trim()
+    : DEFAULT_FOCUS;
+
+  if (!topic) {
+    res.status(400).json({ error: "topic is required" });
+    return;
+  }
+
+  if (content.length < 20) {
+    res.status(400).json({ error: "content must be at least 20 characters" });
+    return;
+  }
+
+  const result = createScopedInterviewSession({
+    topic,
+    rawContent: content,
+    focus,
+    generateId: () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  });
+
+  repositories.sessions.save(result.session);
+
+  res.status(201).json({
+    sessionId: result.session.id,
+    state: result.session.state,
+    topic: result.session.topic,
+    interviewType: result.session.interviewType,
+    focusArea: result.focusArea,
+    source: result.source,
+    parsed: result.parsed,
+    totalQuestions: result.totalQuestions,
+    previewQuestions: result.previewQuestions,
+    normalizedContent: result.normalizedContent,
+    detectedContentType: result.detectedContentType,
+    nextTool: "ask_question",
+  });
+});
+
 app.get("/api/sessions/:id/reward-summary", (req, res) => {
   const session = repositories.sessions.list().find((candidate) => candidate.id === req.params.id);
   if (!session) {
@@ -281,6 +325,16 @@ app.get("/api/sessions/:id/reward-summary", (req, res) => {
     Object.keys(knowledgeTopic.warmupLevels).length > 0;
 
   res.json(buildSessionRewardSummary(session, loadSessions(), hasWarmupContent));
+});
+
+app.get("/api/sessions/:id/launch-prompt", (req, res) => {
+  const session = repositories.sessions.getById(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  res.json(buildSessionLaunchPrompt(session));
 });
 
 app.get("/api/sessions/:id/delete-preview", (req, res) => {
@@ -356,6 +410,34 @@ app.get("/api/reports/:id", (req, res) => {
     return;
   }
   res.type("text/markdown").send(fs.readFileSync(reportPath, "utf8"));
+});
+
+app.get("/api/sessions/:id/report-ui", (req, res) => {
+  const session = repositories.sessions.getById(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  const datasetPath = path.join(GENERATED_UI_DIR, `${req.params.id}-report-ui.json`);
+  if (!fs.existsSync(datasetPath)) {
+    res.json({
+      ready: false,
+      sessionId: session.id,
+      state: session.state,
+      message: session.state === "ENDED"
+        ? "Report UI dataset has not been generated yet."
+        : "Interview is still in progress. Report UI will be available after the interview is finished.",
+    });
+    return;
+  }
+
+  res.json({
+    ready: true,
+    sessionId: session.id,
+    state: session.state,
+    dataset: JSON.parse(fs.readFileSync(datasetPath, "utf8")),
+  });
 });
 
 app.get("/api/mistakes", (req, res) => {

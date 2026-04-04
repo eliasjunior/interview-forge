@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { deleteSession, getGeneratedReportUi, getSession, getSessionDeletePreview, getSessionRewardSummary, type ReportUiDataset } from '../api'
+import { deleteSession, getGeneratedReportUi, getSession, getSessionDeletePreview, getSessionLaunchPrompt, getSessionRewardSummary, type ReportUiDataset, type SessionLaunchPrompt } from '../api'
 import type { Session, Evaluation, Concept, SessionDeletionPreview, SessionKind, SessionRewardSummary } from '@mock-interview/shared'
 import ScoreBadge, { ScoreBar } from '../components/ScoreBadge'
 
@@ -36,14 +36,21 @@ function getStudyCategory(session: Session): 'topic' | 'algorithm' {
   return session.studyCategory ?? 'topic'
 }
 
+function extractProblemStatement(customContent: string): string | null {
+  const match = customContent.match(/##\s+Problem Statement\s*\n([\s\S]+?)(?=\n##|$)/i)
+  return match ? match[1].trim() : null
+}
+
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [session, setSession] = useState<Session | null>(null)
   const [reportUi, setReportUi] = useState<ReportUiDataset | null>(null)
   const [rewardSummary, setRewardSummary] = useState<SessionRewardSummary | null>(null)
+  const [launchPrompt, setLaunchPrompt] = useState<SessionLaunchPrompt | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [copyToast, setCopyToast] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
   const [openQ, setOpenQ] = useState<number | null>(0)
   const [deleteBusy, setDeleteBusy] = useState(false)
@@ -69,6 +76,17 @@ export default function ReportPage() {
   }, [id, session, refreshTick])
 
   useEffect(() => {
+    if (!id || !session || getSessionKind(session) === 'study' || session.state === 'ENDED') {
+      setLaunchPrompt(null)
+      return
+    }
+
+    getSessionLaunchPrompt(id)
+      .then(setLaunchPrompt)
+      .catch(() => setLaunchPrompt(null))
+  }, [id, session, refreshTick])
+
+  useEffect(() => {
     function triggerRefresh() {
       setRefreshTick((value) => value + 1)
     }
@@ -88,12 +106,22 @@ export default function ReportPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!copyToast) return
+    const timeoutId = window.setTimeout(() => setCopyToast(null), 2200)
+    return () => window.clearTimeout(timeoutId)
+  }, [copyToast])
+
   if (loading) return <div className="loading">Loading report…</div>
   if (error || !session) return <div className="error-msg">{error ?? 'Session not found'}</div>
 
   const avg = calcAvg(session.evaluations)
   const isStudy = getSessionKind(session) === 'study'
   const isAlgorithmStudy = isStudy && getStudyCategory(session) === 'algorithm'
+  const isCodeInterview = session.interviewType === 'code'
+  const problemStatement = isCodeInterview && session.customContent
+    ? extractProblemStatement(session.customContent)
+    : null
   const tabs: Tab[] = isStudy ? ['overview', 'questions'] : ['overview', 'questions', 'transcript']
 
   async function handleDeleteSession() {
@@ -113,15 +141,32 @@ export default function ReportPage() {
     }
   }
 
+  async function handleCopyLaunchPrompt() {
+    if (!launchPrompt) return
+    try {
+      await navigator.clipboard.writeText(launchPrompt.prompt)
+      setCopyToast('Launch prompt copied')
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
   return (
     <div>
       <div className="page-actions">
         <button className="btn-back" onClick={() => navigate('/sessions')}>
           ← Back to sessions
         </button>
-        <button className="btn-danger" onClick={handleDeleteSession} disabled={deleteBusy}>
-          {deleteBusy ? 'Deleting…' : 'Delete session'}
-        </button>
+        <div className="page-actions-group">
+          {launchPrompt && (
+            <button className="btn-secondary" onClick={() => void handleCopyLaunchPrompt()}>
+              Start In Claude
+            </button>
+          )}
+          <button className="btn-danger" onClick={handleDeleteSession} disabled={deleteBusy}>
+            {deleteBusy ? 'Deleting…' : 'Delete session'}
+          </button>
+        </div>
       </div>
 
       {/* Header */}
@@ -140,6 +185,9 @@ export default function ReportPage() {
               <span className={`tag ${isAlgorithmStudy ? 'tag-algorithm' : 'tag-topic'}`}>
                 {isAlgorithmStudy ? 'Algorithm' : 'Topic'}
               </span>
+            )}
+            {isCodeInterview && (
+              <span className="tag tag-algorithm">Code Interview</span>
             )}
           </div>
         </div>
@@ -167,6 +215,32 @@ export default function ReportPage() {
           <div className="stat-label">{isStudy ? 'Source format' : 'Knowledge source'}</div>
         </div>
       </div>
+
+      {/* Problem Statement — always visible for code interviews */}
+      {problemStatement && (
+        <div className="study-summary-box" style={{ marginBottom: 24 }}>
+          <div className="page-subtitle" style={{ marginBottom: 8 }}>Problem Statement</div>
+          <div className="qa-section-text" style={{ whiteSpace: 'pre-wrap' }}>{problemStatement}</div>
+        </div>
+      )}
+
+      {launchPrompt && (
+        <div className="launch-prompt-card">
+          <div className="launch-prompt-header">
+            <div>
+              <div className="page-subtitle" style={{ marginBottom: 6 }}>Start In Claude</div>
+              <div className="launch-prompt-title">{launchPrompt.title}</div>
+            </div>
+            <button className="btn-secondary" onClick={() => void handleCopyLaunchPrompt()}>
+              Copy prompt
+            </button>
+          </div>
+          <div className="launch-prompt-body">
+            Use this in Claude Desktop to hand off the session cleanly. Claude should start with <code>get_session</code> and continue from the current state.
+          </div>
+          <pre className="launch-prompt-code">{launchPrompt.prompt}</pre>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="tabs">
@@ -320,6 +394,12 @@ export default function ReportPage() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {copyToast && (
+        <div className="copy-toast">
+          {copyToast}
         </div>
       )}
     </div>

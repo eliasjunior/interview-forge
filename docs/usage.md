@@ -52,7 +52,7 @@ Warm-up advancement rule: a level advances only after 2 completed warm-up sessio
 
 ## 1. Full interview
 
-The core loop. Claude asks questions one at a time, waits for your answer, scores it, optionally asks a follow-up, then moves to the next question. At the end it generates a report and flashcards for weak answers automatically.
+The core loop. Claude asks questions one at a time, waits for your answer, scores it, optionally asks a follow-up, then moves to the next question. At the end it generates a report and prepares flashcard drafts for weak answers.
 
 Reached after completing the warm-up ladder, or directly for topics without warm-up content.
 
@@ -72,7 +72,9 @@ server_status
   → ask_followup { sessionId }   ← only if score < 3 or answer was incomplete
   → next_question { sessionId }
   → [repeat per question]
-  → end_interview { sessionId }   ← generates report + flashcards
+  → end_interview { sessionId }   ← generates report + flashcard next step
+  → prepare_flashcards { sessionId }
+  → create_flashcard { ...draft } ← once per returned draft
 ```
 
 **Available topics:** JWT, REST + Spring/JPA, Payment API Design, URL Shortener, mTLS/TLS, Java Concurrency, Java OS & JVM Internals, Rotate Matrix.
@@ -85,11 +87,12 @@ The current flow is:
 
 1. Run a full interview.
 2. End the interview with `end_interview`.
-3. `end_interview` finalizes the session, writes the report, merges concepts into the graph, and auto-generates flashcards for weak answers.
-4. Review the completed session feedback and identify recurring mistakes or weak areas.
-5. Optionally persist those patterns with `log_mistake`.
-6. Optionally create a follow-up implementation exercise with `create_exercise` based on the weak area.
-7. Run `start_drill` to revisit the weak answers verbally, using prior weak evaluations plus any logged mistakes as recall context.
+3. `end_interview` finalizes the session, writes the report, merges concepts into the graph, and returns `prepare_flashcards` as the next step when weak answers exist.
+4. `prepare_flashcards` returns ready-to-submit `create_flashcard` payloads for those weak answers.
+5. Review the completed session feedback and identify recurring mistakes or weak areas.
+6. Optionally persist those patterns with `log_mistake`.
+7. Optionally create a follow-up implementation exercise with `create_exercise` based on the weak area.
+8. Run `start_drill` to revisit the weak answers verbally, using prior weak evaluations plus any logged mistakes as recall context.
 
 So `start_drill` is not the whole learning loop by itself. It is the targeted verbal-recall step that comes after at least one completed interview and can be combined with flashcards, mistake logging, and exercises.
 
@@ -107,7 +110,9 @@ start_interview { topic: "JWT authentication" }
   → evaluate_answer
   → next_question
   → [repeat per question]
-  → end_interview                  ← report + graph merge + flashcards for weak answers
+  → end_interview                  ← report + graph merge + flashcard draft next step
+  → prepare_flashcards { sessionId }
+  → create_flashcard { ...draft }  ← once per returned draft
   → log_mistake { ... }            ← optional, for recurring patterns found in feedback
   → create_exercise { ... }        ← optional, for hands-on follow-up practice
 start_drill { topic: "JWT authentication" }
@@ -128,24 +133,38 @@ Start an interview from any content you supply — a spec, README, architecture 
 
 ### Option A — paste content directly
 
-You already have the material and just want to run it as an interview.
+You already have the material and just want to run it as an interview. The current product flow starts in the UI and then hands off to Claude.
 
-**You say:**
+**UI flow:**
+1. Open `/topics`.
+2. Click `Start With Content`.
+3. Enter:
+   - `topic`
+   - optional `focus`
+   - pasted `content`
+4. Create the session.
+5. Open the session page.
+6. Click `Start In Claude` or `Copy prompt`.
+
+The backend creates a scoped interview session immediately. For algorithm prompts, it wraps the pasted content into a stronger interview scope before saving the session.
+
+**Then in Claude Desktop:**
 ```text
-Run a scoped interview on this Payment API spec, focus on reliability and edge cases:
-
-[paste your spec here]
+Please start or resume the scoped interview for session <sessionId>. Call get_session first, follow the instruction field if present, and continue from the current state. If the session is ready to begin, start with ask_question.
 ```
 
 **Claude runs:**
 ```text
-start_scoped_interview {
-  topic: "Payment API",
-  content: "...your pasted spec...",
-  focus: "robustness, reliability, and extensibility"
-}
-  → ask_question → submit_answer → evaluate_answer → ... → end_interview
+get_session { sessionId: "..." }
+  → ask_question → submit_answer → evaluate_answer → next_question
+  → ... repeat until done ...
+  → end_interview
 ```
+
+**Notes:**
+- The session page shows the exact launch prompt generated by the backend.
+- This is currently the recommended path for algorithm-style interviews created from pasted problems.
+- The handoff to Claude is still manual: the UI copies the prompt, but does not open Claude automatically yet.
 
 ### Option B — build a focused scope interactively
 
@@ -186,6 +205,8 @@ build_scope {
 The tool builds a content block with explicit **Focus Areas**, **Evaluation Criteria**, **Known Weak Spots**, and **Out of Scope** sections that anchor the LLM during evaluation and prevent it from going in an unwanted direction.
 
 **Reusing a saved scope:** if you passed `saveAs`, the scope is written to `data/knowledge/scopes/<slug>.md`. Next time, skip the Q&A and call `start_scoped_interview` directly with that file's content.
+
+If you prefer the browser flow, you can also paste the resulting `content` into `Start With Content` in the Topics page instead of calling the tool directly yourself.
 
 ### Content template (for writing your own)
 

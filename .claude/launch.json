@@ -28,8 +28,8 @@
     },
     {
       "name": "ui",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "ui"],
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && npm run dev --prefix ui"],
       "port": 5173
     }
   ]

@@ -7,7 +7,8 @@ import type { Session, Flashcard, Mistake, Skill, Exercise, KnowledgeGraph, Conc
 import type { KnowledgeStore, KnowledgeTopic } from "../knowledge/port.js";
 import { FileKnowledgeStore } from "../knowledge/file.js";
 import type { ToolDeps } from "../tools/deps.js";
-import { assertState, calcAvgScore, buildSummary } from "../interviewUtils.js";
+import { assertState } from "../stateUtils.js";
+import { calcAvgScore, buildSummary } from "../sessionUtils.js";
 import { registerStartWarmUpTool } from "../tools/startWarmUp.js";
 import { registerAskQuestionTool } from "../tools/askQuestion.js";
 import { registerSubmitAnswerTool } from "../tools/submitAnswer.js";

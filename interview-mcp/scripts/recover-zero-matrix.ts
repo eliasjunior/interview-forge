@@ -13,14 +13,9 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { createDb } from "../src/db/client.js";
 import { createSqliteRepositories } from "../src/db/repositories/createRepositories.js";
-import {
-  generateId,
-  calcAvgScore,
-  buildSummary,
-  buildReport,
-  generateFlashcards,
-  mergeConceptsIntoGraph,
-} from "../src/interviewUtils.js";
+import { generateId, calcAvgScore, buildSummary, buildReport } from "../src/sessionUtils.js";
+import { generateFlashcards } from "../src/flashcardUtils.js";
+import { mergeConceptsIntoGraph } from "../src/graphUtils.js";
 import type { Session, Evaluation } from "@mock-interview/shared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

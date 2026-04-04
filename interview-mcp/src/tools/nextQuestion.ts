@@ -2,7 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { ToolDeps } from "./deps.js";
 import { buildSessionRewardSummary } from "./getTopicLevel.js";
-import { buildEndInterviewRecommendations } from "../interviewUtils.js";
+import { buildEndInterviewRecommendations } from "../sessionUtils.js";
+import { buildFlashcardDrafts } from "../flashcardUtils.js";
 
 export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
@@ -22,6 +23,7 @@ export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
       if (done) {
         const { summary, avgScore, concepts, reportFile } = await deps.finalizeSession(session, sessions);
         const recommendations = buildEndInterviewRecommendations(session, deps.loadMistakes(session.topic));
+        const flashcardDrafts = buildFlashcardDrafts(session);
         const knowledgeTopic = deps.knowledge.findByTopic(session.topic);
         const hasWarmupContent =
           knowledgeTopic != null &&
@@ -42,6 +44,16 @@ export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
               reportFile,
               rewardSummary,
               recommendations,
+              flashcards: {
+                draftCount: flashcardDrafts.length,
+                nextStep: flashcardDrafts.length > 0
+                  ? {
+                      tool: "prepare_flashcards",
+                      args: { sessionId },
+                      hint: "Prepare the flashcard drafts, then call create_flashcard once per returned draft.",
+                    }
+                  : null,
+              },
               nextTool: null,
               instruction: "Interview complete. Use get_graph to inspect the knowledge graph.",
             }),

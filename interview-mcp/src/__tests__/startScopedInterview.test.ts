@@ -164,4 +164,24 @@ Business rules
     assert.match(session.customContent ?? "", /# Payments API — Structured Spec/);
     assert.deepEqual(getSavedSessions(), sessions);
   });
+
+  test("wraps plain pasted algorithm prompts into structured scoped content", async () => {
+    const { deps, sessions } = makeDeps();
+    const handlers = captureTool(registerStartScopedInterviewTool, deps);
+
+    const payload = parse(await handlers.get("start_scoped_interview")!({
+      topic: "String Rotation",
+      focus: "algorithmic reasoning and edge cases",
+      content: "Assume you have a method isSubstring which checks if one word is a substring of another. Given two strings, s1 and s2, write code to check if s2 is a rotation of s1 using only one call to isSubstring.",
+    }));
+
+    assert.equal(payload.parsed.contentType, "algorithm");
+    assert.match(payload.normalizedContent, /# Study Scope: String Rotation/);
+    assert.match(payload.normalizedContent, /## Problem Statement/);
+    assert.equal(payload.totalQuestions, 6);
+
+    const session = sessions[payload.sessionId];
+    assert.ok(session);
+    assert.match(session.customContent ?? "", /## Evaluation Criteria/);
+  });
 });

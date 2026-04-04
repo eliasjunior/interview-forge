@@ -82,7 +82,77 @@ Related docs:
 
 ## Flashcard system
 
-After `end_interview`, the server automatically generates flashcards for any question scored below 4. Cards are stored in `data/app.db` and scheduled with the **SM-2 spaced repetition algorithm**.
+Flashcards are now created through an explicit MCP flow so the orchestrator can inspect and persist study cards intentionally instead of relying on hidden server-side writes.
+
+### End-of-interview flow
+
+After `end_interview` or the terminal `next_question` step completes a session:
+
+1. the session is finalized
+2. the report is written
+3. concepts are merged into the graph
+4. the response includes `flashcards.nextStep = prepare_flashcards` when weak answers exist
+5. the orchestrator calls `prepare_flashcards { sessionId }`
+6. the tool returns ready-to-submit `create_flashcard` payloads
+7. the orchestrator calls `create_flashcard` once per returned draft
+
+Created cards are stored in `data/app.db` and scheduled with the **SM-2 spaced repetition algorithm**.
+
+### Why the flow is split
+
+`prepare_flashcards` gives the orchestrator enough structure to make consistent cards without inventing the study format from raw feedback.
+
+Each draft can include:
+
+- `prompt`
+- `cardStyle` (`open` or `multiple_choice`)
+- `anchors`
+- `route`
+- `learnerAnswer`
+- `feedback`
+- `strongerAnswer`
+- `correctAnswer`
+- `studyNotes`
+- `topic`
+- `difficulty`
+- `tags`
+- `sourceSessionId`
+- `sourceQuestionIndex`
+- `sourceOriginalScore`
+
+This keeps flashcard creation visible and testable at the MCP level and preserves source linkage back to the original weak answer.
+
+### Guided card formats
+
+Two guided study formats are supported:
+
+- `open`: prompt + anchors on the front, then learner answer, feedback, model answer, route, and study notes on the back
+- `multiple_choice`: question + anchors on the front, then learner answer, feedback, correct answer, explanation, and route on the back
+
+Some weak spots still produce code-first cards when the concept is better practiced through implementation than verbal recall.
+
+### Example draft
+
+```json
+{
+  "prompt": "Which statements about observability are correct?",
+  "cardStyle": "multiple_choice",
+  "anchors": ["signals", "correlate request", "isolate layer"],
+  "route": [
+    { "anchor": "signals", "detail": "Think logs, metrics, and traces before picking options." },
+    { "anchor": "correlate request", "detail": "Request and trace IDs connect events across one flow." },
+    { "anchor": "isolate layer", "detail": "Use app, DB, and dependency signals to find ownership." }
+  ],
+  "correctAnswer": "A, B, D",
+  "strongerAnswer": "Observability helps follow one request and isolate the failing layer.",
+  "topic": "Observability",
+  "difficulty": "medium",
+  "tags": ["observability"],
+  "sourceSessionId": "session-1",
+  "sourceQuestionIndex": 0,
+  "sourceOriginalScore": 2
+}
+```
 
 A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM** and prints a summary of due cards grouped by topic.
 

@@ -190,11 +190,11 @@ describe("basic MCP tool handlers", () => {
     assert.equal(topics.count, 2);
     assert.match(topics.instruction, /start_interview/);
 
-    const sessions = parse(await sessionHandlers.get("list_sessions")!({}));
-    assert.equal(sessions.length, 2);
-    assert.equal(sessions[0].progress, "1/2");
-    assert.equal(sessions[0].avgScore, "3.0");
-    assert.equal(sessions[1].avgScore, null);
+    const result = parse(await sessionHandlers.get("list_sessions")!({}));
+    assert.equal(result.total, 2);
+    assert.equal(result.sessions[0].progress, "1/2");
+    assert.equal(result.sessions[0].avgScore, "3.0");
+    assert.equal(result.sessions[1].avgScore, null);
   });
 
   test("get_session returns a session and stateErrors for unknown ids", async () => {

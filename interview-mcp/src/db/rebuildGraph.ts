@@ -1,6 +1,6 @@
 import { createDb } from "./client.js";
 import { createSqliteRepositories } from "./repositories/createRepositories.js";
-import { mergeConceptsIntoGraph } from "../interviewUtils.js";
+import { mergeConceptsIntoGraph } from "../graphUtils.js";
 import type { KnowledgeGraph } from "@mock-interview/shared";
 
 const db = createDb();

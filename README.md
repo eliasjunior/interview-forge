@@ -54,6 +54,19 @@ I want to study JWT authentication
 
 Claude can then route you into the warm-up ladder, a full interview, or a drill based on your topic history.
 
+## Custom Content Flow
+
+You can also start a scoped interview directly from the UI when you have your own problem statement or spec.
+
+1. Open `http://localhost:5173/topics`.
+2. Click `Start With Content`.
+3. Enter a topic, optional focus, and paste the content.
+4. Create the session. The backend normalizes the content into scoped interview context before saving it.
+5. Open the created session and use `Start In Claude` or `Copy prompt`.
+6. Paste that prompt into Claude Desktop. Claude should call `get_session` first and continue from the current state.
+
+This is the current recommended path for algorithm-style interviews that are not yet first-class `interviewType: "code"` topics in the knowledge base.
+
 ## What you can do
 
 1. **Conduct interviews** — Claude picks questions from curated knowledge files, or generates them with AI when enabled, asks them one at a time, follows up, and enforces a strict state machine so the session never gets out of sync.

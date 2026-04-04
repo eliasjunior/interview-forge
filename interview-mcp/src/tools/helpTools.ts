@@ -35,6 +35,7 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
         { name: "delete_session", how: "Dry-run or delete a session and its derived artifacts", example: { sessionId: "...", dryRun: true } },
         { name: "list_topics", how: "List curated knowledge topics", example: {} },
         { name: "get_due_flashcards", how: "Get flashcards due for spaced-repetition review today", example: { topic: "JWT authentication" } },
+        { name: "prepare_flashcards", how: "Prepare ready-to-submit create_flashcard payloads for weak answers in a completed session. Call this after end_interview, then pass each draft object into create_flashcard.", example: { sessionId: "..." } },
         { name: "review_flashcard", how: "Submit a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy) — applies SM-2 and schedules next review", example: { cardId: "...", rating: 3 } },
         { name: "log_mistake", how: "Record a micro-skill mistake: what went wrong, the pattern (when it happens), and the fix. Call this after any drill or evaluation.", example: { mistake: "Off-by-one in binary search", pattern: "Always happens with while condition", fix: "Use left <= right and adjust boundaries carefully", topic: "Algorithms" } },
         { name: "list_mistakes", how: "List all logged mistakes, optionally filtered by topic", example: { topic: "Java Thread States" } },

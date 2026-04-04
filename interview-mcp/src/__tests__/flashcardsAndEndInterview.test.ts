@@ -4,6 +4,8 @@ import type { Flashcard, KnowledgeGraph, Mistake, Session, Skill, Exercise, Conc
 import type { ToolDeps } from "../tools/deps.js";
 import { registerEndInterviewTool } from "../tools/endInterview.js";
 import { registerGetDueFlashcardsTool } from "../tools/getDueFlashcards.js";
+import { registerPrepareFlashcardsTool } from "../tools/prepareFlashcards.js";
+import { registerCreateFlashcardTool } from "../tools/createFlashcard.js";
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }>;
 
@@ -91,7 +93,7 @@ function makeDeps(overrides: Partial<ToolDeps> = {}) {
     inspectSessionDeletion: () => null,
     deleteSessionById: () => null,
     loadFlashcards: () => flashcards,
-    saveFlashcard: () => {},
+    saveFlashcard: (card) => { flashcards.push(card); },
     saveFlashcards: () => {},
     loadMistakes: () => [] as Mistake[],
     saveMistake: () => {},
@@ -212,8 +214,64 @@ describe("flashcard and end-interview tools", () => {
     assert.equal(payload.recommendations.drill.tool, "start_drill");
     assert.equal(payload.recommendations.drill.args.sessionId, "session-1");
     assert.equal(payload.recommendations.deepExplanation.mode, "deep_explanation");
+    assert.equal(payload.flashcards.draftCount, 1);
+    assert.equal(payload.flashcards.nextStep.tool, "prepare_flashcards");
     assert.equal(getFinalizeCalls(), 1);
     assert.equal(sessions["session-1"]?.state, "ENDED");
     assert.equal(sessions["session-1"]?.endedAt, "2026-03-28T10:30:00.000Z");
+  });
+
+  test("prepare_flashcards returns ready-to-submit create_flashcard drafts for ended sessions", async () => {
+    const { deps, sessions } = makeDeps();
+    sessions["session-1"]!.state = "ENDED";
+    sessions["session-1"]!.topic = "Observability";
+    sessions["session-1"]!.evaluations = [{
+      questionIndex: 0,
+      question: "Which statements about observability are correct?",
+      answer: "A, B",
+      score: 2,
+      feedback: [
+        "Not quite — the correct answer is",
+        "",
+        "A) Structured logs with a request or trace ID help correlate events across a single request",
+        "B) Metrics such as error rate and latency per dependency help identify where a failure originated",
+        "D) Knowing whether an issue is in the app, the database, or LendingAPI requires signals from all three layers.",
+      ].join("\n"),
+      needsFollowUp: false,
+    }];
+
+    const handlers = captureTool(registerPrepareFlashcardsTool, deps);
+    const payload = parse(await handlers.get("prepare_flashcards")!({ sessionId: "session-1" }));
+    assert.equal(payload.draftCount, 1);
+    assert.equal(payload.drafts[0].cardStyle, "multiple_choice");
+    assert.deepEqual(payload.drafts[0].anchors, ["correlate request", "dependency metrics", "isolate layer"]);
+    assert.equal(payload.drafts[0].correctAnswer, "A, B, D");
+    assert.equal(payload.drafts[0].sourceSessionId, "session-1");
+  });
+
+  test("simulates end_interview -> prepare_flashcards -> create_flashcard tool chain", async () => {
+    const { deps, flashcards } = makeDeps({
+      loadFlashcards: () => flashcards,
+    });
+    const endHandlers = captureTool(registerEndInterviewTool, deps);
+    const prepareHandlers = captureTool(registerPrepareFlashcardsTool, deps);
+    const createHandlers = captureTool(registerCreateFlashcardTool, deps);
+
+    const endPayload = parse(await endHandlers.get("end_interview")!({ sessionId: "session-1" }));
+    assert.equal(endPayload.flashcards.nextStep.tool, "prepare_flashcards");
+
+    const prepared = parse(await prepareHandlers.get("prepare_flashcards")!({ sessionId: "session-1" }));
+    assert.equal(prepared.draftCount, 1);
+
+    const createPayload = parse(await createHandlers.get("create_flashcard")!(prepared.drafts[0]));
+    assert.equal(createPayload.created, true);
+
+    const createdCard = flashcards.find((card) => card.id === createPayload.cardId);
+    assert.ok(createdCard);
+    assert.equal(createdCard?.source?.sessionId, "session-1");
+    assert.equal(createdCard?.source?.questionIndex, 0);
+    assert.match(createdCard?.front ?? "", /Anchors:/);
+    assert.match(createdCard?.back ?? "", /## Route/);
+    assert.match(createdCard?.back ?? "", /trust-boundary details/i);
   });
 });

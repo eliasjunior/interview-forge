@@ -3,17 +3,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Session } from "@mock-interview/shared";
-import { detectContentType, detectGaps, discoverScopeFiles } from "../content/analyzer.js";
-import { extractSpec } from "../content/parser.js";
-import { buildAlgorithmQuestions, buildQuestions, polishContent } from "../content/questionBuilder.js";
+import { discoverScopeFiles } from "../content/analyzer.js";
+import { createScopedInterviewSession, DEFAULT_FOCUS } from "../scopedInterview/session.js";
 import type { ToolDeps } from "./deps.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../../data");
 const SCOPE_DIR = path.join(DATA_DIR, "add-scope");
-
-const DEFAULT_FOCUS = "robustness, reliability, and extensibility in a production environment";
 
 export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
@@ -103,72 +99,54 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
         rawContent = content!;
       }
 
-      const contentType = detectContentType(rawContent);
-      const isAlgorithm = contentType === "algorithm";
-      const spec = isAlgorithm ? { endpoints: [], models: [], rules: [], notes: [] } : extractSpec(rawContent);
-      const gaps = isAlgorithm ? [] : detectGaps(rawContent);
-      const polished = isAlgorithm ? rawContent : polishContent(topic, rawContent, focus);
-      const questions = isAlgorithm
-        ? buildAlgorithmQuestions(topic, rawContent, focus)
-        : buildQuestions(topic, spec, gaps, focus);
+      const result = createScopedInterviewSession({
+        topic,
+        rawContent,
+        focus,
+        resolvedPath,
+        generateId: deps.generateId,
+      });
 
       console.error(
-        `[start_scoped_interview] topic="${topic}" focus="${focus}" contentType=${contentType} ` +
-        (isAlgorithm
-          ? "(algorithm — skipping endpoint/model/gap extraction)"
-          : `endpoints=${spec.endpoints.length} models=${spec.models.length} rules=${spec.rules.length} gaps=${gaps.length}`)
+        `[start_scoped_interview] topic="${topic}" focus="${focus}" contentType=${result.detectedContentType} ` +
+        (result.parsed.contentType === "algorithm"
+          ? "(algorithm — generated scoped content wrapper)"
+          : `endpoints=${result.parsed.endpoints.length} models=${result.parsed.models.length} rules=${result.parsed.rules.length} gaps=${result.parsed.gaps.length}`)
       );
 
       const sessions = deps.loadSessions();
-      const id = deps.generateId();
-
-      const session: Session = {
-        id,
-        topic,
-        interviewType: "design",
-        sessionKind: "interview",
-        state: "ASK_QUESTION",
-        currentQuestionIndex: 0,
-        questions,
-        messages: [],
-        evaluations: [],
-        customContent: polished,
-        focusArea: focus,
-        ...(resolvedPath && { sourcePath: resolvedPath }),
-        createdAt: new Date().toISOString(),
-        knowledgeSource: "file",
-      };
-
-      sessions[id] = session;
+      sessions[result.session.id] = result.session;
       deps.saveSessions(sessions);
 
       return {
         content: [{
           type: "text" as const,
           text: JSON.stringify({
-            sessionId: id,
-            state: session.state,
+            sessionId: result.session.id,
+            state: result.session.state,
             topic,
-            focusArea: focus,
-            source: resolvedPath ?? "inline content",
-            parsed: isAlgorithm
-              ? { contentType: "algorithm" }
-              : {
-                  contentType: "api",
-                  endpoints: spec.endpoints.map((endpoint) => `${endpoint.method} ${endpoint.path}`),
-                  models: spec.models.map((model) => `${model.name} (${model.fields.length} fields)`),
-                  rules: spec.rules,
-                  gaps,
-                },
-            totalQuestions: questions.length,
-            previewQuestions: questions.slice(0, 2),
+            focusArea: result.focusArea,
+            source: result.source,
+            parsed: result.parsed,
+            totalQuestions: result.totalQuestions,
+            previewQuestions: result.previewQuestions,
+            normalizedContent: result.normalizedContent,
+            interviewType: result.session.interviewType,
             nextTool: "ask_question",
             instruction:
-              "Session ready. Content has been parsed and polished for LLM evaluation. " +
-              "Call ask_question to start. " +
-              (deps.ai
-                ? "AI is enabled — evaluate_answer will score against the structured spec automatically."
-                : "AI is disabled — provide score, feedback, and needsFollowUp manually when calling evaluate_answer."),
+              result.detectedContentType === "algorithm"
+                ? "This is a CODE interview session (algorithm problem). " +
+                  "Ask the candidate to explain their approach, analyse time/space complexity, and handle edge cases. " +
+                  "Probe pattern recognition, correctness reasoning, and boundary conditions — not API or system design. " +
+                  "Call ask_question to start. " +
+                  (deps.ai
+                    ? "AI is enabled — evaluate_answer will score against the Study Scope criteria automatically."
+                    : "AI is disabled — provide score, feedback, and needsFollowUp manually when calling evaluate_answer.")
+                : "Session ready. Content has been parsed and polished for LLM evaluation. " +
+                  "Call ask_question to start. " +
+                  (deps.ai
+                    ? "AI is enabled — evaluate_answer will score against the structured spec automatically."
+                    : "AI is disabled — provide score, feedback, and needsFollowUp manually when calling evaluate_answer."),
           }, null, 2),
         }],
       };

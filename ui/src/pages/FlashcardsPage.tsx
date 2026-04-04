@@ -35,11 +35,37 @@ function renderTable(lines: string[]): string {
   return `<table class="fc-table"><tbody>${rows.join('')}</tbody></table>`
 }
 
+function expandInlineOptionSeries(text: string): string {
+  return text
+    .split('\n')
+    .flatMap((line) => {
+      const matches = Array.from(line.matchAll(/\b([A-Z])\)\s/g))
+      if (matches.length < 2) return [line]
+
+      const firstIndex = matches[0]?.index ?? -1
+      if (firstIndex < 0) return [line]
+
+      const prefix = line.slice(0, firstIndex).trimEnd()
+      const options = line
+        .slice(firstIndex)
+        .split(/,\s+(?=[A-Z]\)\s)/)
+        .map(option => option.trim())
+        .filter(Boolean)
+
+      return [
+        prefix,
+        ...options.map(option => `- ${option}`),
+      ].filter(Boolean)
+    })
+    .join('\n')
+}
+
 function mdToHtml(text: string): string {
   const blocks: string[] = []
+  const normalizedText = expandInlineOptionSeries(text)
 
   // 1. Extract code fences first
-  let s = text.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => {
+  let s = normalizedText.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => {
     const i = blocks.length
     blocks.push(`<pre class="fc-pre"><code>${escHtml(code.trimEnd())}</code></pre>`)
     return `\x00BLOCK${i}\x00`
@@ -312,28 +338,31 @@ export default function FlashcardsPage() {
           onClick={() => !flipped && setFlipped(true)}
           style={{ cursor: flipped ? 'default' : 'pointer' }}
         >
-          <div className={`fc-flip-inner${flipped ? ' flipped' : ''}`}>
-
-            {/* Front */}
-            <div className="fc-face fc-front">
+          <div className={`fc-face ${flipped ? 'fc-back' : 'fc-front'}`}>
+            {!flipped && (
               <div className="fc-face-badge">
                 <span style={{ borderColor: diffColor(card.difficulty), color: diffColor(card.difficulty) }}
                   className="tag">{card.difficulty}</span>
               </div>
-              <div className="fc-face-label">Question</div>
-              <div className="fc-question-text">{card.front}</div>
-              <div className="fc-tap-hint">↩ click to reveal answer</div>
-            </div>
-
-            {/* Back */}
-            <div className="fc-face fc-back">
-              <div className="fc-face-label">Answer</div>
-              <div
-                className="fc-answer-text"
-                dangerouslySetInnerHTML={{ __html: mdToHtml(card.back) }}
-              />
-            </div>
-
+            )}
+            <div className="fc-face-label">{flipped ? 'Answer' : 'Question'}</div>
+            {flipped ? (
+              <>
+                <div className="fc-question-review">
+                  <div className="fc-question-review-label">Prompt</div>
+                  <div className="fc-question-review-text">{card.front}</div>
+                </div>
+                <div
+                  className="fc-answer-text"
+                  dangerouslySetInnerHTML={{ __html: mdToHtml(card.back) }}
+                />
+              </>
+            ) : (
+              <>
+                <div className="fc-question-text">{card.front}</div>
+                <div className="fc-tap-hint">↩ click to reveal answer</div>
+              </>
+            )}
           </div>
         </div>
 

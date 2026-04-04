@@ -10,7 +10,19 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
       const sessions = deps.loadSessions();
       const session = sessions[sessionId];
       if (!session) return deps.stateError(`Session '${sessionId}' not found.`);
-      return { content: [{ type: "text" as const, text: JSON.stringify(session) }] };
+
+      const instruction =
+        session.interviewType === "code"
+          ? "This is a CODE interview session (algorithm problem). " +
+            "The problem is in customContent under '## Problem Statement'. " +
+            "Flow: (1) present the problem to the candidate, (2) ask them to explain their approach before coding, " +
+            "(3) probe pattern recognition, time/space complexity, and edge cases, " +
+            "(4) call ask_question → submit_answer → evaluate_answer → next_question, " +
+            "(5) end_interview when done. Do NOT run a system-design or API-design interview."
+          : undefined;
+
+      const payload = instruction ? { ...session, instruction } : session;
+      return { content: [{ type: "text" as const, text: JSON.stringify(payload) }] };
     }
   );
 }

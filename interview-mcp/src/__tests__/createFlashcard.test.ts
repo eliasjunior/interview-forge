@@ -260,4 +260,83 @@ describe("create_flashcard tool handler — integration", () => {
       sqlite.close();
     }
   });
+
+  test("creates a guided open-question card with anchors and route", async () => {
+    const { sqlite, repos } = setupDb();
+    try {
+      const handler = captureToolHandler(makeRealDeps(repos));
+      const result = await handler({
+        prompt: "When should you use useEffect?",
+        cardStyle: "open",
+        anchors: ["goal", "external system", "not pure derivation"],
+        route: [
+          { anchor: "goal", detail: "Think synchronization, not generic post-render work." },
+          { anchor: "external system", detail: "Effects connect React to timers, subscriptions, and imperative APIs." },
+        ],
+        learnerAnswer: "For any logic after render.",
+        feedback: "Too broad.",
+        strongerAnswer: "Use useEffect when React needs to synchronize with something outside React.",
+        topic: "React hooks",
+        difficulty: "medium",
+      });
+
+      const payload = JSON.parse(result.content[0].text);
+      const card = repos.flashcards.list()[0];
+      assert.equal(payload.created, true);
+      assert.equal(payload.cardStyle, "open");
+      assert.match(card.front, /Anchors:/);
+      assert.match(card.front, /external system/);
+      assert.match(card.back, /## Model answer/);
+      assert.match(card.back, /## Route/);
+      assert.match(card.back, /goal -> Think synchronization, not generic post-render work/);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("creates a guided multiple-choice card with correct answer and explanation", async () => {
+    const { sqlite, repos } = setupDb();
+    try {
+      const handler = captureToolHandler(makeRealDeps(repos));
+      await handler({
+        prompt: "Which statements about observability are correct?",
+        cardStyle: "multiple_choice",
+        anchors: ["signals", "correlate request", "isolate layer"],
+        route: [
+          { anchor: "signals", detail: "Think logs, metrics, and traces before picking options." },
+          { anchor: "correlate request", detail: "Request and trace IDs connect events across one flow." },
+        ],
+        correctAnswer: "A, B, D",
+        strongerAnswer: "Observability is about following one request and locating the failing layer.",
+        topic: "Observability",
+        difficulty: "medium",
+      });
+
+      const card = repos.flashcards.list()[0];
+      assert.match(card.back, /## Correct/);
+      assert.match(card.back, /A, B, D/);
+      assert.match(card.back, /## Explanation/);
+      assert.match(card.back, /## Route/);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("guided multiple-choice cards require correctAnswer", async () => {
+    const { deps } = makeMockDeps();
+    const stateErrorDeps = {
+      ...deps,
+      stateError: (msg: string) => ({ content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }] }),
+    } as ToolDeps;
+    const handler = captureToolHandler(stateErrorDeps);
+    const result = await handler({
+      prompt: "Which statements are correct?",
+      cardStyle: "multiple_choice",
+      topic: "Observability",
+      difficulty: "medium",
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    assert.equal(payload.error, "Multiple-choice guided flashcards require correctAnswer.");
+  });
 });

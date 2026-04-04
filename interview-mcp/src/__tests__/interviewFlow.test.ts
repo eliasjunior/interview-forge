@@ -9,7 +9,8 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import type { Session, Flashcard, Mistake, Skill, Exercise, KnowledgeGraph, Concept } from "@mock-interview/shared";
-import { assertState, calcAvgScore, buildSummary } from "../interviewUtils.js";
+import { assertState } from "../stateUtils.js";
+import { calcAvgScore, buildSummary } from "../sessionUtils.js";
 import { selectQuestions, registerStartInterviewTool } from "../tools/startInterview.js";
 import { registerAskQuestionTool } from "../tools/askQuestion.js";
 import { registerSubmitAnswerTool } from "../tools/submitAnswer.js";
