@@ -1,5 +1,6 @@
 import type { AppDb } from "../client.js";
 import { SQLiteFlashcardRepository } from "./sqliteFlashcardRepository.js";
+import { SQLiteFlashcardAnswerRepository } from "./sqliteFlashcardAnswerRepository.js";
 import { SQLiteGraphRepository } from "./sqliteGraphRepository.js";
 import { SQLiteMistakeRepository } from "./sqliteMistakeRepository.js";
 import { SQLiteSessionRepository } from "./sqliteSessionRepository.js";
@@ -12,6 +13,7 @@ export function createSqliteRepositories(db: AppDb): AppRepositories {
   return {
     sessions: new SQLiteSessionRepository(db),
     flashcards: new SQLiteFlashcardRepository(db),
+    flashcardAnswers: new SQLiteFlashcardAnswerRepository(db),
     graph: new SQLiteGraphRepository(db),
     mistakes: new SQLiteMistakeRepository(db),
     skills: new SQLiteSkillRepository(db),

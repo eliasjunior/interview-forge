@@ -84,6 +84,8 @@ function makeFlashcard(overrides: Partial<Flashcard> = {}): Flashcard {
     interval: 1,
     easeFactor: 2.5,
     repetitions: 0,
+    parentFlashcardId: undefined,
+    replacedByFlashcardId: undefined,
     ...overrides,
   };
 }
@@ -131,6 +133,9 @@ function makeMistake(overrides: Partial<Mistake> = {}): Mistake {
     fix: "Classify the workload first, then size workers and queues with that model.",
     topic: "Java concurrency",
     createdAt: "2026-03-01T10:13:00.000Z",
+    sourceAnswerId: undefined,
+    sourceFlashcardId: undefined,
+    replacementFlashcardId: undefined,
     ...overrides,
   };
 }

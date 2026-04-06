@@ -45,6 +45,9 @@ function makeDeps(overrides: Partial<ToolDeps> = {}) {
     loadFlashcards: () => [] as Flashcard[],
     saveFlashcard: () => {},
     saveFlashcards: () => {},
+    loadFlashcardAnswersByState: () => [],
+    saveFlashcardAnswer: () => {},
+    updateFlashcardAnswer: () => {},
     loadMistakes: () => [] as Mistake[],
     saveMistake: () => {},
     loadSkills: () => [] as Skill[],
@@ -178,10 +181,13 @@ Business rules
     assert.equal(payload.parsed.contentType, "algorithm");
     assert.match(payload.normalizedContent, /# Study Scope: String Rotation/);
     assert.match(payload.normalizedContent, /## Problem Statement/);
-    assert.equal(payload.totalQuestions, 6);
+    assert.equal(payload.totalQuestions, 7);
+    assert.match(payload.instruction, /must end with a coding implementation question/);
 
     const session = sessions[payload.sessionId];
     assert.ok(session);
     assert.match(session.customContent ?? "", /## Evaluation Criteria/);
+    assert.match(session.customContent ?? "", /\*\*implementation\*\*/);
+    assert.match(session.questions.at(-1) ?? "", /Now implement String Rotation/);
   });
 });

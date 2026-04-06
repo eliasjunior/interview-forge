@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { Flashcard, ReviewRating } from '@mock-interview/shared'
-import { dismissFlashcard, getFlashcards, restoreFlashcard, reviewFlashcard } from '../api'
+import { dismissFlashcard, getFlashcards, restoreFlashcard, reviewFlashcard, submitFlashcardAnswer } from '../api'
 
 // ── Rating config ────────────────────────────────────────────────────────────
 
@@ -143,6 +143,39 @@ function diffColor(d: string) {
   return 'var(--success)'
 }
 
+function formatTimestamp(value?: string): string {
+  if (!value) return 'Unknown'
+  return new Date(value).toLocaleString()
+}
+
+function buildFlashcardHistory(cards: Flashcard[], selectedId: string): Flashcard[] {
+  const byId = new Map(cards.map(card => [card.id, card]))
+  const selected = byId.get(selectedId)
+  if (!selected) return []
+
+  let root = selected
+  const seenParents = new Set<string>([root.id])
+  while (root.parentFlashcardId) {
+    const parent = byId.get(root.parentFlashcardId)
+    if (!parent || seenParents.has(parent.id)) break
+    root = parent
+    seenParents.add(parent.id)
+  }
+
+  const chain: Flashcard[] = []
+  const seenChain = new Set<string>()
+  let current: Flashcard | undefined = root
+  while (current && !seenChain.has(current.id)) {
+    chain.push(current)
+    seenChain.add(current.id)
+    current = current.replacedByFlashcardId
+      ? byId.get(current.replacedByFlashcardId)
+      : undefined
+  }
+
+  return chain
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FlashcardsPage() {
@@ -161,6 +194,8 @@ export default function FlashcardsPage() {
   const [rating, setRating]         = useState<ReviewRating | null>(null)
   const [done, setDone]             = useState(false)
   const [busyCardId, setBusyCardId] = useState<string | null>(null)
+  const [myAnswer, setMyAnswer]     = useState('')
+  const [historyCardId, setHistoryCardId] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -214,6 +249,7 @@ export default function FlashcardsPage() {
     setFlipped(false)
     setRating(null)
     setDone(false)
+    setMyAnswer('')
     setReviewing(true)
   }
 
@@ -263,8 +299,13 @@ export default function FlashcardsPage() {
   const handleRate = async (r: ReviewRating) => {
     if (rating !== null) return // already rated, waiting for animation
     setRating(r)
+    const cardId = queue[cursor].id
+    const trimmedAnswer = myAnswer.trim()
     try {
-      await reviewFlashcard(queue[cursor].id, r)
+      await reviewFlashcard(cardId, r)
+      if (trimmedAnswer) {
+        submitFlashcardAnswer(cardId, trimmedAnswer, r).catch(e => console.error('answer submit error', e))
+      }
     } catch (e) {
       console.error('review error', e)
     }
@@ -277,6 +318,7 @@ export default function FlashcardsPage() {
         setCursor(next)
         setFlipped(false)
         setRating(null)
+        setMyAnswer('')
       }
     }, 400)
   }
@@ -360,7 +402,15 @@ export default function FlashcardsPage() {
             ) : (
               <>
                 <div className="fc-question-text">{card.front}</div>
-                <div className="fc-tap-hint">↩ click to reveal answer</div>
+                <textarea
+                  className="fc-answer-input"
+                  placeholder="Write your answer before revealing…"
+                  value={myAnswer}
+                  onChange={e => setMyAnswer(e.target.value)}
+                  onClick={e => e.stopPropagation()}
+                  rows={4}
+                />
+                <div className="fc-tap-hint">↩ click card or show answer when ready</div>
               </>
             )}
           </div>
@@ -399,6 +449,9 @@ export default function FlashcardsPage() {
   // ── Overview ─────────────────────────────────────────────────────────────────
 
   const totalDue = activeCards.filter(isDue).length
+  const historyChain = historyCardId ? buildFlashcardHistory(cards, historyCardId) : []
+  const historySelectedCard = historyCardId ? cards.find(card => card.id === historyCardId) ?? null : null
+  const hasHistory = Boolean(historySelectedCard && (historySelectedCard.parentFlashcardId || historySelectedCard.replacedByFlashcardId))
 
   return (
     <div>
@@ -512,6 +565,7 @@ export default function FlashcardsPage() {
                   card={card}
                   isDue
                   onDismiss={handleDismiss}
+                  onShowHistory={setHistoryCardId}
                   dismissing={busyCardId === card.id}
                 />
               ))}
@@ -527,6 +581,7 @@ export default function FlashcardsPage() {
                   card={card}
                   isDue={false}
                   onDismiss={handleDismiss}
+                  onShowHistory={setHistoryCardId}
                   dismissing={busyCardId === card.id}
                 />
               ))}
@@ -544,12 +599,70 @@ export default function FlashcardsPage() {
                     card={card}
                     isDue={false}
                     onDismiss={handleRestore}
+                    onShowHistory={setHistoryCardId}
                     dismissing={busyCardId === card.id}
                     archived
                   />
                 ))}
             </>
           )}
+        </div>
+      )}
+
+      {historySelectedCard && (
+        <div className="graph-modal-backdrop" onClick={() => setHistoryCardId(null)}>
+          <div className="fc-history-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="graph-modal-header">
+              <div>
+                <h3>Flashcard History</h3>
+                <p className="fc-history-subtitle">{historySelectedCard.topic}</p>
+              </div>
+              <button className="btn-back" onClick={() => setHistoryCardId(null)}>✕ Close</button>
+            </div>
+
+            {!hasHistory ? (
+              <div className="fc-history-empty">
+                <h4>No history yet</h4>
+                <p>This flashcard has not been replaced or improved yet. When Claude creates a stronger version, it will appear here.</p>
+              </div>
+            ) : (
+              <div className="fc-history-list">
+                {historyChain.map((card, index) => {
+                  const isSelected = card.id === historySelectedCard.id
+                  const isCurrent = !card.archivedAt
+                  return (
+                    <div key={card.id} className={`fc-history-item${isSelected ? ' selected' : ''}`}>
+                      <div className="fc-history-rail" aria-hidden="true">
+                        <span className={`fc-history-dot${isCurrent ? ' current' : ''}`} />
+                        {index < historyChain.length - 1 && <span className="fc-history-line" />}
+                      </div>
+                      <div className="fc-history-card">
+                        <div className="fc-history-item-header">
+                          <div className="fc-history-version">
+                            {index === 0 ? 'Original' : `Improved v${index + 1}`}
+                          </div>
+                          <div className="fc-history-badges">
+                            <span className={`tag${isSelected ? ' active' : ''}`}>{isSelected ? 'Viewing' : 'Version'}</span>
+                            <span className="tag" style={{ borderColor: isCurrent ? 'var(--success)' : 'var(--line)', color: isCurrent ? 'var(--success)' : 'var(--muted)' }}>
+                              {isCurrent ? 'Current' : 'Archived'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="fc-history-question">{card.front}</div>
+                        <div className="fc-history-meta">
+                          <span>Created {formatTimestamp(card.createdAt)}</span>
+                          {card.archivedAt && <span>Archived {formatTimestamp(card.archivedAt)}</span>}
+                        </div>
+                        <div className="fc-history-preview">
+                          {card.back.slice(0, 220)}{card.back.length > 220 ? '…' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -559,8 +672,8 @@ export default function FlashcardsPage() {
 // ── FlashcardRow ─────────────────────────────────────────────────────────────
 
 function FlashcardRow(
-  { card, isDue: due, onDismiss, dismissing, archived = false }:
-  { card: Flashcard; isDue: boolean; onDismiss: (cardId: string) => void; dismissing: boolean; archived?: boolean }
+  { card, isDue: due, onDismiss, onShowHistory, dismissing, archived = false }:
+  { card: Flashcard; isDue: boolean; onDismiss: (cardId: string) => void; onShowHistory: (cardId: string) => void; dismissing: boolean; archived?: boolean }
 ) {
   const [expanded, setExpanded] = useState(false)
 
@@ -575,6 +688,15 @@ function FlashcardRow(
           <div className="fc-row-question">{card.front}</div>
         </div>
         <div className="fc-row-meta">
+          <button
+            className="fc-history-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              onShowHistory(card.id)
+            }}
+          >
+            History
+          </button>
           {!archived && (
             <button
               className="fc-dismiss-btn fc-dismiss-inline"

@@ -19,6 +19,9 @@ export class SQLiteMistakeRepository implements MistakeRepository {
       fix: r.fix,
       topic: r.topic ?? undefined,
       createdAt: r.createdAt,
+      sourceAnswerId: r.sourceAnswerId ?? undefined,
+      sourceFlashcardId: r.sourceFlashcardId ?? undefined,
+      replacementFlashcardId: r.replacementFlashcardId ?? undefined,
     }));
   }
 
@@ -30,6 +33,9 @@ export class SQLiteMistakeRepository implements MistakeRepository {
       fix: mistake.fix,
       topic: mistake.topic ?? null,
       createdAt: mistake.createdAt,
+      sourceAnswerId: mistake.sourceAnswerId ?? null,
+      sourceFlashcardId: mistake.sourceFlashcardId ?? null,
+      replacementFlashcardId: mistake.replacementFlashcardId ?? null,
     }).run();
   }
 }

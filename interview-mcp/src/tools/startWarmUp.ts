@@ -69,18 +69,91 @@ function shuffled<T>(arr: T[]): T[] {
   return out;
 }
 
+function normaliseAnswerPattern(answer: string | undefined): string {
+  if (!answer) return "";
+
+  const trimmed = answer.trim().toUpperCase();
+  if (trimmed === "ALL" || trimmed === "NONE") return trimmed;
+
+  return trimmed
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+function answerCardinality(answerPattern: string): number {
+  if (!answerPattern) return -1;
+  if (answerPattern === "ALL") return 4;
+  if (answerPattern === "NONE") return 0;
+  return answerPattern.split(",").filter(Boolean).length;
+}
+
+type WarmupCandidate = {
+  item: import("../knowledge/port.js").WarmUpQuestion,
+  index: number,
+  timesAsked: number,
+  recentlyAsked: boolean,
+  answerPattern: string,
+  correctCount: number,
+};
+
+function orderWarmupQuestions(candidates: WarmupCandidate[]): WarmupCandidate[] {
+  const remaining = [...candidates];
+  const ordered: WarmupCandidate[] = [];
+
+  while (remaining.length > 0) {
+    const previous = ordered[ordered.length - 1];
+    let bestIndex = 0;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let i = 0; i < remaining.length; i++) {
+      const candidate = remaining[i];
+      let score = 0;
+
+      if (previous) {
+        if (candidate.answerPattern !== "" && candidate.answerPattern === previous.answerPattern) {
+          score += 100;
+        }
+        if (candidate.correctCount >= 0 && candidate.correctCount === previous.correctCount) {
+          score += 15;
+        }
+      }
+
+      if (candidate.recentlyAsked) score += 10;
+      score += candidate.timesAsked * 2;
+      score += candidate.index / 1000;
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = i;
+      }
+    }
+
+    ordered.push(remaining.splice(bestIndex, 1)[0]);
+  }
+
+  return ordered;
+}
+
 function selectWarmupQuestions(
   items: import("../knowledge/port.js").WarmUpQuestion[],
   pastAskCounts: Map<string, number>,
   recentSet: Set<string>,
   maxQuestions = MAX_WARMUP_QUESTIONS,
 ): import("../knowledge/port.js").WarmUpQuestion[] {
-  const candidates = items.map((item, index) => ({
-    item,
-    index,
-    timesAsked: pastAskCounts.get(item.question) ?? 0,
-    recentlyAsked: recentSet.has(item.question),
-  }));
+  const candidates: WarmupCandidate[] = items.map((item, index) => {
+    const answerPattern = normaliseAnswerPattern(item.answer);
+    return {
+      item,
+      index,
+      timesAsked: pastAskCounts.get(item.question) ?? 0,
+      recentlyAsked: recentSet.has(item.question),
+      answerPattern,
+      correctCount: answerCardinality(answerPattern),
+    };
+  });
 
   // Recently-asked last; then least-asked first; shuffle ties so the subset varies
   candidates.sort((a, b) => {
@@ -89,11 +162,10 @@ function selectWarmupQuestions(
     return Math.random() - 0.5;
   });
 
-  // Pick the freshest N, then restore authored order within the subset
-  return candidates
-    .slice(0, maxQuestions)
-    .sort((a, b) => a.index - b.index)
-    .map(({ item }) => item);
+  // Pick the freshest N, then order them to avoid repetitive answer-key shapes
+  // such as four consecutive A,B,C,D multi-selects when the authored pool allows
+  // more variety.
+  return orderWarmupQuestions(candidates.slice(0, maxQuestions)).map(({ item }) => item);
 }
 
 export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {

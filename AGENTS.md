@@ -87,6 +87,8 @@ Current tool surface in `interview-mcp`:
 - `list_sessions`
 - `get_due_flashcards`
 - `review_flashcard`
+- `evaluate_flashcard`
+- `save_flashcard_evaluation`
 - `log_mistake`
 - `list_mistakes`
 - `add_skill`
@@ -135,12 +137,26 @@ This repeats per question and ends in `ENDED`.
 - cards are scheduled with the SM-2 spaced repetition algorithm
 - flashcards are stored in `interview-mcp/data/app.db`
 - review happens through `get_due_flashcards` and `review_flashcard`
+- raw recall attempts are stored in `flashcard_answers` with a `Pending -> Evaluating -> Completed` lifecycle
+- `POST /api/flashcards/:id/answers` validates non-empty content and stores optional user-written answers for later evaluation
+- flashcards support replacement lineage through `parentFlashcardId` and `replacedByFlashcardId`
+- `evaluate_flashcard` claims pending answers for orchestrator evaluation and returns question, correct answer, and candidate answer context
+- `save_flashcard_evaluation` persists the verdict, archives weak cards, creates improved replacements, links the chain, logs linked mistakes, and marks the answer as completed
 
 ### Mistake Logging
 
 - mistakes can be persisted with `log_mistake`
 - logged entries capture the mistake, the pattern behind it, and the fix
 - mistakes are queryable with `list_mistakes`
+- mistakes may link back to the originating flashcard answer and both sides of a flashcard replacement via `sourceAnswerId`, `sourceFlashcardId`, and `replacementFlashcardId`
+
+### Flashcard Review Flow
+
+- in the UI, the review card front includes an optional answer textarea before reveal
+- rating still drives SM-2 through the existing review flow; answer capture is additive and fire-and-forget when text is present
+- flow: review card -> optionally type answer -> flip -> rate -> answer saved as `Pending`
+- later, the orchestrator runs `evaluate_flashcard` and then `save_flashcard_evaluation` once per pending answer
+- if recall needs improvement, the old card is archived, an improved replacement card is queued, and history remains intact through the lineage fields
 
 ### Targeted Drills
 

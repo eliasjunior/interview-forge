@@ -98,6 +98,14 @@ function createSpyRepositories() {
         calls.graph = graph;
       },
     },
+    flashcardAnswers: {
+      insert: () => undefined,
+      getById: () => null,
+      listByFlashcardId: () => [],
+      listByState: () => [],
+      updateState: () => undefined,
+      update: () => undefined,
+    },
     mistakes: {
       list: () => [],
       insert: () => undefined,

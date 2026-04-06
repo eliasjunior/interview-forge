@@ -38,6 +38,9 @@ function makeDeps(
     loadFlashcards: () => [] as Flashcard[],
     saveFlashcard: () => {},
     saveFlashcards: () => {},
+    loadFlashcardAnswersByState: () => [],
+    saveFlashcardAnswer: () => {},
+    updateFlashcardAnswer: () => {},
     loadMistakes: () => [] as Mistake[],
     saveMistake: () => {},
     loadSkills: () => [] as Skill[],
@@ -247,5 +250,40 @@ describe("start_warm_up branch coverage", () => {
     assert.equal(payload.format, "mcq");
     assert.deepEqual(payload.previouslyAskedQuestions, ["Which statements about volatile are correct?"]);
     assert.equal(typeof payload.freshQuestionsSelected, "number");
+  });
+
+  test("orders warm-up MCQs to avoid repeated answer patterns when alternatives exist", async () => {
+    const topic: KnowledgeTopic = {
+      topic: "TLS and mTLS",
+      summary: "Transport security basics",
+      questions: ["Unused"],
+      evaluationCriteria: ["Unused"],
+      questionDifficulties: ["foundation"],
+      concepts: [{ word: "TLS", cluster: "security" }],
+      warmupLevels: {
+        1: {
+          questions: [
+            { question: "Q1", choices: ["A", "B", "C", "D"], answer: "A,B,C,D" },
+            { question: "Q2", choices: ["A", "B", "C", "D"], answer: "A,B,C,D" },
+            { question: "Q3", choices: ["A", "B", "C", "D"], answer: "B" },
+            { question: "Q4", choices: ["A", "B", "C", "D"], answer: "A,C" },
+            { question: "Q5", choices: ["A", "B", "C", "D"], answer: "A,B,C,D" },
+          ],
+        },
+      },
+    };
+    const knowledge: KnowledgeStore = {
+      findByTopic: () => topic,
+      listTopics: () => [topic.topic],
+    };
+    const sessionStore = makeSessionStore();
+    const deps = makeDeps(sessionStore, knowledge);
+    const startWarmUp = captureHandler(registerStartWarmUpTool, deps);
+
+    const payload = parse(await startWarmUp({ topic: "TLS and mTLS", level: 1 }));
+    const created = sessionStore.get(payload.sessionId);
+
+    assert.ok(created?.questAnswers);
+    assert.deepEqual(created?.questAnswers, ["A,B,C,D", "B", "A,B,C,D", "A,C", "A,B,C,D"]);
   });
 });

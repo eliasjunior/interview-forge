@@ -161,22 +161,22 @@ Answer: A,B,C,D
 A) A keystore is about your presented identity
 B) A truststore is about who you trust
 C) An mTLS client typically needs both
-D) In Java, a truststore does not contain your private key used for client authentication
-Answer: A,B,C,D
+D) In Java, a truststore usually contains the client's private key for authentication
+Answer: A,B,C
 
 3. Which statements about X.509 validation are correct?
 A) The certificate chain must lead to a trusted root or intermediate policy accepted by the truststore
-B) Expiration dates matter during validation
+B) Expiration dates matter only in browsers, not in backend TLS
 C) Key usage / extended key usage can matter
 D) Hostname matching alone is not enough if chain trust fails
-Answer: A,B,C,D
+Answer: A,C,D
 
 4. Which statements about the TLS handshake are correct?
 A) The private key should never cross the network
-B) Certificate-based authentication proves key ownership via signature
+B) Certificate-based authentication works by sending the private key encrypted to the peer
 C) ClientHello and ServerHello participate in negotiation
 D) mTLS means the client skips validating the server
-Answer: A,B,C
+Answer: A,C
 
 5. Which statements about certificate rotation are correct?
 A) Overlapping validity windows reduce operational risk
@@ -188,37 +188,37 @@ Answer: A,B,C
 6. Which statements about TLS session resumption are correct?
 A) It reduces CPU and handshake latency on reconnect
 B) TLS 1.3 can support 0-RTT resumption with replay caveats
-C) It can still coexist with normal certificate-based trust establishment
+C) After the first connection, resumption replaces normal certificate-based trust checks permanently
 D) Session tickets allow the server to avoid storing per-session state centrally
-Answer: A,B,C,D
+Answer: A,B,D
 
 7. Which statements about revocation are correct?
 A) CRLs can become large and stale between updates
-B) OCSP adds a live status lookup unless stapled
+B) OCSP stapling means the client still has to call the CA directly during every handshake
 C) OCSP stapling reduces separate revocation lookups from clients
-D) Revocation makes certificate expiry irrelevant
-Answer: A,B,C
+D) OCSP stapling is usually preferable to per-client OCSP lookups on high-traffic servers
+Answer: A,C,D
 
 8. Which statements about TLS termination are correct?
 A) Edge termination decrypts at the load balancer
 B) End-to-end or re-encrypted TLS is usually stronger for zero-trust service communication
 C) Edge termination alone means traffic inside the cluster may be plain HTTP
-D) TLS passthrough limits L7 inspection because the backend keeps the encrypted session
-Answer: A,B,C,D
+D) TLS passthrough lets the load balancer inspect decrypted HTTP headers before forwarding
+Answer: A,B,C
 
 9. Which statements about debugging TLS failures are correct?
 A) `openssl s_client` is useful before debugging Java-specific config
-B) `-Djavax.net.debug=ssl,handshake` can show JVM handshake details
+B) `-Djavax.net.debug=ssl,handshake` mainly shows HTTP application payloads, not TLS details
 C) `curl -v` with client certs can help isolate mTLS issues
 D) TLS failures should always be debugged by changing cipher suites first
-Answer: A,B,C
+Answer: A,C
 
 10. Which statements about zero-trust certificate automation are correct?
 A) Short-lived certificates reduce blast radius
 B) Automated rotation is essential at scale
-C) Service identity is stronger when bound to workload identity rather than IP address alone
+C) Service identity is strongest when it is tied only to a stable IP address
 D) mTLS authenticates workloads, but authorization policy is still needed
-Answer: A,B,C,D
+Answer: A,B,D
 
 ### Level 2
 

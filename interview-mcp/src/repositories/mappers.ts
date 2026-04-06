@@ -221,6 +221,8 @@ export function mapFlashcardToNormalizedRecord(flashcard: Flashcard): Normalized
       title: null,
       focusItem: null,
       studyNotes: null,
+      parentFlashcardId: flashcard.parentFlashcardId ?? null,
+      replacedByFlashcardId: flashcard.replacedByFlashcardId ?? null,
     },
     tags: flashcard.tags.map((tag) => ({
       flashcardId: flashcard.id,
@@ -252,6 +254,8 @@ export function mapFlashcardAggregateToDomain(rows: FlashcardAggregateRows): Fla
     repetitions: rows.flashcard.repetitions,
     lastReviewedAt: rows.flashcard.lastReviewedAt ?? undefined,
     archivedAt: rows.flashcard.archivedAt ?? undefined,
+    parentFlashcardId: rows.flashcard.parentFlashcardId ?? undefined,
+    replacedByFlashcardId: rows.flashcard.replacedByFlashcardId ?? undefined,
   };
 }
 

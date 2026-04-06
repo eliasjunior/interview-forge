@@ -31,6 +31,8 @@ import { registerDeleteSessionTool } from "./deleteSession.js";
 import { registerGenerateFlashcardVariationTool } from "./generateFlashcardVariation.js";
 import { registerGetTopicLevelTool } from "./getTopicLevel.js";
 import { registerStartWarmUpTool } from "./startWarmUp.js";
+import { registerEvaluateFlashcardTool } from "./evaluateFlashcard.js";
+import { registerSaveFlashcardEvaluationTool } from "./saveFlashcardEvaluation.js";
 
 export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerServerStatusTool(server, deps);
@@ -64,4 +66,6 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerGenerateFlashcardVariationTool(server, deps);
   registerGetTopicLevelTool(server, deps);
   registerStartWarmUpTool(server, deps);
+  registerEvaluateFlashcardTool(server, deps);
+  registerSaveFlashcardEvaluationTool(server, deps);
 }

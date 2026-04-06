@@ -107,6 +107,9 @@ function makeDeps(overrides: Partial<ToolDeps> = {}) {
     loadFlashcards: () => [] as Flashcard[],
     saveFlashcard: () => {},
     saveFlashcards: () => {},
+    loadFlashcardAnswersByState: () => [],
+    saveFlashcardAnswer: () => {},
+    updateFlashcardAnswer: () => {},
     loadMistakes: (topic?: string) => topic ? mistakes.filter((entry) => entry.topic === topic) : mistakes,
     saveMistake: (mistake) => {
       mistakes.push(mistake);

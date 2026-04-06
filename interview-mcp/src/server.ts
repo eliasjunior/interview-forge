@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 
 import type { AIProvider } from "./ai/index.js";
 import { createKnowledgeStore, type KnowledgeStore } from "./knowledge/index.js";
-import type { Session, Concept, KnowledgeGraph, Flashcard, Mistake, Skill, Exercise } from "@mock-interview/shared";
+import type { Session, Concept, KnowledgeGraph, Flashcard, FlashcardAnswer, Mistake, Skill, Exercise } from "@mock-interview/shared";
 import { assertState } from "./stateUtils.js";
 import { generateId, findLast, calcAvgScore, buildSummary, buildReport, buildTranscript } from "./sessionUtils.js";
 import { mergeConceptsIntoGraph } from "./graphUtils.js";
@@ -95,6 +95,18 @@ function saveFlashcard(card: Flashcard) {
 
 function saveFlashcards(cards: Flashcard[]) {
   repositories.flashcards.replaceAll(cards);
+}
+
+function loadFlashcardAnswersByState(state: FlashcardAnswer["state"]): FlashcardAnswer[] {
+  return repositories.flashcardAnswers.listByState(state);
+}
+
+function saveFlashcardAnswer(answer: FlashcardAnswer): void {
+  repositories.flashcardAnswers.insert(answer);
+}
+
+function updateFlashcardAnswer(answer: FlashcardAnswer): void {
+  repositories.flashcardAnswers.update(answer);
 }
 
 function loadMistakes(topic?: string): Mistake[] {
@@ -233,6 +245,9 @@ const deps: ToolDeps = {
   loadFlashcards,
   saveFlashcard,
   saveFlashcards,
+  loadFlashcardAnswersByState,
+  saveFlashcardAnswer,
+  updateFlashcardAnswer,
   loadMistakes,
   saveMistake,
   loadSkills,

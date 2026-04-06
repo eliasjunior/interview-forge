@@ -100,6 +100,9 @@ export const flashcards = sqliteTable("flashcards", {
   title: text("title"),
   focusItem: text("focus_item"),
   studyNotes: text("study_notes"),
+  // Lineage — set when evaluate_flashcard creates an improved replacement
+  parentFlashcardId: text("parent_flashcard_id"),
+  replacedByFlashcardId: text("replaced_by_flashcard_id"),
 });
 
 export const flashcardTags = sqliteTable(
@@ -202,6 +205,24 @@ export const mistakes = sqliteTable("mistakes", {
   fix: text("fix").notNull(),
   topic: text("topic"),
   createdAt: text("created_at").notNull(),
+  // Flashcard answer linkage — set when created by evaluate_flashcard
+  sourceAnswerId: text("source_answer_id"),
+  sourceFlashcardId: text("source_flashcard_id"),
+  replacementFlashcardId: text("replacement_flashcard_id"),
+});
+
+export const flashcardAnswers = sqliteTable("flashcard_answers", {
+  id: text("id").primaryKey(),
+  flashcardId: text("flashcard_id").notNull().references(() => flashcards.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  state: text("state").notNull().default("Pending"), // Pending | Evaluating | Completed
+  smRating: integer("sm_rating"),                    // 1–4 user rating, stored for reference
+  evaluatedAt: text("evaluated_at"),
+  evaluationResult: text("evaluation_result"),       // LLM gap analysis text
+  llmVerdict: text("llm_verdict"),                   // 'good_enough' | 'needs_improvement'
+  mistakeId: text("mistake_id"),
+  newFlashcardId: text("new_flashcard_id"),
+  createdAt: text("created_at").notNull(),
 });
 
 export const topicPlans = sqliteTable("topic_plans", {
@@ -280,5 +301,12 @@ export const graphNodeClustersRelations = relations(graphNodeClusters, ({ one })
   node: one(graphNodes, {
     fields: [graphNodeClusters.nodeId],
     references: [graphNodes.id],
+  }),
+}));
+
+export const flashcardAnswersRelations = relations(flashcardAnswers, ({ one }) => ({
+  flashcard: one(flashcards, {
+    fields: [flashcardAnswers.flashcardId],
+    references: [flashcards.id],
   }),
 }));

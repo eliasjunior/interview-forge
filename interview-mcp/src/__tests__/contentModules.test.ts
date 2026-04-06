@@ -68,7 +68,9 @@ Space: O(1)
 `;
 
     assert.equal(detectContentType(algorithmSpec), "algorithm");
-    assert.equal(buildAlgorithmQuestions("Rotate Matrix", algorithmSpec, "correctness").length, 6);
+    const questions = buildAlgorithmQuestions("Rotate Matrix", algorithmSpec, "correctness");
+    assert.equal(questions.length, 7);
+    assert.match(questions.at(-1) ?? "", /Now implement Rotate Matrix/);
   });
 
   test("discoverScopeFiles ranks topic matches and returns previews", () => {

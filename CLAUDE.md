@@ -124,7 +124,7 @@ ui/src/
 
 Session states: `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW_UP` (loops), then `ENDED`.
 
-**24 MCP tools:** `server_status`, `help_tools`, `start_interview`, `start_scoped_interview`, `start_drill`, `ask_question`, `submit_answer`, `evaluate_answer`, `ask_followup`, `next_question`, `end_interview`, `get_session`, `list_sessions`, `list_topics`, `get_due_flashcards`, `review_flashcard`, `log_mistake`, `list_mistakes`, `add_skill`, `list_skills`, `update_skill`, `practice_micro_skill`, `create_exercise`, `list_exercises`
+**26 MCP tools:** `server_status`, `help_tools`, `start_interview`, `start_scoped_interview`, `start_drill`, `ask_question`, `submit_answer`, `evaluate_answer`, `ask_followup`, `next_question`, `end_interview`, `get_session`, `list_sessions`, `list_topics`, `get_due_flashcards`, `review_flashcard`, `evaluate_flashcard`, `save_flashcard_evaluation`, `log_mistake`, `list_mistakes`, `add_skill`, `list_skills`, `update_skill`, `practice_micro_skill`, `create_exercise`, `list_exercises`
 
 **REST API (port 3001):**
 - `GET /api/sessions` — all sessions
@@ -133,6 +133,7 @@ Session states: `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW
 - `GET /api/graph` — knowledge graph JSON
 - `GET /api/flashcards` — all flashcards
 - `POST /api/flashcards/:id/review` — submit a review rating `{ rating: 1|2|3|4 }`, applies SM-2, returns updated card
+- `POST /api/flashcards/:id/answers` — store an optional non-empty raw candidate answer for later evaluation
 - `GET /api/mistakes` — all logged mistakes (optional `?topic=` filter)
 - `GET /generated/report-ui.html` — HTML report viewer
 
@@ -153,8 +154,21 @@ Each card contains:
 - **Back** — rich markdown: candidate's answer, interviewer feedback, stronger model answer, and deeper dive (if available)
 - **SRS state** — `dueDate`, `interval` (days), `easeFactor`, `repetitions`, `lastReviewedAt`
 - **Metadata** — `topic`, `difficulty` (easy/medium/hard mapped from score), `tags`, `source` (sessionId + questionIndex)
+- **Lineage** — optional `parentFlashcardId` and `replacedByFlashcardId` so improved cards form a replacement chain instead of losing history
 
 Cards are **idempotent**: re-running `end_interview` on the same session will not create duplicates (deduplication by `id = sessionId-questionIndex`).
+
+### Flashcard Answer Evaluation Loop
+
+The flashcard review system now captures optional free-text recall attempts separately from the SM-2 rating flow:
+
+- `flashcard_answers` stores the raw answer plus a `Pending -> Evaluating -> Completed` state machine
+- the UI lets the learner type an answer on the front of the review card before revealing the back
+- submitting a rating still performs the normal `review_flashcard` SM-2 update; if answer text exists, the UI also posts it asynchronously to `POST /api/flashcards/:id/answers`
+- `evaluate_flashcard` claims pending answers, marks them `Evaluating`, and returns the context Claude needs: flashcard question, expected answer, and candidate answer
+- Claude must then call `save_flashcard_evaluation` once per returned answer with the verdict
+- if the verdict is `needs_improvement`, the old card is archived, a stronger replacement card is created with `parentFlashcardId`, the old card gets `replacedByFlashcardId`, and a linked mistake is logged
+- mistakes created from this path can link back to `sourceAnswerId`, `sourceFlashcardId`, and `replacementFlashcardId`
 
 ### SM-2 Algorithm (`srsUtils.ts`)
 
@@ -178,12 +192,25 @@ Cards are **idempotent**: re-running `end_interview` on the same session will no
 - Args: `cardId` (string), `rating` (1–4)
 - Applies SM-2, updates `app.db`, returns `nextDueDate`, `nextInterval`, `easeFactor`, `repetitions`
 
+**`evaluate_flashcard`**
+- Scans for pending entries in `flashcard_answers`
+- Marks claimed answers as `Evaluating`
+- Returns batched evaluation context so the orchestrator can judge recall quality without exposing hidden guidance to the learner
+
+**`save_flashcard_evaluation`**
+- Args include the `answerId` returned by `evaluate_flashcard` plus Claude's verdict
+- Marks the flashcard answer `Completed`
+- On weak recall, archives the old card, creates an improved replacement card, and logs a fully linked mistake entry
+
 **Typical Claude review session flow:**
 ```
 1. get_due_flashcards           → see what's due today
 2. [for each card]
    review_flashcard { cardId, rating }  → submit recall quality
-3. All done — next review dates are set automatically
+3. evaluate_flashcard           → claim pending raw answers for evaluation
+4. [for each returned answer]
+   save_flashcard_evaluation { ... }    → persist verdict / replacement card / linked mistake
+5. All done — next review dates and any improved replacement cards are set automatically
 ```
 
 ### REST API (for the UI)
@@ -192,6 +219,7 @@ Cards are **idempotent**: re-running `end_interview` on the same session will no
 |---|---|
 | `GET /api/flashcards` | Returns `Flashcard[]` — all cards, all topics |
 | `POST /api/flashcards/:id/review` | Body: `{ rating: 1\|2\|3\|4 }`. Applies SM-2, saves, returns updated `Flashcard` |
+| `POST /api/flashcards/:id/answers` | Body: `{ content: string }`. Saves a non-empty raw recall attempt as `Pending` for later Claude evaluation |
 
 ### UI — FlashcardsPage (`/flashcards`)
 
@@ -204,9 +232,11 @@ Cards are **idempotent**: re-running `end_interview` on the same session will no
 
 **Review mode** (launched via "Start Review (N)" button):
 - 3D CSS flip card — front shows question, click/button to reveal answer
+- Front also includes an optional answer textarea so the learner can attempt recall before reveal
 - Back renders full markdown: headers, bullet lists, tables, inline code, code fences, blockquotes
 - Progress bar tracks position in the queue
 - Rating buttons appear after flip: **Again** (red) / **Hard** (yellow) / **Good** (teal) / **Easy** (green)
+- Rating does not depend on whether an answer was typed; when answer text exists it is submitted in the background for later evaluation
 - Auto-advances to next card after 400 ms; shows 🎉 completion screen when queue is empty
 
 **Done screen:** shows total cards reviewed, link back to overview.

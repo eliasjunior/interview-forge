@@ -3,6 +3,7 @@ import type {
   KnowledgeGraph,
   ReportMeta,
   Flashcard,
+  FlashcardAnswer,
   ReviewRating,
   Mistake,
   GraphInspectionResult,
@@ -160,6 +161,13 @@ export const getMistakes = (topic?: string): Promise<Mistake[]> =>
 
 export const reviewFlashcard = (id: string, rating: ReviewRating): Promise<Flashcard> =>
   post(`${BASE}/flashcards/${encodeURIComponent(id)}/review`, { rating })
+
+export const submitFlashcardAnswer = (
+  id: string,
+  content: string,
+  smRating?: ReviewRating
+): Promise<FlashcardAnswer> =>
+  post(`${BASE}/flashcards/${encodeURIComponent(id)}/answers`, { content, smRating })
 
 export const dismissFlashcard = (id: string): Promise<Flashcard> =>
   post(`${BASE}/flashcards/${encodeURIComponent(id)}/archive`, {})

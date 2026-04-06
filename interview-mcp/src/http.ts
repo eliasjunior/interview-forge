@@ -12,12 +12,14 @@ import { buildSessionRewardSummary, detectTopicLevel } from "./tools/getTopicLev
 import type {
   ReviewRating,
   Flashcard,
+  FlashcardAnswer,
   Session,
   GraphInspectionResult,
   GraphInspectionSession,
   ProgressSessionKind,
   TopicPlanPriority,
 } from "@mock-interview/shared";
+import { randomUUID } from "crypto";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 import { canonicalizeConceptWord } from "./graph/concepts.js";
@@ -475,6 +477,34 @@ app.post("/api/flashcards/:id/archive", (req, res) => {
   cards[idx] = { ...cards[idx], archivedAt };
   saveFlashcards(cards);
   res.json(cards[idx]);
+});
+
+app.post("/api/flashcards/:id/answers", (req, res) => {
+  const flashcardId = req.params.id;
+  const cards = loadFlashcards();
+  const card = cards.find(c => c.id === flashcardId);
+  if (!card) { res.status(404).json({ error: "Card not found" }); return; }
+  if (card.archivedAt) { res.status(409).json({ error: "Card is archived" }); return; }
+
+  const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
+  if (!content) { res.status(400).json({ error: "content is required and must not be empty" }); return; }
+
+  const smRating = req.body.smRating != null ? Number(req.body.smRating) : undefined;
+  if (smRating !== undefined && ![1, 2, 3, 4].includes(smRating)) {
+    res.status(400).json({ error: "smRating must be 1–4" }); return;
+  }
+
+  const answer: FlashcardAnswer = {
+    id: randomUUID(),
+    flashcardId,
+    content,
+    state: "Pending",
+    smRating: smRating as FlashcardAnswer["smRating"],
+    createdAt: new Date().toISOString(),
+  };
+
+  repositories.flashcardAnswers.insert(answer);
+  res.status(201).json(answer);
 });
 
 app.post("/api/flashcards/:id/unarchive", (req, res) => {

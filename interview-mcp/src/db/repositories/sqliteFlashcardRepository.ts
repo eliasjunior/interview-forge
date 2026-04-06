@@ -45,6 +45,8 @@ export class SQLiteFlashcardRepository implements FlashcardRepository {
           title: record.flashcard.title,
           focusItem: record.flashcard.focusItem,
           studyNotes: record.flashcard.studyNotes,
+          parentFlashcardId: record.flashcard.parentFlashcardId,
+          replacedByFlashcardId: record.flashcard.replacedByFlashcardId,
         },
       }).run();
 
@@ -80,6 +82,8 @@ export class SQLiteFlashcardRepository implements FlashcardRepository {
             title: record.flashcard.title,
             focusItem: record.flashcard.focusItem,
             studyNotes: record.flashcard.studyNotes,
+            parentFlashcardId: record.flashcard.parentFlashcardId,
+            replacedByFlashcardId: record.flashcard.replacedByFlashcardId,
           },
         }).run();
 

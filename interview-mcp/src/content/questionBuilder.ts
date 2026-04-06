@@ -9,7 +9,7 @@ import { detectGaps } from "./analyzer.js";
 import { extractSpec } from "./parser.js";
 import type { ExtractedSpec } from "./parser.js";
 
-/** Six structured questions focused on algorithmic thinking. */
+/** Seven structured questions focused on algorithmic thinking, ending with implementation. */
 export function buildAlgorithmQuestions(topic: string, _content: string, _focus: string): string[] {
   return [
     `Looking at ${topic}, what algorithmic pattern or technique would you apply here, and why? ` +
@@ -31,6 +31,10 @@ export function buildAlgorithmQuestions(topic: string, _content: string, _focus:
 
     `How would you design test cases for ${topic}? ` +
     `Give at least one minimal example, one edge case, and one large-input scenario.`,
+
+    `Now implement ${topic}. ` +
+    `Write working code or precise pseudocode, narrate the key decisions as you go, ` +
+    `and use the test cases you just designed to sanity-check the implementation before you finish.`,
   ];
 }
 

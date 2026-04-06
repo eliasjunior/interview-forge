@@ -233,6 +233,38 @@ export interface Flashcard {
   lastReviewedAt?: string
   /** When set, the card is archived and should no longer appear in active review flows */
   archivedAt?: string
+
+  // ── Flashcard lineage ───────────────────────────────────────────────────────
+  /** ID of the card this was derived from (set when evaluate_flashcard creates an improved card) */
+  parentFlashcardId?: string
+  /** ID of the card that replaced this one (set when this card is superseded) */
+  replacedByFlashcardId?: string
+}
+
+// ── Flashcard answers ─────────────────────────────────────────────────────────
+
+export type AnswerState = 'Pending' | 'Evaluating' | 'Completed'
+export type FlashcardAnswerVerdict = 'good_enough' | 'needs_improvement'
+
+export interface FlashcardAnswer {
+  id: string
+  flashcardId: string
+  /** The raw answer the user typed before flipping the card */
+  content: string
+  state: AnswerState
+  /** SM-2 rating the user gave (1–4), stored for reference */
+  smRating?: ReviewRating
+  /** When the LLM evaluated this answer */
+  evaluatedAt?: string
+  /** LLM's gap analysis text */
+  evaluationResult?: string
+  /** Whether the answer was good enough or needs improvement */
+  llmVerdict?: FlashcardAnswerVerdict
+  /** FK to the mistake created (if needs_improvement) */
+  mistakeId?: string
+  /** FK to the replacement flashcard created (if needs_improvement) */
+  newFlashcardId?: string
+  createdAt: string
 }
 
 /** Rating passed to review_flashcard — mirrors SM-2 quality 1–4 */
@@ -281,6 +313,14 @@ export interface Mistake {
   /** Optional topic tag (e.g. "Java Thread States") */
   topic?: string
   createdAt: string
+
+  // ── Flashcard answer linkage (set when created by evaluate_flashcard) ────────
+  /** FK to the FlashcardAnswer that triggered this mistake */
+  sourceAnswerId?: string
+  /** FK to the original flashcard that was answered */
+  sourceFlashcardId?: string
+  /** FK to the improved flashcard created as a replacement */
+  replacementFlashcardId?: string
 }
 
 // ── Exercises ─────────────────────────────────────────────────────────────────
