@@ -134,7 +134,7 @@ C) Rejecting certificates unless they match a preconfigured expected cert or pub
 D) Copying a CA certificate into every pod image
 Answer: C
 
-9. What is OCSP stapling?
+9. You want revocation checking without making every client call the CA during the handshake. Which mechanism solves that?
 A) The client sends its certificate twice for reliability
 B) The server includes a cached signed revocation status response in the handshake
 C) The CA embeds the private key into the certificate chain

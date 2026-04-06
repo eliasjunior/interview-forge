@@ -58,7 +58,7 @@ Every topic has a 4-level progression ladder. Before jumping into a full intervi
 | L3 — Ranger | Full interview unlocked; latest full interview avg score ≥ 3.0, or all warm-up levels completed |
 | L4 — Jedi Ready | Last 2 completed full interviews for this topic both have avg score ≥ 4.0 |
 
-**Level advancement thresholds:** a warm-up level advances only after 2 completed sessions at that level with avg score ≥ 4.0. Warm-up sessions are capped at 5 questions and can draw a different subset each run when more authored questions exist. A full interview with avg < 2.5 drops the topic back to L1 for reinforcement. `L4` requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
+**Level advancement thresholds:** a warm-up level advances immediately after 1 completed session at that level with avg score ≥ 4.0, or after 2 consecutive completed sessions at that level with avg score ≥ 3.0. Warm-up sessions are capped at 5 questions and can draw a different subset each run when more authored questions exist. A full interview with avg < 2.5 drops the topic back to L1 for reinforcement. `L4` requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
 
 **MCP tools for the warm-up flow:**
 ```text

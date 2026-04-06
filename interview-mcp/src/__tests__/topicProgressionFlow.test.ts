@@ -154,21 +154,39 @@ describe("topic progression flow", () => {
     const evaluateAnswer = captureHandler(registerEvaluateAnswerTool, deps);
     const nextQuestion = captureHandler(registerNextQuestionTool, deps);
 
-    async function finishWarmupSession(level: 0 | 1 | 2) {
+    async function finishWarmupSession(level: 0 | 1 | 2, score: 3 | 4 | 5 = 5) {
       const started = parse(await startWarmUp({ topic: TOPIC, level }));
       parse(await askQuestion({ sessionId: started.sessionId }));
 
       if (level === 0) {
         await submitAnswer({ sessionId: started.sessionId, answer: "B" });
-        parse(await evaluateAnswer({ sessionId: started.sessionId }));
+        if (score === 5) {
+          parse(await evaluateAnswer({ sessionId: started.sessionId }));
+        } else {
+          parse(await evaluateAnswer({
+            sessionId: started.sessionId,
+            score,
+            feedback: "Warm-up evaluation override for progression coverage.",
+            needsFollowUp: false,
+          }));
+        }
       } else if (level === 1) {
         await submitAnswer({ sessionId: started.sessionId, answer: "A,B" });
-        parse(await evaluateAnswer({ sessionId: started.sessionId }));
+        if (score === 5) {
+          parse(await evaluateAnswer({ sessionId: started.sessionId }));
+        } else {
+          parse(await evaluateAnswer({
+            sessionId: started.sessionId,
+            score,
+            feedback: "Warm-up evaluation override for progression coverage.",
+            needsFollowUp: false,
+          }));
+        }
       } else {
         await submitAnswer({ sessionId: started.sessionId, answer: "count++ is still read-modify-write, so volatile is not enough" });
         parse(await evaluateAnswer({
           sessionId: started.sessionId,
-          score: 5,
+          score,
           feedback: "Strong explanation of visibility vs atomicity.",
           needsFollowUp: false,
         }));
@@ -199,37 +217,30 @@ describe("topic progression flow", () => {
       required: 2,
       targetLevel: 1,
       variant: "warmup",
-      label: "0 / 2 passes",
+      label: "0 / 2 streak",
       attempted: false,
       almostThere: false,
     });
 
-    await finishWarmupSession(0);
-    const halfwayL0 = parse(await getTopicLevel({ topic: TOPIC }));
-    assert.equal(halfwayL0.level, 0);
-    assert.equal(halfwayL0.progress.current, 1);
-    assert.equal(halfwayL0.progress.targetLevel, 1);
-
-    await finishWarmupSession(0);
+    await finishWarmupSession(0, 4);
     const unlockedL1 = parse(await getTopicLevel({ topic: TOPIC }));
     assert.equal(unlockedL1.level, 1);
     assert.equal(unlockedL1.progress.current, 0);
     assert.equal(unlockedL1.progress.targetLevel, 2);
 
-    await finishWarmupSession(1);
-    await finishWarmupSession(1);
+    await finishWarmupSession(1, 5);
     const unlockedL2 = parse(await getTopicLevel({ topic: TOPIC }));
     assert.equal(unlockedL2.level, 2);
     assert.equal(unlockedL2.progress.current, 0);
     assert.equal(unlockedL2.progress.targetLevel, 3);
 
-    await finishWarmupSession(2);
+    await finishWarmupSession(2, 3);
     const halfwayL2 = parse(await getTopicLevel({ topic: TOPIC }));
     assert.equal(halfwayL2.level, 2);
     assert.equal(halfwayL2.progress.current, 1);
     assert.equal(halfwayL2.progress.targetLevel, 3);
 
-    await finishWarmupSession(2);
+    await finishWarmupSession(2, 3);
     const unlockedL3 = parse(await getTopicLevel({ topic: TOPIC }));
     assert.equal(unlockedL3.level, 3);
     assert.equal(unlockedL3.progress.variant, "interview");

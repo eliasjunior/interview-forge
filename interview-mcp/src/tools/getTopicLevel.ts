@@ -7,18 +7,60 @@ import type { Session, SessionRewardSummary, TopicLevelSnapshot, TopicStatus, Wa
 // Level detection logic
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Score threshold (out of 5) required to advance to the next warm-up level. */
-const ADVANCE_THRESHOLD = 4.0;
+/** Strong warm-up score (out of 5) that advances immediately to the next level. */
+const IMMEDIATE_ADVANCE_THRESHOLD = 4.0;
+
+/** Solid warm-up score (out of 5) that advances after two consecutive sessions. */
+const STREAK_ADVANCE_THRESHOLD = 3.0;
 
 /** Real interview readiness requires repeated strong full-interview performance. */
 const JEDI_READY_THRESHOLD = 4.0;
 
-/** Warm-up advancement requires repeated passed sessions at the same level. */
-const REQUIRED_WARMUP_PASSES = 2;
+/** Consecutive solid warm-up sessions required when the score is below immediate-advance threshold. */
+const REQUIRED_WARMUP_STREAK = 2;
 
 function calcAvg(scores: number[]): number | null {
   if (!scores.length) return null;
   return scores.reduce((a, b) => a + b, 0) / scores.length;
+}
+
+function getWarmupLevelProgress(sessions: Session[]) {
+  const sortedSessions = [...sessions].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  let currentStreak = 0;
+  let bestAvg: number | null = null;
+  let passed = false;
+
+  for (const session of sortedSessions) {
+    const avg = calcAvg(session.evaluations.map((e) => e.score));
+    if (avg === null) continue;
+    bestAvg = bestAvg === null ? avg : Math.max(bestAvg, avg);
+
+    if (avg >= IMMEDIATE_ADVANCE_THRESHOLD) {
+      passed = true;
+      currentStreak = REQUIRED_WARMUP_STREAK;
+      break;
+    }
+
+    if (avg >= STREAK_ADVANCE_THRESHOLD) {
+      currentStreak += 1;
+      if (currentStreak >= REQUIRED_WARMUP_STREAK) {
+        passed = true;
+        break;
+      }
+      continue;
+    }
+
+    currentStreak = 0;
+  }
+
+  return {
+    passed,
+    bestAvg,
+    currentStreak: Math.min(currentStreak, REQUIRED_WARMUP_STREAK),
+  };
 }
 
 /**
@@ -60,14 +102,14 @@ export function detectTopicLevel(
       status: 'cold',
       reason: "No sessions found for this topic — start from Level 0.",
       nextLevelRequirement: hasWarmupContent
-        ? `Pass Level 0 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance.`
-        : `Pass Level 0 warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance.`,
+        ? `Reach avg score ≥ ${IMMEDIATE_ADVANCE_THRESHOLD} once, or avg score ≥ ${STREAK_ADVANCE_THRESHOLD} in ${REQUIRED_WARMUP_STREAK} consecutive Level 0 warm-ups, to advance.`
+        : `Reach avg score ≥ ${IMMEDIATE_ADVANCE_THRESHOLD} once, or avg score ≥ ${STREAK_ADVANCE_THRESHOLD} in ${REQUIRED_WARMUP_STREAK} consecutive Level 0 warm-ups, to advance.`,
       progress: {
         current: 0,
-        required: REQUIRED_WARMUP_PASSES,
+        required: REQUIRED_WARMUP_STREAK,
         targetLevel: 1,
         variant: 'warmup',
-        label: '0 / 2 passes',
+        label: `0 / ${REQUIRED_WARMUP_STREAK} streak`,
         attempted: false,
         almostThere: false,
       },
@@ -101,8 +143,8 @@ export function detectTopicLevel(
         reason: `Last 2 full interviews avg ${latestTwoAverages[0].toFixed(1)} and ${latestTwoAverages[1].toFixed(1)} — Jedi Ready.`,
         nextLevelRequirement: "Already at Level 4 — keep practising full interviews to stay sharp.",
         progress: {
-          current: REQUIRED_WARMUP_PASSES,
-          required: REQUIRED_WARMUP_PASSES,
+          current: REQUIRED_WARMUP_STREAK,
+          required: REQUIRED_WARMUP_STREAK,
           targetLevel: 4,
           variant: 'complete',
           label: 'Mastered',
@@ -122,13 +164,13 @@ export function detectTopicLevel(
         reason: `Last 2 full interviews avg ${latestTwoAverages[0]!.toFixed(1)} and ${latestTwoAverages[1]!.toFixed(1)} — Ranger unlocked.`,
         nextLevelRequirement: "Complete 2 full interviews in a row with avg score ≥ 4.0 to reach Level 4.",
         progress: {
-          current: Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_PASSES),
-          required: REQUIRED_WARMUP_PASSES,
+          current: Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_STREAK),
+          required: REQUIRED_WARMUP_STREAK,
           targetLevel: 4,
           variant: 'interview',
-          label: `${Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_PASSES)} / ${REQUIRED_WARMUP_PASSES} strong interviews`,
+          label: `${Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_STREAK)} / ${REQUIRED_WARMUP_STREAK} strong interviews`,
           attempted: true,
-          almostThere: Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_PASSES) === REQUIRED_WARMUP_PASSES - 1,
+          almostThere: Math.min(consecutiveStrongInterviewCount, REQUIRED_WARMUP_STREAK) === REQUIRED_WARMUP_STREAK - 1,
         },
       };
     }
@@ -142,10 +184,10 @@ export function detectTopicLevel(
         nextLevelRequirement: "Complete one more full interview with avg score ≥ 3.0 to unlock Level 3.",
         progress: {
           current: 1,
-          required: REQUIRED_WARMUP_PASSES,
+          required: REQUIRED_WARMUP_STREAK,
           targetLevel: 3,
           variant: 'interview',
-          label: `1 / ${REQUIRED_WARMUP_PASSES} interviews`,
+          label: `1 / ${REQUIRED_WARMUP_STREAK} interviews`,
           attempted: true,
           almostThere: true,
         },
@@ -175,42 +217,27 @@ export function detectTopicLevel(
   // Determine highest warmup level passed
   const warmupSessions = topicSessions.filter((s) => s.sessionKind === "warmup");
 
-  // Count how many times each warm-up level has been passed.
-  const passedCountByLevel = new Map<number, number>();
-  const bestAvgByLevel = new Map<number, number>();
-  for (const s of warmupSessions) {
-    const lvl = s.questLevel ?? 0;
-    const scores = s.evaluations.map((e) => e.score);
-    const avg = calcAvg(scores);
-    if (avg === null) continue;
-    const current = bestAvgByLevel.get(lvl) ?? -1;
-    if (avg > current) bestAvgByLevel.set(lvl, avg);
-    if (avg >= ADVANCE_THRESHOLD) {
-      passedCountByLevel.set(lvl, (passedCountByLevel.get(lvl) ?? 0) + 1);
-    }
-  }
-
   // Walk levels 0 → 1 → 2 and find the first one not yet passed
   for (const lvl of [0, 1, 2] as const) {
-    const avg = bestAvgByLevel.get(lvl);
-    const passCount = passedCountByLevel.get(lvl) ?? 0;
-    if (passCount < REQUIRED_WARMUP_PASSES) {
-      const attempted = avg !== undefined;
+    const levelSessions = warmupSessions.filter((s) => (s.questLevel ?? 0) === lvl);
+    const levelProgress = getWarmupLevelProgress(levelSessions);
+    if (!levelProgress.passed) {
+      const attempted = levelProgress.bestAvg !== null;
       return {
         level: lvl,
         status: 'warmup' as TopicStatus,
         reason: attempted
-          ? `Level ${lvl} warm-up progress ${passCount}/${REQUIRED_WARMUP_PASSES} passes (best avg ${avg!.toFixed(1)}).`
+          ? `Level ${lvl} warm-up progress ${levelProgress.currentStreak}/${REQUIRED_WARMUP_STREAK} streak (best avg ${levelProgress.bestAvg!.toFixed(1)}).`
           : `Level ${lvl} warm-up not yet attempted.`,
-        nextLevelRequirement: `Pass Level ${lvl} warm-up ${REQUIRED_WARMUP_PASSES} times with avg score ≥ ${ADVANCE_THRESHOLD} to advance to Level ${lvl + 1}.`,
+        nextLevelRequirement: `Reach avg score ≥ ${IMMEDIATE_ADVANCE_THRESHOLD} once, or avg score ≥ ${STREAK_ADVANCE_THRESHOLD} in ${REQUIRED_WARMUP_STREAK} consecutive Level ${lvl} warm-ups, to advance to Level ${lvl + 1}.`,
         progress: {
-          current: passCount,
-          required: REQUIRED_WARMUP_PASSES,
+          current: levelProgress.currentStreak,
+          required: REQUIRED_WARMUP_STREAK,
           targetLevel: (lvl + 1) as WarmUpLevel,
           variant: 'warmup',
-          label: `${passCount} / ${REQUIRED_WARMUP_PASSES} passes`,
+          label: `${levelProgress.currentStreak} / ${REQUIRED_WARMUP_STREAK} streak`,
           attempted,
-          almostThere: passCount === REQUIRED_WARMUP_PASSES - 1,
+          almostThere: levelProgress.currentStreak === REQUIRED_WARMUP_STREAK - 1,
         },
       };
     }
@@ -223,13 +250,13 @@ export function detectTopicLevel(
     reason: "All warm-up levels completed — full mock unlocked. Use start_interview.",
     nextLevelRequirement: "Already at Level 3 — complete 2 full interviews in a row with avg score ≥ 4.0 to reach Level 4.",
     progress: {
-      current: Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_PASSES),
-      required: REQUIRED_WARMUP_PASSES,
+      current: Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_STREAK),
+      required: REQUIRED_WARMUP_STREAK,
       targetLevel: 4,
       variant: 'interview',
-      label: `${Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_PASSES)} / ${REQUIRED_WARMUP_PASSES} strong interviews`,
+      label: `${Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_STREAK)} / ${REQUIRED_WARMUP_STREAK} strong interviews`,
       attempted: true,
-      almostThere: Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_PASSES) === REQUIRED_WARMUP_PASSES - 1,
+      almostThere: Math.min(consecutiveStrongInterviews(topicSessions), REQUIRED_WARMUP_STREAK) === REQUIRED_WARMUP_STREAK - 1,
     },
   };
 }
@@ -293,7 +320,7 @@ function buildRewardCopy(
       nextHint: current.progress.almostThere
         ? current.progress.variant === "interview"
           ? `One strong interview unlocks L${current.progress.targetLevel}.`
-          : `One more pass unlocks L${current.progress.targetLevel}.`
+          : `One more solid warm-up unlocks L${current.progress.targetLevel}.`
         : current.nextLevelRequirement,
     };
   }
@@ -306,7 +333,7 @@ function buildRewardCopy(
       nextHint: current.progress.almostThere
         ? current.progress.variant === "interview"
           ? `One strong interview unlocks L${current.progress.targetLevel}.`
-          : `One more pass unlocks L${current.progress.targetLevel}.`
+          : `One more solid warm-up unlocks L${current.progress.targetLevel}.`
         : current.nextLevelRequirement,
     };
   }
@@ -319,7 +346,7 @@ function buildRewardCopy(
     nextHint: current.progress.almostThere
       ? current.progress.variant === "interview"
         ? `One strong interview unlocks L${current.progress.targetLevel}.`
-        : `One more pass unlocks L${current.progress.targetLevel}.`
+        : `One more solid warm-up unlocks L${current.progress.targetLevel}.`
       : undefined,
   };
 }

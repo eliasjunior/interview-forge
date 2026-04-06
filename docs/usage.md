@@ -30,7 +30,7 @@ start_warm_up { topic: "JWT authentication", level: 0 }
   → evaluate_answer { sessionId }    ← auto-scored against correct answer
   → next_question { sessionId }
   → [repeat per question]
-  → end_interview { sessionId }      ← counts as 1 pass when avg ≥ 4.0; 2 passes at the same level are required to advance
+  → end_interview { sessionId }      ← advances immediately when avg ≥ 4.0, or after 2 consecutive sessions with avg ≥ 3.0
 ```
 
 Each warm-up session is capped at 5 questions. If more than 5 questions exist for that level, the server picks a different subset per session while keeping the selected order aligned to the authored progression.
@@ -48,7 +48,7 @@ Each warm-up session is capped at 5 questions. If more than 5 questions exist fo
 | `dropped` (interview avg < 2.5) | `start_warm_up { level: 1 }` (reinforcement) |
 | `ready` (`L3`/`L4`) | `start_interview { topic }` |
 
-Warm-up advancement rule: a level advances only after 2 completed warm-up sessions at that same level with avg score ≥ 4.0. With 5 questions, that effectively means at least 4/5 correct twice for L0/L1. `L4` requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
+Warm-up advancement rule: a level advances immediately after one completed warm-up session at that level with avg score ≥ 4.0, or after 2 consecutive completed sessions at that level with avg score ≥ 3.0. `L4` still requires 2 completed full interviews for that topic with avg score ≥ 4.0 in both.
 
 ## 1. Full interview
 

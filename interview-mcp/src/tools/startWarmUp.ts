@@ -40,11 +40,14 @@ const POOL_EXHAUSTED_PREAMBLE =
 
 const LEVEL_INSTRUCTION: Record<0 | 1 | 2, string> = {
   0: POOL_EXHAUSTED_PREAMBLE +
-     "Present each MCQ question with its choices. Wait for the candidate to pick an option letter (A/B/C/D). " +
+     "Present each MCQ question with its choices. When a question stem is definition-heavy, reframe it briefly in practical terms: name the problem or operational goal first, then ask which mechanism solves it, without leaking the answer. " +
+     "After scoring, explain the correct choice in terms of the problem it solves and the main tradeoff or benefit. " +
+     "Wait for the candidate to pick an option letter (A/B/C/D). " +
      "After they answer, call evaluate_answer — it will auto-score based on the correct answer. " +
      "Encourage the candidate; frame errors as learning moments, not failures.",
   1: POOL_EXHAUSTED_PREAMBLE +
-     "Present each advanced MCQ question with its choices. Some questions may have multiple correct answers. " +
+     "Present each advanced MCQ question with its choices. If the stem is phrased as pure recall, briefly anchor it in a realistic system problem, design goal, or failure mode before asking for the option. Some questions may have multiple correct answers. " +
+     "After scoring, explain which operational concern each correct option addresses. " +
      "Ask the candidate to answer with option letters like A or A,C, or use ALL / NONE when appropriate. " +
      "Call evaluate_answer — it will auto-score based on the authored answer key. " +
      "Keep the tone calm, but make the candidate justify subtle distinctions when they miss one.",

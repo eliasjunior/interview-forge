@@ -114,7 +114,7 @@ C) A log of certificate renewals only
 D) A sequence from leaf certificate toward trusted issuing authorities
 Answer: D
 
-8. What is OCSP stapling?
+8. You need fresher certificate revocation status without forcing each client to query the CA directly. Which TLS mechanism fits best?
 A) The server includes a cached signed revocation status response during handshake
 B) The client sends its private key first
 C) The CA embeds the whole CRL into every certificate
