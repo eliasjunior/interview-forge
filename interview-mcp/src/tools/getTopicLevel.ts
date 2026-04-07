@@ -261,6 +261,128 @@ export function detectTopicLevel(
   };
 }
 
+function buildStableProgress(level: WarmUpLevel): TopicLevelProgress {
+  switch (level) {
+    case 1:
+      return {
+        current: 0,
+        required: REQUIRED_WARMUP_STREAK,
+        targetLevel: 2,
+        variant: "warmup",
+        label: `0 / ${REQUIRED_WARMUP_STREAK} streak`,
+        attempted: true,
+        almostThere: false,
+      };
+    case 2:
+      return {
+        current: 0,
+        required: REQUIRED_WARMUP_STREAK,
+        targetLevel: 3,
+        variant: "interview",
+        label: `0 / ${REQUIRED_WARMUP_STREAK} interviews`,
+        attempted: true,
+        almostThere: false,
+      };
+    case 3:
+      return {
+        current: 0,
+        required: REQUIRED_WARMUP_STREAK,
+        targetLevel: 4,
+        variant: "interview",
+        label: `0 / ${REQUIRED_WARMUP_STREAK} strong interviews`,
+        attempted: true,
+        almostThere: false,
+      };
+    case 4:
+      return {
+        current: REQUIRED_WARMUP_STREAK,
+        required: REQUIRED_WARMUP_STREAK,
+        targetLevel: 4,
+        variant: "complete",
+        label: "Mastered",
+        attempted: true,
+        almostThere: false,
+      };
+    default:
+      return {
+        current: 0,
+        required: REQUIRED_WARMUP_STREAK,
+        targetLevel: 1,
+        variant: "warmup",
+        label: `0 / ${REQUIRED_WARMUP_STREAK} streak`,
+        attempted: false,
+        almostThere: false,
+      };
+  }
+}
+
+function buildStableLevelSnapshot(level: WarmUpLevel): TopicLevelSnapshot {
+  const progress = buildStableProgress(level);
+
+  switch (level) {
+    case 4:
+      return {
+        level,
+        status: "ready",
+        reason: "Previously reached Level 4. Topic levels do not decay.",
+        nextLevelRequirement: "Already at Level 4 — keep practising full interviews to stay sharp.",
+        progress,
+      };
+    case 3:
+      return {
+        level,
+        status: "ready",
+        reason: "Previously unlocked Level 3. Topic levels do not decay.",
+        nextLevelRequirement: "Complete 2 full interviews in a row with avg score ≥ 4.0 to reach Level 4.",
+        progress,
+      };
+    case 2:
+      return {
+        level,
+        status: "warmup",
+        reason: "Previously reached Level 2. Topic levels do not decay.",
+        nextLevelRequirement: "Complete full interviews with avg score ≥ 3.0 to unlock Level 3.",
+        progress,
+      };
+    case 1:
+      return {
+        level,
+        status: "warmup",
+        reason: "Previously reached Level 1. Topic levels do not decay.",
+        nextLevelRequirement: `Reach avg score ≥ ${IMMEDIATE_ADVANCE_THRESHOLD} once, or avg score ≥ ${STREAK_ADVANCE_THRESHOLD} in ${REQUIRED_WARMUP_STREAK} consecutive Level 1 warm-ups, to advance to Level 2.`,
+        progress,
+      };
+    default:
+      return {
+        level,
+        status: "cold",
+        reason: "No sessions found for this topic — start from Level 0.",
+        nextLevelRequirement: `Reach avg score ≥ ${IMMEDIATE_ADVANCE_THRESHOLD} once, or avg score ≥ ${STREAK_ADVANCE_THRESHOLD} in ${REQUIRED_WARMUP_STREAK} consecutive Level 0 warm-ups, to advance.`,
+        progress,
+      };
+  }
+}
+
+export function stabilizeTopicLevelSnapshot(
+  snapshot: TopicLevelSnapshot,
+  persistedLevel?: WarmUpLevel,
+): TopicLevelSnapshot {
+  if (persistedLevel === undefined || persistedLevel <= snapshot.level) {
+    return snapshot;
+  }
+
+  const stable = buildStableLevelSnapshot(persistedLevel);
+
+  if (stable.progress.targetLevel === snapshot.progress.targetLevel && stable.progress.variant === snapshot.progress.variant) {
+    return {
+      ...stable,
+      progress: snapshot.progress,
+    };
+  }
+
+  return stable;
+}
+
 function consecutiveStrongInterviews(sessions: Session[]) {
   const interviewSessions = sessions
     .filter((s) => !s.sessionKind || s.sessionKind === "interview")
@@ -398,8 +520,12 @@ export function registerGetTopicLevelTool(server: McpServer, deps: ToolDeps) {
         knowledgeTopic != null &&
         knowledgeTopic.warmupLevels != null &&
         Object.keys(knowledgeTopic.warmupLevels).length > 0;
+      const persistedLevel = deps.findTopicPlan?.(topic)?.lastUnlockedLevel;
 
-      const result = detectTopicLevel(topic, sessions, hasWarmupContent);
+      const result = stabilizeTopicLevelSnapshot(
+        detectTopicLevel(topic, sessions, hasWarmupContent),
+        persistedLevel,
+      );
 
       return {
         content: [{

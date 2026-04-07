@@ -270,6 +270,27 @@ export interface FlashcardAnswer {
 /** Rating passed to review_flashcard — mirrors SM-2 quality 1–4 */
 export type ReviewRating = 1 | 2 | 3 | 4
 
+// ── Flashcard list / history API shapes ──────────────────────────────────────
+
+export type FlashcardListStatus = 'active' | 'archived' | 'all'
+
+export interface FlashcardListResponse {
+  items: Flashcard[]
+  total: number
+  hasMore: boolean
+  /** Opaque cursor — pass back as `cursor` param to get the next page */
+  nextCursor: string | null
+}
+
+export interface FlashcardHistoryResponse {
+  /** ID of the card that was requested */
+  selectedId: string
+  /** Whether the chain has more than one version */
+  hasHistory: boolean
+  /** Full lineage chain ordered oldest → newest */
+  items: Flashcard[]
+}
+
 export interface FlashcardReviewResult {
   cardId: string
   rating: ReviewRating

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { Flashcard, ReviewRating } from '@mock-interview/shared'
-import { dismissFlashcard, getFlashcards, restoreFlashcard, reviewFlashcard, submitFlashcardAnswer } from '../api'
+import { dismissFlashcard, getFlashcardHistory, getFlashcardsPage, restoreFlashcard, reviewFlashcard, submitFlashcardAnswer } from '../api'
 
 // ── Rating config ────────────────────────────────────────────────────────────
 
@@ -10,6 +10,8 @@ const RATINGS: { rating: ReviewRating; label: string; desc: string; cls: string 
   { rating: 3, label: 'Good',  desc: 'Normal',    cls: 'fc-btn-good'  },
   { rating: 4, label: 'Easy',  desc: 'Perfect',   cls: 'fc-btn-easy'  },
 ]
+
+const PAGE_SIZE = 20
 
 // ── Markdown renderer ────────────────────────────────────────────────────────
 
@@ -148,39 +150,23 @@ function formatTimestamp(value?: string): string {
   return new Date(value).toLocaleString()
 }
 
-function buildFlashcardHistory(cards: Flashcard[], selectedId: string): Flashcard[] {
-  const byId = new Map(cards.map(card => [card.id, card]))
-  const selected = byId.get(selectedId)
-  if (!selected) return []
-
-  let root = selected
-  const seenParents = new Set<string>([root.id])
-  while (root.parentFlashcardId) {
-    const parent = byId.get(root.parentFlashcardId)
-    if (!parent || seenParents.has(parent.id)) break
-    root = parent
-    seenParents.add(parent.id)
-  }
-
-  const chain: Flashcard[] = []
-  const seenChain = new Set<string>()
-  let current: Flashcard | undefined = root
-  while (current && !seenChain.has(current.id)) {
-    chain.push(current)
-    seenChain.add(current.id)
-    current = current.replacedByFlashcardId
-      ? byId.get(current.replacedByFlashcardId)
-      : undefined
-  }
-
-  return chain
+function compactFlashcardFront(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FlashcardsPage() {
   const [cards, setCards]           = useState<Flashcard[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore]       = useState(false)
   const [loading, setLoading]       = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [topicFilter, setTopicFilter] = useState('All')
   const [topicQuery, setTopicQuery] = useState('')
@@ -196,16 +182,39 @@ export default function FlashcardsPage() {
   const [busyCardId, setBusyCardId] = useState<string | null>(null)
   const [myAnswer, setMyAnswer]     = useState('')
   const [historyCardId, setHistoryCardId] = useState<string | null>(null)
+  const [historyCards, setHistoryCards] = useState<Flashcard[]>([])
+  const [historyTopic, setHistoryTopic] = useState('')
+  const [historyHasHistory, setHistoryHasHistory] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
-    getFlashcards(true)
-      .then(setCards)
-      .catch(e => setError(String(e)))
-      .finally(() => setLoading(false))
-  }, [])
+  const currentStatus = viewMode === 'active' ? 'active' : 'archived'
 
-  useEffect(() => { load() }, [load])
+  const loadPage = useCallback(async (reset: boolean, cursor?: string) => {
+    const setBusy = reset ? setLoading : setLoadingMore
+    setBusy(true)
+    setError(null)
+    try {
+      const response = await getFlashcardsPage({
+        status: currentStatus,
+        topic: topicFilter === 'All' ? undefined : topicFilter,
+        limit: PAGE_SIZE,
+        cursor,
+      })
+      setCards(prev => reset ? response.items : [...prev, ...response.items])
+      setTotalCount(response.total)
+      setNextCursor(response.nextCursor)
+      setHasMore(response.hasMore)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }, [currentStatus, topicFilter])
+
+  useEffect(() => {
+    void loadPage(true)
+  }, [loadPage])
 
   useEffect(() => {
     if (!reviewing) return
@@ -221,11 +230,9 @@ export default function FlashcardsPage() {
   if (loading) return <div className="loading">Loading flashcards…</div>
   if (error)   return <div className="error-msg">Failed to load flashcards: {error}</div>
 
-  const activeCards = cards.filter(c => !c.archivedAt)
-  const archivedCards = cards.filter(c => c.archivedAt)
-  const visibleCards = viewMode === 'active' ? activeCards : archivedCards
+  const visibleCards = cards
   const dueCountByTopic = new Map<string, number>()
-  for (const card of activeCards) {
+  for (const card of cards) {
     if (!isDue(card)) continue
     dueCountByTopic.set(card.topic, (dueCountByTopic.get(card.topic) ?? 0) + 1)
   }
@@ -236,10 +243,7 @@ export default function FlashcardsPage() {
     : topics
   const selectedTopicVisible = topicOptions.includes(topicFilter)
   const effectiveTopicFilter = selectedTopicVisible ? topicFilter : 'All'
-  const filtered = effectiveTopicFilter === 'All'
-    ? visibleCards
-    : visibleCards.filter(c => c.topic === effectiveTopicFilter)
-  const dueCards = filtered.filter(isDue)
+  const dueCards = visibleCards.filter(isDue)
 
   // ── Start review ────────────────────────────────────────────────────────────
 
@@ -256,14 +260,13 @@ export default function FlashcardsPage() {
   const exitReview = () => {
     setReviewing(false)
     setDone(false)
-    load()
+    void loadPage(true)
   }
 
-  const updateCardArchiveState = (cardId: string, archived: boolean) => {
-    setCards(prev => prev.map(card => (
-      card.id === cardId ? { ...card, archivedAt: archived ? new Date().toISOString() : undefined } : card
-    )))
+  const removeVisibleCard = (cardId: string) => {
+    setCards(prev => prev.filter(card => card.id !== cardId))
     setQueue(prev => prev.filter(card => card.id !== cardId))
+    setTotalCount(prev => Math.max(0, prev - 1))
   }
 
   const handleDismiss = async (cardId: string) => {
@@ -271,7 +274,7 @@ export default function FlashcardsPage() {
     setBusyCardId(cardId)
     try {
       await dismissFlashcard(cardId)
-      updateCardArchiveState(cardId, true)
+      removeVisibleCard(cardId)
     } catch (e) {
       console.error('dismiss error', e)
       setError(String(e))
@@ -285,7 +288,7 @@ export default function FlashcardsPage() {
     setBusyCardId(cardId)
     try {
       await restoreFlashcard(cardId)
-      updateCardArchiveState(cardId, false)
+      removeVisibleCard(cardId)
     } catch (e) {
       console.error('restore error', e)
       setError(String(e))
@@ -298,22 +301,26 @@ export default function FlashcardsPage() {
 
   const handleRate = async (r: ReviewRating) => {
     if (rating !== null) return // already rated, waiting for animation
-    setRating(r)
+    setError(null)
     const cardId = queue[cursor].id
     const trimmedAnswer = myAnswer.trim()
+    if (!trimmedAnswer) {
+      setError('Answer is required before you rate this flashcard.')
+      return
+    }
+    setRating(r)
     try {
       await reviewFlashcard(cardId, r)
-      if (trimmedAnswer) {
-        submitFlashcardAnswer(cardId, trimmedAnswer, r).catch(e => console.error('answer submit error', e))
-      }
+      await submitFlashcardAnswer(cardId, trimmedAnswer, r)
     } catch (e) {
-      console.error('review error', e)
+      console.error('review or answer submit error', e)
+      setError(String(e))
     }
     setTimeout(() => {
       const next = cursor + 1
       if (next >= queue.length) {
         setDone(true)
-        load()
+        void loadPage(true)
       } else {
         setCursor(next)
         setFlipped(false)
@@ -375,11 +382,7 @@ export default function FlashcardsPage() {
         </div>
 
         {/* Flip card */}
-        <div
-          className="fc-flip-wrapper"
-          onClick={() => !flipped && setFlipped(true)}
-          style={{ cursor: flipped ? 'default' : 'pointer' }}
-        >
+        <div className="fc-flip-wrapper">
           <div className={`fc-face ${flipped ? 'fc-back' : 'fc-front'}`}>
             {!flipped && (
               <div className="fc-face-badge">
@@ -394,6 +397,16 @@ export default function FlashcardsPage() {
                   <div className="fc-question-review-label">Prompt</div>
                   <div className="fc-question-review-text">{card.front}</div>
                 </div>
+                <div className="fc-answer-editor">
+                  <div className="fc-question-review-label">Your Answer</div>
+                  <textarea
+                    className="fc-answer-input"
+                    placeholder="Edit your answer before rating…"
+                    value={myAnswer}
+                    onChange={e => setMyAnswer(e.target.value)}
+                    rows={5}
+                  />
+                </div>
                 <div
                   className="fc-answer-text"
                   dangerouslySetInnerHTML={{ __html: mdToHtml(card.back) }}
@@ -407,10 +420,9 @@ export default function FlashcardsPage() {
                   placeholder="Write your answer before revealing…"
                   value={myAnswer}
                   onChange={e => setMyAnswer(e.target.value)}
-                  onClick={e => e.stopPropagation()}
                   rows={4}
                 />
-                <div className="fc-tap-hint">↩ click card or show answer when ready</div>
+                <div className="fc-tap-hint">Answer is required. Use “Show Answer” when you want to flip the card.</div>
               </>
             )}
           </div>
@@ -418,14 +430,14 @@ export default function FlashcardsPage() {
 
         {/* Rating row */}
         <div className={`fc-rating-row${flipped ? ' visible' : ''}`}>
-          <p className="fc-rating-prompt">How well did you remember?</p>
+          <p className="fc-rating-prompt">How well did you remember? Submit your written answer first by choosing a rating.</p>
           <div className="fc-rating-btns">
             {RATINGS.map(({ rating: r, label, desc, cls }) => (
               <button
                 key={r}
                 className={`fc-rating-btn ${cls}${rating === r ? ' selected' : ''}`}
                 onClick={() => handleRate(r)}
-                disabled={rating !== null}
+                disabled={rating !== null || !myAnswer.trim()}
               >
                 <span className="fc-rating-label">{label}</span>
                 <span className="fc-rating-desc">{desc}</span>
@@ -448,10 +460,24 @@ export default function FlashcardsPage() {
 
   // ── Overview ─────────────────────────────────────────────────────────────────
 
-  const totalDue = activeCards.filter(isDue).length
-  const historyChain = historyCardId ? buildFlashcardHistory(cards, historyCardId) : []
-  const historySelectedCard = historyCardId ? cards.find(card => card.id === historyCardId) ?? null : null
-  const hasHistory = Boolean(historySelectedCard && (historySelectedCard.parentFlashcardId || historySelectedCard.replacedByFlashcardId))
+  const openHistory = async (card: Flashcard) => {
+    setHistoryCardId(card.id)
+    setHistoryTopic(card.topic)
+    setHistoryCards([])
+    setHistoryHasHistory(false)
+    setHistoryError(null)
+    setHistoryLoading(true)
+    try {
+      const response = await getFlashcardHistory(card.id)
+      setHistoryCards(response.items)
+      setHistoryHasHistory(response.hasHistory)
+      setHistoryCardId(response.selectedId)
+    } catch (e) {
+      setHistoryError(String(e))
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   return (
     <div>
@@ -459,7 +485,9 @@ export default function FlashcardsPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 className="page-title">Flashcards</h1>
-            <p className="page-subtitle">{activeCards.length} active · {archivedCards.length} archived · {totalDue} due today</p>
+            <p className="page-subtitle">
+              {totalCount} {viewMode} flashcard{totalCount !== 1 ? 's' : ''} · {cards.length} loaded{viewMode === 'active' ? ` · ${dueCards.length} due in view` : ''}
+            </p>
           </div>
           {viewMode === 'active' && dueCards.length > 0 && (
             <button className="fc-start-btn" onClick={startReview}>
@@ -495,14 +523,14 @@ export default function FlashcardsPage() {
       {/* Stats */}
       <div className="stats-row">
         <div className="stat-card">
-          <div className="stat-value">{viewMode === 'active' ? activeCards.length : archivedCards.length}</div>
+          <div className="stat-value">{totalCount}</div>
           <div className="stat-label">{viewMode === 'active' ? 'Active' : 'Archived'}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value" style={{ color: viewMode === 'active' && totalDue > 0 ? 'var(--warning)' : 'var(--success)' }}>
-            {viewMode === 'active' ? totalDue : archivedCards.length}
+          <div className="stat-value" style={{ color: viewMode === 'active' && dueCards.length > 0 ? 'var(--warning)' : 'var(--success)' }}>
+            {cards.length}
           </div>
-          <div className="stat-label">{viewMode === 'active' ? 'Due Today' : 'Stored'}</div>
+          <div className="stat-label">Loaded</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{topics.length - 1}</div>
@@ -510,7 +538,7 @@ export default function FlashcardsPage() {
         </div>
         <div className="stat-card">
           <div className="stat-value">{visibleCards.filter(c => c.repetitions > 0).length}</div>
-          <div className="stat-label">Reviewed</div>
+          <div className="stat-label">Reviewed In View</div>
         </div>
       </div>
 
@@ -535,7 +563,7 @@ export default function FlashcardsPage() {
             {topicOptions.map(topic => (
               <option key={topic} value={topic}>
                 {topic === 'All'
-                  ? `All${viewMode === 'active' && totalDue > 0 ? ` (${totalDue})` : ''}`
+                  ? `All${cards.length > 0 ? ` (${cards.length})` : ''}`
                   : `${topic}${viewMode === 'active' && (dueCountByTopic.get(topic) ?? 0) > 0 ? ` (${dueCountByTopic.get(topic)})` : ''}`}
               </option>
             ))}
@@ -544,7 +572,7 @@ export default function FlashcardsPage() {
       )}
 
       {/* Card list */}
-      {filtered.length === 0 ? (
+      {visibleCards.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">🃏</div>
           <div className="empty-state-msg">
@@ -565,23 +593,23 @@ export default function FlashcardsPage() {
                   card={card}
                   isDue
                   onDismiss={handleDismiss}
-                  onShowHistory={setHistoryCardId}
+                  onShowHistory={openHistory}
                   dismissing={busyCardId === card.id}
                 />
               ))}
             </>
           )}
           {/* Upcoming cards */}
-          {viewMode === 'active' && filtered.filter(c => !isDue(c)).length > 0 && (
+          {viewMode === 'active' && visibleCards.filter(c => !isDue(c)).length > 0 && (
             <>
               <h2 className="fc-section-label" style={{ marginTop: 24 }}>Upcoming</h2>
-              {filtered.filter(c => !isDue(c)).map(card => (
+              {visibleCards.filter(c => !isDue(c)).map(card => (
                 <FlashcardRow
                   key={card.id}
                   card={card}
                   isDue={false}
                   onDismiss={handleDismiss}
-                  onShowHistory={setHistoryCardId}
+                  onShowHistory={openHistory}
                   dismissing={busyCardId === card.id}
                 />
               ))}
@@ -589,17 +617,14 @@ export default function FlashcardsPage() {
           )}
           {viewMode === 'archived' && (
             <>
-              <h2 className="fc-section-label">Archived · {filtered.length}</h2>
-              {filtered
-                .slice()
-                .sort((a, b) => new Date(b.archivedAt ?? 0).getTime() - new Date(a.archivedAt ?? 0).getTime())
-                .map(card => (
+              <h2 className="fc-section-label">Archived · {visibleCards.length}</h2>
+              {visibleCards.map(card => (
                   <FlashcardRow
                     key={card.id}
                     card={card}
                     isDue={false}
                     onDismiss={handleRestore}
-                    onShowHistory={setHistoryCardId}
+                    onShowHistory={openHistory}
                     dismissing={busyCardId === card.id}
                     archived
                   />
@@ -609,32 +634,53 @@ export default function FlashcardsPage() {
         </div>
       )}
 
-      {historySelectedCard && (
+      {hasMore && !reviewing && (
+        <div className="fc-load-more">
+          <button
+            className="fc-start-btn"
+            onClick={() => void loadPage(false, nextCursor ?? undefined)}
+            disabled={loadingMore}
+          >
+            {loadingMore ? 'Loading…' : `Load more (${Math.max(totalCount - cards.length, 0)} remaining)`}
+          </button>
+        </div>
+      )}
+
+      {historyCardId && (
         <div className="graph-modal-backdrop" onClick={() => setHistoryCardId(null)}>
           <div className="fc-history-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="graph-modal-header">
-              <div>
+            <div className="fc-history-header">
+              <div className="fc-history-header-copy">
                 <h3>Flashcard History</h3>
-                <p className="fc-history-subtitle">{historySelectedCard.topic}</p>
+                <p className="fc-history-subtitle">{historyTopic}</p>
               </div>
-              <button className="btn-back" onClick={() => setHistoryCardId(null)}>✕ Close</button>
+              <button className="fc-history-close" onClick={() => setHistoryCardId(null)}>Close</button>
             </div>
 
-            {!hasHistory ? (
+            {historyLoading ? (
+              <div className="fc-history-empty">
+                <h4>Loading history…</h4>
+              </div>
+            ) : historyError ? (
+              <div className="fc-history-empty">
+                <h4>Could not load history</h4>
+                <p>{historyError}</p>
+              </div>
+            ) : !historyHasHistory ? (
               <div className="fc-history-empty">
                 <h4>No history yet</h4>
                 <p>This flashcard has not been replaced or improved yet. When Claude creates a stronger version, it will appear here.</p>
               </div>
             ) : (
               <div className="fc-history-list">
-                {historyChain.map((card, index) => {
-                  const isSelected = card.id === historySelectedCard.id
+                {historyCards.map((card, index) => {
+                  const isSelected = card.id === historyCardId
                   const isCurrent = !card.archivedAt
                   return (
                     <div key={card.id} className={`fc-history-item${isSelected ? ' selected' : ''}`}>
                       <div className="fc-history-rail" aria-hidden="true">
                         <span className={`fc-history-dot${isCurrent ? ' current' : ''}`} />
-                        {index < historyChain.length - 1 && <span className="fc-history-line" />}
+                        {index < historyCards.length - 1 && <span className="fc-history-line" />}
                       </div>
                       <div className="fc-history-card">
                         <div className="fc-history-item-header">
@@ -673,9 +719,10 @@ export default function FlashcardsPage() {
 
 function FlashcardRow(
   { card, isDue: due, onDismiss, onShowHistory, dismissing, archived = false }:
-  { card: Flashcard; isDue: boolean; onDismiss: (cardId: string) => void; onShowHistory: (cardId: string) => void; dismissing: boolean; archived?: boolean }
+  { card: Flashcard; isDue: boolean; onDismiss: (cardId: string) => void; onShowHistory: (card: Flashcard) => void; dismissing: boolean; archived?: boolean }
 ) {
   const [expanded, setExpanded] = useState(false)
+  const hasHistory = Boolean(card.parentFlashcardId || card.replacedByFlashcardId)
 
   return (
     <div
@@ -685,18 +732,20 @@ function FlashcardRow(
       <div className="fc-row-header">
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="fc-row-topic">{card.topic}</div>
-          <div className="fc-row-question">{card.front}</div>
+          <div className="fc-row-question">{compactFlashcardFront(card.front)}</div>
         </div>
         <div className="fc-row-meta">
-          <button
-            className="fc-history-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              onShowHistory(card.id)
-            }}
-          >
-            History
-          </button>
+          {hasHistory && (
+            <button
+              className="fc-history-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onShowHistory(card)
+              }}
+            >
+              History
+            </button>
+          )}
           {!archived && (
             <button
               className="fc-dismiss-btn fc-dismiss-inline"

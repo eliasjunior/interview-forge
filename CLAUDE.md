@@ -167,6 +167,7 @@ The flashcard review system now captures optional free-text recall attempts sepa
 - submitting a rating still performs the normal `review_flashcard` SM-2 update; if answer text exists, the UI also posts it asynchronously to `POST /api/flashcards/:id/answers`
 - `evaluate_flashcard` claims pending answers, marks them `Evaluating`, and returns the context Claude needs: flashcard question, expected answer, and candidate answer
 - Claude must then call `save_flashcard_evaluation` once per returned answer with the verdict
+- Any scheduled or automated flashcard-evaluation workflow is incomplete if it runs only `evaluate_flashcard`; it must also execute `save_flashcard_evaluation` for every returned answer or those answers will remain unfinalized and no replacement/history chain will be persisted
 - if the verdict is `needs_improvement`, the old card is archived, a stronger replacement card is created with `parentFlashcardId`, the old card gets `replacedByFlashcardId`, and a linked mistake is logged
 - mistakes created from this path can link back to `sourceAnswerId`, `sourceFlashcardId`, and `replacementFlashcardId`
 
@@ -196,6 +197,7 @@ The flashcard review system now captures optional free-text recall attempts sepa
 - Scans for pending entries in `flashcard_answers`
 - Marks claimed answers as `Evaluating`
 - Returns batched evaluation context so the orchestrator can judge recall quality without exposing hidden guidance to the learner
+- Does not by itself create replacement cards, archive old cards, log mistakes, or complete the workflow
 
 **`save_flashcard_evaluation`**
 - Args include the `answerId` returned by `evaluate_flashcard` plus Claude's verdict
@@ -212,6 +214,8 @@ The flashcard review system now captures optional free-text recall attempts sepa
    save_flashcard_evaluation { ... }    → persist verdict / replacement card / linked mistake
 5. All done — next review dates and any improved replacement cards are set automatically
 ```
+
+If a scheduler or automation stops after step 3, the system will not persist flashcard improvement history.
 
 ### REST API (for the UI)
 

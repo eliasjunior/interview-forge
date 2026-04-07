@@ -3,6 +3,9 @@ import type {
   KnowledgeGraph,
   ReportMeta,
   Flashcard,
+  FlashcardHistoryResponse,
+  FlashcardListResponse,
+  FlashcardListStatus,
   FlashcardAnswer,
   ReviewRating,
   Mistake,
@@ -153,8 +156,24 @@ export const getGraph = (): Promise<KnowledgeGraph> => req(`${BASE}/graph`)
 export const inspectGraphNodes = (nodeIds: string[]): Promise<GraphInspectionResult> =>
   post(`${BASE}/graph/inspect`, { nodeIds })
 
-export const getFlashcards = (includeArchived = false): Promise<Flashcard[]> =>
-  req(`${BASE}/flashcards${includeArchived ? '?includeArchived=true' : ''}`)
+export interface FlashcardPageQuery {
+  status: FlashcardListStatus
+  topic?: string
+  limit?: number
+  cursor?: string
+}
+
+export const getFlashcardsPage = ({ status, topic, limit, cursor }: FlashcardPageQuery): Promise<FlashcardListResponse> => {
+  const params = new URLSearchParams()
+  params.set('status', status)
+  if (topic && topic !== 'All') params.set('topic', topic)
+  if (typeof limit === 'number') params.set('limit', String(limit))
+  if (cursor) params.set('cursor', cursor)
+  return req(`${BASE}/flashcards?${params.toString()}`)
+}
+
+export const getFlashcardHistory = (id: string): Promise<FlashcardHistoryResponse> =>
+  req(`${BASE}/flashcards/${encodeURIComponent(id)}/history`)
 
 export const getMistakes = (topic?: string): Promise<Mistake[]> =>
   req(`${BASE}/mistakes${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`)

@@ -8,7 +8,7 @@ import fs from "fs";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
 import { applySM2 } from "./srsUtils.js";
 import { FileKnowledgeStore } from "./knowledge/file.js";
-import { buildSessionRewardSummary, detectTopicLevel } from "./tools/getTopicLevel.js";
+import { buildSessionRewardSummary, detectTopicLevel, stabilizeTopicLevelSnapshot } from "./tools/getTopicLevel.js";
 import type {
   ReviewRating,
   Flashcard,
@@ -27,6 +27,12 @@ import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sess
 import { buildSessionLaunchPrompt } from "./sessions/launchPrompt.js";
 import { buildProgressOverview } from "./progress.js";
 import { createScopedInterviewSession, DEFAULT_FOCUS } from "./scopedInterview/session.js";
+import {
+  buildFlashcardHistory,
+  DEFAULT_FLASHCARD_PAGE_SIZE,
+  MAX_FLASHCARD_PAGE_SIZE,
+  paginateFlashcards,
+} from "./http/flashcards.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -197,7 +203,14 @@ app.get("/api/topics/:topic/level", (req, res) => {
     Object.keys(knowledgeTopic.warmupLevels).length > 0;
 
   const sessions = loadSessions();
-  const { level, status, reason, nextLevelRequirement, progress } = detectTopicLevel(topic, sessions, hasWarmupContent);
+  const persistedLevel = repositories.topicPlans
+    .list()
+    .find((plan) => normalizeTopicPlanKey(plan.topic) === normalizeTopicPlanKey(topic))
+    ?.lastUnlockedLevel;
+  const { level, status, reason, nextLevelRequirement, progress } = stabilizeTopicLevelSnapshot(
+    detectTopicLevel(topic, sessions, hasWarmupContent),
+    persistedLevel,
+  );
   res.json({ topic, level, status, reason, nextLevelRequirement, hasWarmupContent, progress });
 });
 
@@ -448,9 +461,31 @@ app.get("/api/mistakes", (req, res) => {
 });
 
 app.get("/api/flashcards", (req, res) => {
-  const includeArchived = req.query.includeArchived === "true";
+  const status = typeof req.query.status === "string"
+    ? req.query.status
+    : req.query.includeArchived === "true"
+      ? "all"
+      : "active";
+  if (status !== "active" && status !== "archived" && status !== "all") {
+    res.status(400).json({ error: "status must be one of: active, archived, all" });
+    return;
+  }
+
+  const topic = typeof req.query.topic === "string" ? req.query.topic : undefined;
+  const limit = parseBoundedInt(req.query.limit, DEFAULT_FLASHCARD_PAGE_SIZE, 1, MAX_FLASHCARD_PAGE_SIZE);
+  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
   const cards = loadFlashcards();
-  res.json(includeArchived ? cards : cards.filter((card) => !card.archivedAt));
+  res.json(paginateFlashcards(cards, { status, topic, limit, cursor }));
+});
+
+app.get("/api/flashcards/:id/history", (req, res) => {
+  const history = buildFlashcardHistory(loadFlashcards(), req.params.id);
+  if (!history) {
+    res.status(404).json({ error: "Card not found" });
+    return;
+  }
+
+  res.json(history);
 });
 
 app.post("/api/flashcards/:id/review", (req, res) => {

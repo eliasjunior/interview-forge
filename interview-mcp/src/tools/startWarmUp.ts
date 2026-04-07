@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Session, WarmUpLevel, QuestionFormat } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
-import { detectTopicLevel } from "./getTopicLevel.js";
+import { detectTopicLevel, stabilizeTopicLevelSnapshot } from "./getTopicLevel.js";
 import { selectQuestions } from "./startInterview.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -202,7 +202,10 @@ export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {
       const resolvedLevel: WarmUpLevel =
         level !== undefined
           ? level
-          : detectTopicLevel(topic, sessions, hasWarmupContent).level;
+          : stabilizeTopicLevelSnapshot(
+              detectTopicLevel(topic, sessions, hasWarmupContent),
+              deps.findTopicPlan?.(topic)?.lastUnlockedLevel,
+            ).level;
 
       // Build cross-session ask history for the resolved warm-up level
       const normalise = (s: string) => s.toLowerCase().replace(/[\s\-_]+/g, "");

@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import type { Session, Flashcard, Mistake, Skill, Exercise, KnowledgeGraph, Concept } from "@mock-interview/shared";
+import type { Session, Flashcard, Mistake, Skill, Exercise, KnowledgeGraph, Concept, TopicPlan } from "@mock-interview/shared";
 import type { KnowledgeStore, KnowledgeTopic } from "../knowledge/port.js";
 import type { ToolDeps } from "../tools/deps.js";
 import { assertState } from "../stateUtils.js";
@@ -74,6 +74,7 @@ let idCounter = 0;
 function makeDeps(
   sessionStore: ReturnType<typeof makeSessionStore>,
   knowledge: KnowledgeStore = makeKnowledgeStore(),
+  findTopicPlanOverride: (topic: string) => TopicPlan | null = () => null,
 ): ToolDeps {
   return {
     ai: null,
@@ -97,6 +98,7 @@ function makeDeps(
     findSkillByName: () => null,
     saveSkill: () => {},
     updateSkill: () => {},
+    findTopicPlan: findTopicPlanOverride,
     loadExercises: () => [] as Exercise[],
     findExerciseByName: () => null,
     saveExercise: () => {},
@@ -258,5 +260,45 @@ describe("topic progression flow", () => {
     assert.equal(unlockedL4.progress.variant, "complete");
     assert.equal(unlockedL4.progress.current, 2);
     assert.equal(unlockedL4.progress.label, "Mastered");
+  });
+
+  test("keeps the persisted topic level for UI routing after a later weak interview", async () => {
+    const store = makeSessionStore({
+      weakInterview: {
+        id: "weak-interview",
+        topic: TOPIC,
+        interviewType: "design",
+        state: "ENDED",
+        currentQuestionIndex: 1,
+        questions: ["Q1"],
+        messages: [],
+        evaluations: [{ questionIndex: 0, question: "Q1", answer: "A", score: 2, feedback: "weak", needsFollowUp: false }],
+        createdAt: "2026-03-30T10:00:00.000Z",
+        endedAt: "2026-03-30T10:10:00.000Z",
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(
+      store,
+      makeKnowledgeStore(),
+      () => ({
+        topic: "java-concurrency",
+        focused: false,
+        priority: "secondary",
+        updatedAt: "2026-03-29T10:00:00.000Z",
+        lastUnlockedLevel: 2,
+      }),
+    );
+
+    const getTopicLevel = captureHandler(registerGetTopicLevelTool, deps);
+    const startWarmUp = captureHandler(registerStartWarmUpTool, deps);
+
+    const level = parse(await getTopicLevel({ topic: TOPIC }));
+    assert.equal(level.level, 2);
+    assert.equal(level.progress.targetLevel, 3);
+    assert.match(level.reason, /do not decay/i);
+
+    const started = parse(await startWarmUp({ topic: TOPIC }));
+    assert.equal(started.level, 2);
   });
 });

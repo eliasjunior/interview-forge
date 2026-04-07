@@ -1,6 +1,6 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNull, isNotNull } from "drizzle-orm";
 import type { Flashcard } from "@mock-interview/shared";
-import type { FlashcardRepository } from "../../repositories/flashcardRepository.js";
+import type { FlashcardPage, FlashcardRepository } from "../../repositories/flashcardRepository.js";
 import type { AppDb } from "../client.js";
 import { flashcardConcepts, flashcards, flashcardTags } from "../schema.js";
 import {
@@ -109,6 +109,89 @@ export class SQLiteFlashcardRepository implements FlashcardRepository {
         if (record.concepts.length) tx.insert(flashcardConcepts).values(record.concepts).run();
       }
     });
+  }
+
+  listPaginated(opts: { status: 'active' | 'archived'; topic?: string; limit: number; cursor?: string }): FlashcardPage {
+    // Pull all rows matching status + optional topic, then apply cursor-based window in memory.
+    // The table is small enough that this is acceptable; a DB-level query would require
+    // dynamic sort columns that don't map cleanly to Drizzle's typed API.
+    let query = this.db.select().from(flashcards).$dynamic();
+    if (opts.status === 'active') {
+      query = query.where(isNull(flashcards.archivedAt));
+    } else {
+      query = query.where(isNotNull(flashcards.archivedAt));
+    }
+
+    const allRows = query.all();
+    let all = allRows
+      .filter((row) => !opts.topic || row.topic === opts.topic)
+      .map((row) => this.hydrate(row.id));
+
+    // Sort by dueDate asc for active, archivedAt desc for archived.
+    if (opts.status === 'active') {
+      all.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.id.localeCompare(b.id));
+    } else {
+      all.sort((a, b) => (b.archivedAt ?? '').localeCompare(a.archivedAt ?? '') || b.id.localeCompare(a.id));
+    }
+
+    const total = all.length;
+
+    if (opts.cursor) {
+      try {
+        const decoded = JSON.parse(Buffer.from(opts.cursor, 'base64url').toString('utf8')) as { id?: string; dueDate?: string; archivedAt?: string };
+        if (opts.status === 'active' && decoded.dueDate && decoded.id) {
+          all = all.filter((c) => c.dueDate > decoded.dueDate! || (c.dueDate === decoded.dueDate && c.id > decoded.id!));
+        } else if (opts.status === 'archived' && decoded.archivedAt !== undefined && decoded.id) {
+          all = all.filter((c) => (c.archivedAt ?? '') < decoded.archivedAt! || ((c.archivedAt ?? '') === decoded.archivedAt && c.id < decoded.id!));
+        }
+      } catch {
+        // invalid cursor — ignore
+      }
+    }
+
+    const window = all.slice(0, opts.limit + 1);
+    const items = window.slice(0, opts.limit);
+    const hasMore = window.length > opts.limit;
+
+    let nextCursor: string | null = null;
+    if (hasMore && items.length > 0) {
+      const last = items[items.length - 1]!;
+      if (opts.status === 'active') {
+        nextCursor = Buffer.from(JSON.stringify({ dueDate: last.dueDate, id: last.id }), 'utf8').toString('base64url');
+      } else {
+        nextCursor = Buffer.from(JSON.stringify({ archivedAt: last.archivedAt ?? '', id: last.id }), 'utf8').toString('base64url');
+      }
+    }
+
+    return { items, total, hasMore, nextCursor };
+  }
+
+  getChain(id: string): Flashcard[] {
+    const all = this.list();
+    const byId = new Map(all.map((c) => [c.id, c]));
+    const card = byId.get(id);
+    if (!card) return [];
+
+    // Walk to root via parentFlashcardId.
+    let root = card;
+    const seenParents = new Set<string>([root.id]);
+    while (root.parentFlashcardId) {
+      const parent = byId.get(root.parentFlashcardId);
+      if (!parent || seenParents.has(parent.id)) break;
+      root = parent;
+      seenParents.add(parent.id);
+    }
+
+    // Walk forward via replacedByFlashcardId.
+    const chain: Flashcard[] = [];
+    const seen = new Set<string>();
+    let current: Flashcard | undefined = root;
+    while (current && !seen.has(current.id)) {
+      chain.push(current);
+      seen.add(current.id);
+      current = current.replacedByFlashcardId ? byId.get(current.replacedByFlashcardId) : undefined;
+    }
+    return chain;
   }
 
   deleteBySourceSessionId(sessionId: string): number {

@@ -84,7 +84,9 @@ function createSpyRepositories() {
     },
     flashcards: {
       list: () => [],
+      listPaginated: () => ({ items: [], total: 0, hasMore: false, nextCursor: null }),
       getById: () => null,
+      getChain: () => [],
       save: () => undefined,
       saveMany: () => undefined,
       deleteBySourceSessionId: () => 0,

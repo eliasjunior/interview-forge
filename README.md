@@ -77,6 +77,21 @@ This is the current recommended path for algorithm-style interviews that are not
 6. **Visualise progress** — the React dashboard shows session history, reports, the D3 knowledge graph, and flashcard review.
 7. **Add a rewards loop** — the learning experience is designed to feel more engaging and motivating, using lightweight ideas from games and neuroscience to reinforce progress.
 
+## Flashcard Evaluation Loop
+
+Flashcard review has a second loop beyond SM-2 scheduling:
+
+1. The learner answers a flashcard in the UI.
+2. The answer is stored in `flashcard_answers` with state `Pending`.
+3. Claude runs `evaluate_flashcard`, which claims `Pending` answers and marks them `Evaluating`.
+4. Claude must then call `save_flashcard_evaluation` once per returned answer.
+5. On `needs_improvement`, the old card is archived, a stronger replacement card is created, lineage is linked with `parentFlashcardId` / `replacedByFlashcardId`, and a mistake is logged.
+
+Important:
+- `evaluate_flashcard` alone does not finish the workflow.
+- Any automation or scheduled job that runs `evaluate_flashcard` must also run `save_flashcard_evaluation` for each answer it receives.
+- If that second step is skipped, no flashcard improvement history is saved.
+
 ## Docs
 
 - [Getting started](docs/getting-started.md)

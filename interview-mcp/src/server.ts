@@ -145,6 +145,13 @@ function saveExercise(exercise: Exercise): void {
   repositories.exercises.insert(exercise);
 }
 
+function findTopicPlan(topic: string) {
+  const topicPlanKey = resolveTopicPlanKey(topic);
+  return repositories.topicPlans
+    .list()
+    .find((plan) => plan.topic === topicPlanKey || plan.topic === topic) ?? null;
+}
+
 function saveReport(session: Session) {
   if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
   const filename = path.join(REPORTS_DIR, `${session.id}.md`);
@@ -211,15 +218,19 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
 
   const currentLevelSnapshot = detectTopicLevel(session.topic, sessions, hasWarmupContent);
   const topicPlanKey = resolveTopicPlanKey(session.topic);
-  const existingTopicPlan = repositories.topicPlans.list().find((plan) => plan.topic === topicPlanKey || plan.topic === session.topic);
-  const leveledUp = currentLevelSnapshot.level > previousLevelSnapshot.level;
+  const existingTopicPlan = findTopicPlan(session.topic);
+  const previousStoredLevel = existingTopicPlan?.lastUnlockedLevel;
+  const currentStoredLevel = Math.max(previousStoredLevel ?? 0, currentLevelSnapshot.level);
+  const leveledUp = previousStoredLevel === undefined
+    ? currentStoredLevel > 0
+    : currentStoredLevel > previousStoredLevel;
   repositories.topicPlans.upsert({
     topic: topicPlanKey,
     focused: existingTopicPlan?.focused ?? false,
     priority: existingTopicPlan?.priority ?? "secondary",
     updatedAt: new Date().toISOString(),
     lastLevelUpAt: leveledUp ? new Date().toISOString() : existingTopicPlan?.lastLevelUpAt,
-    lastUnlockedLevel: leveledUp ? currentLevelSnapshot.level : existingTopicPlan?.lastUnlockedLevel,
+    lastUnlockedLevel: currentStoredLevel,
   });
 
   return { summary, avgScore, concepts, reportFile };
@@ -254,6 +265,7 @@ const deps: ToolDeps = {
   findSkillByName,
   saveSkill,
   updateSkill,
+  findTopicPlan,
   loadExercises,
   findExerciseByName,
   saveExercise,

@@ -1,6 +1,6 @@
 import type { AIProvider } from "../ai/index.js";
 import type { KnowledgeStore } from "../knowledge/index.js";
-import type { Concept, Evaluation, Exercise, Flashcard, FlashcardAnswer, KnowledgeGraph, Mistake, Skill, Session } from "@mock-interview/shared";
+import type { Concept, Evaluation, Exercise, Flashcard, FlashcardAnswer, KnowledgeGraph, Mistake, Skill, Session, TopicPlan } from "@mock-interview/shared";
 import type { SessionDeletionPreview } from "../sessions/deleteFlow.js";
 
 export type StateError = ReturnType<ToolDeps["stateError"]>;
@@ -38,6 +38,7 @@ export interface ToolDeps {
   findSkillByName(name: string): Skill | null;
   saveSkill(skill: Skill): void;
   updateSkill(skill: Skill): void;
+  findTopicPlan?(topic: string): TopicPlan | null;
 
   loadExercises(topic?: string, maxDifficulty?: number, tags?: string[]): Exercise[];
   findExerciseByName(name: string): Exercise | null;
