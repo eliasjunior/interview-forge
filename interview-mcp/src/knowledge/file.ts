@@ -175,13 +175,11 @@ function parseWarmupLevels(md: string): Partial<Record<0 | 1 | 2, WarmUpLevelCon
   return Object.keys(result).length ? result : undefined;
 }
 
-function parseFile(filePath: string): KnowledgeTopic | null {
+export function parseKnowledgeMarkdown(md: string, fallbackTopic: string): KnowledgeTopic | null {
   try {
-    const md = fs.readFileSync(filePath, "utf-8");
-
     // Title: first # heading
     const titleMatch = md.match(/^#\s+(.+)/m);
-    const topic = titleMatch ? titleMatch[1].trim() : path.basename(filePath, ".md");
+    const topic = titleMatch ? titleMatch[1].trim() : fallbackTopic;
 
     const summary              = extractSection(md, "Summary");
     const questionsSection     = extractSection(md, "Questions");
@@ -196,11 +194,25 @@ function parseFile(filePath: string): KnowledgeTopic | null {
     const warmupLevels         = parseWarmupLevels(md);
 
     if (questions.length === 0) {
-      console.error(`[knowledge] ${path.basename(filePath)}: no questions found — skipping`);
       return null;
     }
 
     return { topic, summary, questions, evaluationCriteria, concepts, questionDifficulties, warmupLevels };
+  } catch (err) {
+    console.error(`[knowledge] failed to parse markdown for ${fallbackTopic}:`, err);
+    return null;
+  }
+}
+
+export function parseKnowledgeFile(filePath: string): KnowledgeTopic | null {
+  try {
+    const md = fs.readFileSync(filePath, "utf-8");
+    const parsed = parseKnowledgeMarkdown(md, path.basename(filePath, ".md"));
+    if (!parsed) {
+      console.error(`[knowledge] ${path.basename(filePath)}: no questions found — skipping`);
+      return null;
+    }
+    return parsed;
   } catch (err) {
     console.error(`[knowledge] failed to parse ${filePath}:`, err);
     return null;
@@ -225,7 +237,7 @@ export class FileKnowledgeStore implements KnowledgeStore {
     if (!fs.existsSync(dir)) return;
 
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith(".md"))) {
-      const parsed = parseFile(path.join(dir, file));
+      const parsed = parseKnowledgeFile(path.join(dir, file));
       if (!parsed) continue;
 
       // Index by normalised filename stem AND normalised topic title

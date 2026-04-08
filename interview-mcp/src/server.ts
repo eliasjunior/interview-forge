@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 
 import type { AIProvider } from "./ai/index.js";
 import { createKnowledgeStore, type KnowledgeStore } from "./knowledge/index.js";
-import type { Session, Concept, KnowledgeGraph, Flashcard, FlashcardAnswer, Mistake, Skill, Exercise } from "@mock-interview/shared";
+import type { Session, Concept, KnowledgeGraph, Flashcard, FlashcardAnswer, Mistake, Skill, Exercise, WarmUpLevel } from "@mock-interview/shared";
 import { assertState } from "./stateUtils.js";
 import { generateId, findLast, calcAvgScore, buildSummary, buildReport, buildTranscript } from "./sessionUtils.js";
 import { mergeConceptsIntoGraph } from "./graphUtils.js";
@@ -20,6 +20,7 @@ import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
 import { normalizeConcepts } from "./graph/concepts.js";
 import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sessions/admin.js";
+import { shouldRecordTopicLevelUp } from "./topicPlanProgress.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -220,10 +221,13 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   const topicPlanKey = resolveTopicPlanKey(session.topic);
   const existingTopicPlan = findTopicPlan(session.topic);
   const previousStoredLevel = existingTopicPlan?.lastUnlockedLevel;
-  const currentStoredLevel = Math.max(previousStoredLevel ?? 0, currentLevelSnapshot.level);
-  const leveledUp = previousStoredLevel === undefined
-    ? currentStoredLevel > 0
-    : currentStoredLevel > previousStoredLevel;
+  const currentStoredLevel = Math.max(previousStoredLevel ?? 0, currentLevelSnapshot.level) as WarmUpLevel;
+  const leveledUp = shouldRecordTopicLevelUp({
+    previousSnapshot: previousLevelSnapshot,
+    currentSnapshot: currentLevelSnapshot,
+    previousStoredLevel,
+    currentStoredLevel,
+  });
   repositories.topicPlans.upsert({
     topic: topicPlanKey,
     focused: existingTopicPlan?.focused ?? false,

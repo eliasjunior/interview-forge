@@ -13,6 +13,7 @@ import { registerLogMistakeTool } from "../tools/logMistake.js";
 import { registerAllTools } from "../tools/registerAllTools.js";
 import { registerServerStatusTool } from "../tools/serverStatus.js";
 import { registerUpdateSkillTool } from "../tools/updateSkill.js";
+import { registerReviewKnowledgeFileTool } from "../tools/reviewKnowledgeFile.js";
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: Array<{ type?: "text"; text: string }> }>;
 
@@ -200,6 +201,37 @@ describe("basic MCP tool handlers", () => {
     assert.equal(result.sessions[1].avgScore, null);
   });
 
+  test("review_knowledge_file parses curated markdown and returns a review loop payload", async () => {
+    const { deps } = makeDeps({
+      knowledge: {
+        listTopics: () => ["Java Concurrency"],
+        findByTopic: (topic: string) =>
+          topic.toLowerCase() === "java concurrency"
+            ? {
+                topic: "Java Concurrency",
+                summary: "",
+                questions: [],
+                evaluationCriteria: [],
+                questionDifficulties: [],
+                concepts: [],
+              }
+            : null,
+      } as ToolDeps["knowledge"],
+    });
+    const handlers = captureTool(registerReviewKnowledgeFileTool, deps);
+
+    const byFile = parse(await handlers.get("review_knowledge_file")!({ filePath: "java-concurrency.md" }));
+    assert.equal(byFile.topic, "Java Concurrency");
+    assert.equal(byFile.summary.questionCount > 0, true);
+    assert.equal(byFile.sectionChecks.criteriaAligned, true);
+    assert.equal(byFile.nextStep.action, "user_review");
+    assert.equal(byFile.questions[0].questionIndex, 1);
+
+    const byTopic = parse(await handlers.get("review_knowledge_file")!({ topic: "Java Concurrency" }));
+    assert.equal(byTopic.topic, "Java Concurrency");
+    assert.match(byTopic.filePath, /java-concurrency\.md$/);
+  });
+
   test("get_session returns a session and stateErrors for unknown ids", async () => {
     const { deps } = makeDeps();
     const handlers = captureTool(registerGetSessionTool, deps);
@@ -289,6 +321,7 @@ describe("basic MCP tool handlers", () => {
       "server_status",
       "help_tools",
       "list_topics",
+      "review_knowledge_file",
       "list_sessions",
       "get_session",
       "log_mistake",

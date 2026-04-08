@@ -161,7 +161,7 @@ Answer: A,B,C,D
 4. Which statements about PKIX validation are correct?
 A) The chain must lead to trusted CA material
 B) A matching hostname alone is enough to skip chain validation
-C) Usage constraints may matter
+C) Certificate usage constraints, such as Key Usage and Extended Key Usage for server authentication, may affect validity
 D) Expiry matters
 Answer: A,C,D
 
@@ -201,9 +201,9 @@ D) It narrows what certificates are accepted
 Answer: A,B,C,D
 
 10. Which statements about TLS termination are correct?
-A) Edge termination can simplify operations
+A) Edge termination at a load balancer or API gateway can simplify certificate management, rotation, and centralized TLS policy enforcement
 B) End-to-end mTLS better preserves internal trust boundaries
-C) Passthrough limits traffic inspection at the edge
+C) TLS passthrough limits the edge's ability to inspect HTTP details, modify requests, or apply Layer 7 routing and policy to encrypted traffic
 D) There is one universally correct model for every architecture
 Answer: A,B,C
 

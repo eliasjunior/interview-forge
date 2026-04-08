@@ -34,6 +34,11 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
         { name: "list_sessions", how: "List sessions", example: {} },
         { name: "delete_session", how: "Dry-run or delete a session and its derived artifacts", example: { sessionId: "...", dryRun: true } },
         { name: "list_topics", how: "List curated knowledge topics", example: {} },
+        {
+          name: "review_knowledge_file",
+          how: "Review a curated knowledge markdown file before editing it. Parses questions, checks rubric and difficulty alignment, flags likely issues, and returns a structured checklist for the user to mark each question as keep, needs_improvement, or remove.",
+          example: { filePath: "java-concurrency.md" },
+        },
         { name: "get_due_flashcards", how: "Get flashcards due for spaced-repetition review today", example: { topic: "JWT authentication" } },
         { name: "prepare_flashcards", how: "Prepare ready-to-submit create_flashcard payloads for weak answers in a completed session. Call this after end_interview, then pass each draft object into create_flashcard.", example: { sessionId: "..." } },
         { name: "review_flashcard", how: "Submit a recall rating (1=Again, 2=Hard, 3=Good, 4=Easy) — applies SM-2 and schedules next review", example: { cardId: "...", rating: 3 } },

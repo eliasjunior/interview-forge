@@ -35,6 +35,7 @@ export function registerServerStatusTool(server: McpServer, deps: ToolDeps) {
             uiPort: deps.uiPort,
             recommendedNextTools: [
               "list_topics",
+              "review_knowledge_file",
               "start_interview",
             ],
           }),
