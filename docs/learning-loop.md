@@ -54,6 +54,13 @@ The learning experience is designed to feel more engaging and motivating, using 
 
 `create_exercise` fits after a completed interview or drill when you want hands-on practice instead of another verbal round.
 
+There are now two distinct ways to get there:
+
+1. After a completed session, ask the orchestrator to create a follow-up exercise from the weak spots in that session.
+2. From the Topics UI, open a topic, choose a weak slice question, and use the authored exercise guidance attached to that question.
+
+The second path is intentionally more structured. Some knowledge-file questions are marked as good exercise candidates, while others are explicitly discussion-only. The UI should only offer the exercise action for questions whose authored metadata says an exercise makes sense.
+
 Typical flow:
 
 ```text
@@ -74,6 +81,16 @@ Notes:
 - it returns a complexity assessment and roadmap
 - if the exercise is too hard, the orchestrator should show the roadmap and offer prerequisites first
 - this step is optional and currently manual
+- question-level exercise prompts are now guided by authored metadata in the knowledge files:
+  - `Exercise fit`
+  - `Exercise owner`
+  - `Exercise goal`
+  - `Exercise scope`
+  - `Exercise constraints`
+  - `Exercise acceptance`
+  - `Exercise seed`
+- if a question is marked `Exercise fit: none`, the exercise action should stay hidden and the question should remain a verbal/drill-only prompt
+- this keeps compact exercises focused on the core layer or behavior instead of drifting into end-to-end framework wiring
 
 Related docs:
 

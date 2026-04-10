@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Topic, TopicLevel } from '../api'
+import type { Topic, TopicDetails, TopicLevel, TopicQuestionDetail } from '../api'
 
-import { createScopedInterview, getTopicPlans, getTopics, getTopicLevel, updateTopicPlan } from '../api'
+import { createScopedInterview, getTopicDetails, getTopicPlans, getTopics, getTopicLevel, updateTopicPlan } from '../api'
 import type { TopicPlan, TopicPlanPriority } from '@mock-interview/shared'
 
 const LEVEL_STORAGE_KEY = 'topics-level-snapshot'
@@ -170,6 +170,65 @@ type CustomInterviewDraft = {
   topic: string
   focus: string
   content: string
+}
+
+type TopicQuestionPickerState = {
+  topicFile: string
+  displayName: string
+  loading: boolean
+  error: string | null
+  details: TopicDetails | null
+}
+
+function formatDifficultyLabel(value: string | null) {
+  if (!value) return null
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function buildWeakSlicePrompt(topicName: string, question: TopicQuestionDetail) {
+  const lines = [
+    `I want a targeted hands-on exercise for one narrow weak area from the topic "${topicName}".`,
+    '',
+    'Weak slice:',
+    `"${question.text}"`,
+    '',
+    'Please use the available interview-mcp tools to turn this into a concrete exercise.',
+    '- Prefer create_exercise.',
+    '- Do not simply repeat the original interview question back to me.',
+    '- Convert the weak slice into a practical implementation or design task with a realistic scenario, a clear problem statement, incremental steps, and evaluation criteria.',
+    '- Keep the scope narrow and specific to this slice.',
+    '- Only fall back to start_scoped_interview if this truly cannot be made into a meaningful exercise.',
+    '- After creating the exercise, I may use start_scoped_interview later as a follow-up verbal defense.',
+  ]
+
+  if (question.exercise.fit !== 'none') {
+    lines.push('', 'Authored exercise guidance:')
+    lines.push(`- Exercise fit: ${question.exercise.fit}`)
+    if (question.exercise.owner) lines.push(`- Exercise owner: ${question.exercise.owner}`)
+    if (question.exercise.goal) lines.push(`- Exercise goal: ${question.exercise.goal}`)
+    if (question.exercise.scope) lines.push(`- Exercise scope: ${question.exercise.scope}`)
+    if (question.exercise.constraints?.length) {
+      lines.push('- Exercise constraints:')
+      lines.push(...question.exercise.constraints.map((item) => `  - ${item}`))
+    }
+    if (question.exercise.acceptance?.length) {
+      lines.push('- Exercise acceptance:')
+      lines.push(...question.exercise.acceptance.map((item) => `  - ${item}`))
+    }
+    if (question.exercise.seed) lines.push(`- Exercise seed: ${question.exercise.seed}`)
+    lines.push('- Use this authored guidance as the primary input for shaping the exercise.')
+  }
+
+  return lines.join('\n')
+}
+
+function formatWeakSliceText(text: string) {
+  return text
+    .replace(/```(\w+)?\s*([\s\S]*?)\s*```/g, (_match, lang: string | undefined, code: string) => `\n\n\`\`\`${lang ?? ''}\n${code.trim()}\n\`\`\`\n\n`)
+    .replace(/\s+(Evaluation criteria:|Strong answer:|Weak answer:|Model answer:|Hint:|Follow-up:)\s*/g, '\n\n$1\n')
+    .replace(/\s+-\s+/g, '\n- ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function getRecommendedAction(levelData: TopicLevel, topicFile: string): TopicAction {
@@ -353,6 +412,68 @@ function CustomInterviewModal({
   )
 }
 
+function TopicQuestionPickerModal({
+  state,
+  onClose,
+  onCopy,
+}: {
+  state: TopicQuestionPickerState
+  onClose: () => void
+  onCopy: (question: TopicQuestionDetail) => void | Promise<void>
+}) {
+  return (
+    <div className="graph-modal-backdrop" onClick={onClose}>
+      <div className="custom-interview-modal weak-slice-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="graph-modal-header">
+          <div>
+            <h2 className="topics-plan-title">Choose Weak Slice</h2>
+            <p className="topics-plan-subtitle">Pick one authored question from this topic and copy a prompt the LLM can use to choose the right interview-mcp tool.</p>
+          </div>
+          <button className="btn-back" onClick={onClose}>✕ Close</button>
+        </div>
+
+        <div className="weak-slice-header">
+          <div className="weak-slice-topic">{state.displayName}</div>
+          {state.details?.summary && (
+            <p className="weak-slice-summary">{state.details.summary}</p>
+          )}
+        </div>
+
+        {state.loading && <div className="page-loading">Loading questions...</div>}
+        {state.error && <div className="error-msg">{state.error}</div>}
+
+        {!state.loading && !state.error && state.details && (
+          <div className="weak-slice-list">
+            {state.details.questions.map((question) => (
+              <div key={question.index} className="weak-slice-item">
+                <div className="weak-slice-item-main">
+                  <div className="weak-slice-item-top">
+                    <span className="weak-slice-index">Q{question.index + 1}</span>
+                    {formatDifficultyLabel(question.difficulty) && (
+                      <span className={`weak-slice-difficulty difficulty-${question.difficulty}`}>
+                        {formatDifficultyLabel(question.difficulty)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="weak-slice-question">{formatWeakSliceText(question.text)}</div>
+                </div>
+                {question.exercise.fit !== 'none' && (
+                  <button
+                    className="btn-secondary weak-slice-copy-btn"
+                    onClick={() => onCopy(question)}
+                  >
+                    Copy exercise prompt
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function TopicsPage() {
@@ -370,6 +491,7 @@ export default function TopicsPage() {
   const [customInterviewDraft, setCustomInterviewDraft] = useState<CustomInterviewDraft | null>(null)
   const [customInterviewBusy, setCustomInterviewBusy] = useState(false)
   const [customInterviewError, setCustomInterviewError] = useState<string | null>(null)
+  const [topicQuestionPicker, setTopicQuestionPicker] = useState<TopicQuestionPickerState | null>(null)
   const [loading, setLoading] = useState(true)
   const pageRef = useRef<HTMLDivElement | null>(null)
   const refreshInFlightRef = useRef(false)
@@ -540,6 +662,35 @@ export default function TopicsPage() {
     setActiveMenu(null)
   }
 
+  async function openTopicQuestionPicker(topic: Topic) {
+    setTopicQuestionPicker({
+      topicFile: topic.file,
+      displayName: topic.displayName,
+      loading: true,
+      error: null,
+      details: null,
+    })
+
+    try {
+      const details = await getTopicDetails(topic.file)
+      setTopicQuestionPicker({
+        topicFile: topic.file,
+        displayName: topic.displayName,
+        loading: false,
+        error: null,
+        details,
+      })
+    } catch (error) {
+      setTopicQuestionPicker({
+        topicFile: topic.file,
+        displayName: topic.displayName,
+        loading: false,
+        error: error instanceof Error ? error.message : String(error),
+        details: null,
+      })
+    }
+  }
+
   async function handleCreateCustomInterview() {
     if (!customInterviewDraft || customInterviewBusy) return
 
@@ -565,6 +716,29 @@ export default function TopicsPage() {
       setCustomInterviewError(error instanceof Error ? error.message : String(error))
     } finally {
       setCustomInterviewBusy(false)
+    }
+  }
+
+  async function handleCopyWeakSlicePrompt(topicName: string, question: TopicQuestionDetail) {
+    try {
+      await navigator.clipboard.writeText(buildWeakSlicePrompt(topicName, question))
+      setToastQueue(prev => [
+        ...prev,
+        {
+          id: `${topicName}-weak-slice-${question.index}`,
+          message: `Copied weak-slice prompt for ${topicName}.`,
+          level: 1,
+        },
+      ])
+    } catch {
+      setToastQueue(prev => [
+        ...prev,
+        {
+          id: `${topicName}-weak-slice-${question.index}-failed`,
+          message: `Could not copy the weak-slice prompt for ${topicName}.`,
+          level: 0,
+        },
+      ])
     }
   }
 
@@ -685,6 +859,12 @@ export default function TopicsPage() {
                         handleCopyPrompt={handleCopyPrompt}
                         compact
                       />
+                      <button
+                        className="topic-secondary-btn"
+                        onClick={() => void openTopicQuestionPicker(topic)}
+                      >
+                        Weak Slice
+                      </button>
                       {level !== undefined && <LadderRungs currentLevel={level} />}
                       <div className="topics-plan-progress-block">
                         <div className="topics-plan-progress-title">{getProgressTitle(levelData)}</div>
@@ -779,6 +959,12 @@ export default function TopicsPage() {
                         handleCopyPrompt={handleCopyPrompt}
                       />
                     )}
+                    <button
+                      className="topic-secondary-btn"
+                      onClick={() => void openTopicQuestionPicker(topic)}
+                    >
+                      Weak Slice
+                    </button>
                   </div>
                 </div>
               </div>
@@ -841,6 +1027,14 @@ export default function TopicsPage() {
           }}
           onChange={setCustomInterviewDraft}
           onSubmit={() => void handleCreateCustomInterview()}
+        />
+      )}
+
+      {topicQuestionPicker && (
+        <TopicQuestionPickerModal
+          state={topicQuestionPicker}
+          onClose={() => setTopicQuestionPicker(null)}
+          onCopy={(question) => void handleCopyWeakSlicePrompt(topicQuestionPicker.displayName, question)}
         />
       )}
     </div>

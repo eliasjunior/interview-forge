@@ -35,6 +35,7 @@ Within each tier, questions you have been asked least often across past sessions
 | `cicd-release-flow.md` | CI/CD Release Flow for Backend Engineers | 16 (5 foundation, 7 intermediate, 4 advanced) |
 | `rotate-matrix-algorithm.md` | Rotate Matrix (algorithm) | 14 (5 foundation, 7 intermediate, 2 advanced) |
 | `mortgage-rest-design.md` | Mortgage REST API Design | 20 (5 foundation, 10 intermediate, 5 advanced) |
+| `data-access-tradeoffs-growing-complexity.md` | REST API Growth and Data Trade-offs | 16 (5 foundation, 5 intermediate, 6 advanced) |
 
 ## Warm-up quest levels
 

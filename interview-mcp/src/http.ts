@@ -33,6 +33,11 @@ import {
   MAX_FLASHCARD_PAGE_SIZE,
   paginateFlashcards,
 } from "./http/flashcards.js";
+import {
+  getKnowledgeTopicDetails,
+  listKnowledgeTopics,
+  normalizeTopicPlanKey,
+} from "./http/topicDetails.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -79,28 +84,6 @@ function parseProgressSessionKind(value: unknown): ProgressSessionKind {
     return value;
   }
   return "interview";
-}
-
-function listKnowledgeTopics() {
-  if (!fs.existsSync(KNOWLEDGE_DIR)) return [] as Array<{ file: string; displayName: string }>;
-  return fs.readdirSync(KNOWLEDGE_DIR)
-    .filter((file) => file.endsWith(".md"))
-    .map((file) => {
-      const content = fs.readFileSync(path.join(KNOWLEDGE_DIR, file), "utf8");
-      const match = content.match(/^#\s+(.+)/m);
-      return {
-        file: file.replace(".md", ""),
-        displayName: match ? match[1].trim() : file.replace(".md", ""),
-      };
-    });
-}
-
-function normalizeTopicPlanKey(topic: string) {
-  const normalizedTopic = topic.trim().toLowerCase();
-  const match = listKnowledgeTopics().find((entry) =>
-    entry.file.toLowerCase() === normalizedTopic || entry.displayName.toLowerCase() === normalizedTopic
-  );
-  return match?.file ?? topic;
 }
 
 function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult {
@@ -189,7 +172,18 @@ function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult 
 
 // API: List available interview topics from knowledge files
 app.get("/api/topics", (_req, res) => {
-  res.json(listKnowledgeTopics());
+  res.json(listKnowledgeTopics(KNOWLEDGE_DIR));
+});
+
+app.get("/api/topics/:topic/details", (req, res) => {
+  const topic = decodeURIComponent(req.params.topic);
+  const details = getKnowledgeTopicDetails(KNOWLEDGE_DIR, topic);
+  if (!details) {
+    res.status(404).json({ error: "Topic not found" });
+    return;
+  }
+
+  res.json(details);
 });
 
 // API: Get the recommended warm-up level for a topic
@@ -205,7 +199,7 @@ app.get("/api/topics/:topic/level", (req, res) => {
   const sessions = loadSessions();
   const persistedLevel = repositories.topicPlans
     .list()
-    .find((plan) => normalizeTopicPlanKey(plan.topic) === normalizeTopicPlanKey(topic))
+    .find((plan) => normalizeTopicPlanKey(KNOWLEDGE_DIR, plan.topic) === normalizeTopicPlanKey(KNOWLEDGE_DIR, topic))
     ?.lastUnlockedLevel;
   const { level, status, reason, nextLevelRequirement, progress } = stabilizeTopicLevelSnapshot(
     detectTopicLevel(topic, sessions, hasWarmupContent),
@@ -218,16 +212,16 @@ app.get("/api/topic-plans", (_req, res) => {
   res.json(
     repositories.topicPlans.list().map((plan) => ({
       ...plan,
-      topic: normalizeTopicPlanKey(plan.topic),
+      topic: normalizeTopicPlanKey(KNOWLEDGE_DIR, plan.topic),
     }))
   );
 });
 
 app.put("/api/topic-plans/:topic", (req, res) => {
-  const topic = normalizeTopicPlanKey(decodeURIComponent(req.params.topic));
+  const topic = normalizeTopicPlanKey(KNOWLEDGE_DIR, decodeURIComponent(req.params.topic));
   const focused = typeof req.body?.focused === "boolean" ? req.body.focused : false;
   const priority = req.body?.priority;
-  const existingPlan = repositories.topicPlans.list().find((plan) => normalizeTopicPlanKey(plan.topic) === topic);
+  const existingPlan = repositories.topicPlans.list().find((plan) => normalizeTopicPlanKey(KNOWLEDGE_DIR, plan.topic) === topic);
 
   if (priority !== "core" && priority !== "secondary" && priority !== "optional") {
     res.status(400).json({ error: "priority must be one of: core, secondary, optional" });

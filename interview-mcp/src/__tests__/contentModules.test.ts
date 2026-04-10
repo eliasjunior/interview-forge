@@ -9,6 +9,7 @@ import { buildAlgorithmQuestions, buildQuestions, polishContent } from "../conte
 import { buildDrillCustomContent, buildRecallContext } from "../drills/contentBuilder.js";
 import { assessComplexity } from "../exercises/assessment.js";
 import { buildExerciseMarkdown } from "../exercises/markdown.js";
+import { parseKnowledgeMarkdown } from "../knowledge/file.js";
 import { buildScopeContent, deriveSessionGoal } from "../scope/builder.js";
 import type { Evaluation, Exercise, Mistake } from "@mock-interview/shared";
 
@@ -159,5 +160,39 @@ describe("supporting builders", () => {
     assert.match(markdown, /# Exercise: Race Condition Lab/);
     assert.equal(assessment.tooHard, true);
     assert.deepEqual(assessment.unmetPrerequisites, ["Atomic Counter Basics"]);
+  });
+
+  test("knowledge parser extracts per-question exercise guidance", () => {
+    const parsed = parseKnowledgeMarkdown(`# Topic
+
+## Summary
+Summary
+
+## Questions
+1. How would you paginate this?
+
+   Evaluation criteria:
+   - Must describe bounded page size.
+
+   Exercise fit: micro
+   Exercise goal: Add bounded pagination at the service layer.
+   Exercise owner: service layer
+   Exercise scope: Refactor one list method into a slice method.
+   Exercise constraints:
+   - Keep this to 20 minutes.
+   - Do not make controller wiring the main task.
+   Exercise acceptance:
+   - The service caps oversized limits.
+   - One unit test verifies slice behavior.
+   Exercise seed: Start from a method that returns the full list.
+`, "topic");
+
+    assert.ok(parsed);
+    assert.equal(parsed.questionExercises?.[0]?.fit, "micro");
+    assert.equal(parsed.questionExercises?.[0]?.owner, "service layer");
+    assert.equal(parsed.questionExercises?.[0]?.constraints?.length, 2);
+    assert.equal(parsed.questionExercises?.[0]?.acceptance?.length, 2);
+    assert.match(parsed.questions[0] ?? "", /Evaluation criteria:/);
+    assert.doesNotMatch(parsed.questions[0] ?? "", /Exercise fit:/);
   });
 });

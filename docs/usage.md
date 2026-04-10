@@ -317,6 +317,13 @@ list_skills { maxConfidence: 2 }
 
 Hands-on implementation tasks grounded in real-world scenarios. The tool writes a full `.md` exercise file, persists metadata plus cross-topic tags, assesses complexity, and either presents the exercise or proposes simpler prerequisites first.
 
+Exercises can come from two sources:
+
+1. a direct request after a completed interview or drill
+2. a question-specific weak slice from the Topics UI when that knowledge-file question is authored as exercise-fit
+
+Not every question should produce an exercise. Some are deliberately discussion-only. The authored question metadata decides whether the exercise action appears.
+
 **You say:**
 ```text
 Create an exercise for Java concurrency — implement a producer-consumer queue like you'd use in a background job system
@@ -374,6 +381,40 @@ Show me all matrix problems
 **Claude runs:**
 ```text
 list_exercises { tags: ["matrix"] }
+
+### Question-level exercise guidance
+
+Knowledge files can now attach compact exercise guidance directly to a specific question. This is used to keep 20-minute exercises narrow and centered on the hard part of the problem.
+
+Supported fields:
+
+- `Exercise fit`: `none | micro | standard`
+- `Exercise owner`
+- `Exercise goal`
+- `Exercise scope`
+- `Exercise constraints`
+- `Exercise acceptance`
+- `Exercise seed`
+
+Typical use:
+
+- mark broad architecture/trade-off questions as `Exercise fit: none`
+- mark focused implementation-worthy questions as `micro`
+- mark larger but still valid implementation follow-ups as `standard`
+
+This is especially useful when you want the exercise to stay inside one layer, for example:
+
+- service-layer pagination logic
+- one query-shaping refactor
+- one resilience boundary
+- one focused test suite
+
+and explicitly keep these out of scope:
+
+- controller wiring
+- framework boilerplate
+- multi-step vertical slices
+- unrelated infrastructure work
 ```
 
 For example, `ZeroMatrix` and `RotateMatrixInPlace` can both live under the same broader matrix family via tags like:

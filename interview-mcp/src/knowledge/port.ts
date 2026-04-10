@@ -17,6 +17,18 @@ export interface WarmUpLevelContent {
   questions: WarmUpQuestion[];
 }
 
+export type ExerciseFit = "none" | "micro" | "standard";
+
+export interface QuestionExerciseGuidance {
+  fit: ExerciseFit;
+  goal?: string;
+  owner?: string;
+  scope?: string;
+  constraints?: string[];
+  acceptance?: string[];
+  seed?: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // KnowledgeStore — port
 //
@@ -41,6 +53,9 @@ export interface KnowledgeTopic {
 
   /** Curated ordered questions — replaces ai.generateQuestions */
   questions: string[];
+
+  /** Structured exercise guidance parallel to `questions`. */
+  questionExercises?: QuestionExerciseGuidance[];
 
   /**
    * Evaluation guidelines passed as context to ai.evaluateAnswer.

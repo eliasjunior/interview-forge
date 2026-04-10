@@ -48,7 +48,31 @@ export interface Topic {
   displayName: string
 }
 
+export interface TopicQuestionDetail {
+  index: number
+  text: string
+  difficulty: string | null
+  exercise: {
+    fit: 'none' | 'micro' | 'standard'
+    goal?: string
+    owner?: string
+    scope?: string
+    constraints?: string[]
+    acceptance?: string[]
+    seed?: string
+  }
+}
+
+export interface TopicDetails {
+  file: string
+  topic: string
+  summary: string
+  questions: TopicQuestionDetail[]
+}
+
 export const getTopics = (): Promise<Topic[]> => req(`${BASE}/topics`)
+export const getTopicDetails = (topic: string): Promise<TopicDetails> =>
+  req(`${BASE}/topics/${encodeURIComponent(topic)}/details`)
 export const getTopicPlans = (): Promise<TopicPlan[]> => req(`${BASE}/topic-plans`)
 export const updateTopicPlan = (topic: string, plan: { focused: boolean; priority: TopicPlanPriority }): Promise<TopicPlan> =>
   fetch(`${BASE}/topic-plans/${encodeURIComponent(topic)}`, {

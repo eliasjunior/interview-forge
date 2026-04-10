@@ -276,6 +276,54 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM local t
 - **Flashcard generation is automatic** — triggered by `end_interview`, no manual step needed
 - **SM-2 logic lives only in `srsUtils.ts`** — never duplicate scheduling logic in tools or HTTP handlers
 
+## Knowledge File Improvement Process
+
+When the user asks to improve or update a topic knowledge file under `interview-mcp/data/knowledge/`, follow this exact process.
+
+### Goal
+The purpose of every knowledge file is to prepare the user for real senior-level interviews — not just to catalogue information. Questions must build mental models, not test memorisation. Every change should make the file more effective at that goal.
+
+### Step 1 — Load and group by difficulty
+Read the target file. Group all questions into their difficulty tiers: `foundation`, `intermediate`, `advanced`. Present them tier by tier. Do not review all 25 questions at once.
+
+### Step 2 — Analyse each tier with two lenses
+For every question in the tier, assess:
+1. **Interview frequency** — how often does this actually come up at senior level for this topic?
+2. **Learning value** — does this build a transferable mental model, or does it just test recall?
+
+Then flag structural problems:
+
+| Problem | Signal | Fix |
+|---------|--------|-----|
+| Definition-first framing | Starts with "What is X?" or "Explain X" | Reframe to "What problem does X solve?" or a concrete scenario |
+| Bundled question | More than one `?` in the prompt | Split or focus on the most valuable ask |
+| Laundry-list prompt | Lists things to explain ("Explain A, B, C, and D") | Replace with a colleague misconception or production failure that forces the candidate to cover the same ground |
+| Wrong difficulty label | Design question requires knowledge from a harder tier to answer | Relabel |
+| Bad ordering | Question A requires concept B which appears later | Swap so the foundational concept comes first |
+| Ambiguous scope | The question could be answered at 3 different depths with no guidance | Add a scenario or constraint to anchor the expected depth |
+
+### Step 3 — Present findings, wait for approval
+Show a table of flagged questions with the issue and proposed fix for the current tier. Do not make changes yet. Wait for the user to approve, reject, or modify each suggestion.
+
+### Step 4 — Apply approved changes
+For each approved change, update **three sections** in sync:
+- `## Questions` — rewrite the question text
+- `## Difficulty` — update label if the tier changed
+- `## Evaluation Criteria` — update the lead sentence and scoring guidance to match the new question framing. The core content (what must be covered) usually stays, but the framing of what "strong" and "weak" looks like should reflect the new scenario.
+
+### Rewriting principles
+- **Problem before solution**: "You need a shared counter incremented by many threads without `synchronized`. What does `AtomicInteger` give you?" beats "What are atomic variables?"
+- **Scenario over definition**: "Thread A writes `x = 1` but thread B still reads `x = 0` — why?" beats "Explain the Java Memory Model."
+- **Misconception to correct**: "A colleague insists all threads always see each other's writes immediately — correct this." beats "Explain multi-core CPU caching."
+- **One clear ask per question**: if a question has two `?`, one of them is usually the real question. Keep that one.
+- **Evaluation criteria must match**: if the question now leads with a scenario, the criteria must score whether the candidate identified the problem, not just whether they listed the right APIs.
+
+### What not to change
+- Do not change questions the user marks as `keep` without comment.
+- Do not reorder difficulty tiers — `foundation` must stay learnable before `intermediate`.
+- Do not touch the `## Concepts`, `## Summary`, or `## Warm-up Quests` sections unless explicitly asked.
+- Do not archive or version the file during this process unless asked.
+
 ## Coverage TODO
 
 - Add lightweight coverage reporting with `c8` while keeping the existing Node `--test` runner.

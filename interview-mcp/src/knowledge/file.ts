@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { KnowledgeStore, KnowledgeTopic, WarmUpLevelContent, WarmUpQuestion } from "./port.js";
+import type { KnowledgeStore, KnowledgeTopic, QuestionExerciseGuidance, WarmUpLevelContent, WarmUpQuestion } from "./port.js";
 import type { Concept } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,24 +28,115 @@ function extractSection(md: string, heading: string): string {
   return match ? match[1].trim() : "";
 }
 
-function parseQuestions(section: string): string[] {
-  const questions: string[] = [];
-  let current: string[] = [];
+function parseQuestionBlocks(section: string): string[] {
+  return section.split(/(?=^\d+\.)/m).map((b) => b.trim()).filter(Boolean);
+}
 
-  for (const line of section.split("\n")) {
-    if (/^\d+\./.test(line)) {
-      // Start of a new numbered item — flush the previous one
-      if (current.length) questions.push(current.join(" ").replace(/\s+/g, " ").trim());
-      current = [line.replace(/^\d+\.\s*/, "").trim()];
-    } else if (current.length > 0) {
-      // Continuation line (indented bullets, extra text) — belongs to current question
-      const trimmed = line.trim();
-      if (trimmed) current.push(trimmed);
+function parseQuestionExerciseGuidance(block: string): QuestionExerciseGuidance {
+  const lines = block.split("\n");
+  const guidance: QuestionExerciseGuidance = { fit: "none" };
+  let activeList: "constraints" | "acceptance" | null = null;
+
+  for (const rawLine of lines.slice(1)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    if (/^Exercise fit:/i.test(line)) {
+      const fit = line.replace(/^Exercise fit:\s*/i, "").trim().toLowerCase();
+      guidance.fit = fit === "micro" || fit === "standard" || fit === "none" ? fit : "none";
+      activeList = null;
+      continue;
     }
-  }
-  if (current.length) questions.push(current.join(" ").replace(/\s+/g, " ").trim());
+    if (/^Exercise goal:/i.test(line)) {
+      guidance.goal = line.replace(/^Exercise goal:\s*/i, "").trim();
+      activeList = null;
+      continue;
+    }
+    if (/^Exercise owner:/i.test(line)) {
+      guidance.owner = line.replace(/^Exercise owner:\s*/i, "").trim();
+      activeList = null;
+      continue;
+    }
+    if (/^Exercise scope:/i.test(line)) {
+      guidance.scope = line.replace(/^Exercise scope:\s*/i, "").trim();
+      activeList = null;
+      continue;
+    }
+    if (/^Exercise constraints:/i.test(line)) {
+      guidance.constraints = [];
+      activeList = "constraints";
+      continue;
+    }
+    if (/^Exercise acceptance:/i.test(line)) {
+      guidance.acceptance = [];
+      activeList = "acceptance";
+      continue;
+    }
+    if (/^Exercise seed:/i.test(line)) {
+      guidance.seed = line.replace(/^Exercise seed:\s*/i, "").trim();
+      activeList = null;
+      continue;
+    }
+    if (/^-\s+/.test(line) && activeList) {
+      const item = line.replace(/^-\s+/, "").trim();
+      if (item) {
+        if (activeList === "constraints") guidance.constraints?.push(item);
+        if (activeList === "acceptance") guidance.acceptance?.push(item);
+      }
+      continue;
+    }
 
-  return questions.filter(Boolean);
+    activeList = null;
+  }
+
+  return guidance;
+}
+
+function stripExerciseGuidanceFromBlock(block: string): string {
+  const lines = block.split("\n");
+  const kept: string[] = [];
+  let skippingExerciseList = false;
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (
+      /^Exercise fit:/i.test(trimmed) ||
+      /^Exercise goal:/i.test(trimmed) ||
+      /^Exercise owner:/i.test(trimmed) ||
+      /^Exercise scope:/i.test(trimmed) ||
+      /^Exercise constraints:/i.test(trimmed) ||
+      /^Exercise acceptance:/i.test(trimmed) ||
+      /^Exercise seed:/i.test(trimmed)
+    ) {
+      skippingExerciseList = /^Exercise constraints:/i.test(trimmed) || /^Exercise acceptance:/i.test(trimmed);
+      continue;
+    }
+
+    if (skippingExerciseList && /^-\s+/.test(trimmed)) {
+      continue;
+    }
+
+    if (trimmed) skippingExerciseList = false;
+    kept.push(rawLine);
+  }
+
+  return kept.join("\n").trim();
+}
+
+function parseQuestionExercises(section: string): QuestionExerciseGuidance[] {
+  return parseQuestionBlocks(section).map((block) => parseQuestionExerciseGuidance(block));
+}
+
+function parseQuestionTexts(section: string): string[] {
+  return parseQuestionBlocks(section)
+    .map((block) => stripExerciseGuidanceFromBlock(block))
+    .map((block) => {
+      const lines = block.split("\n");
+      const first = lines[0]?.replace(/^\d+\.\s*/, "").trim() ?? "";
+      const rest = lines.slice(1).map((l) => l.trim());
+      return [first, ...rest].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    })
+    .filter(Boolean);
 }
 
 function parseCriteria(section: string): string[] {
@@ -187,7 +278,8 @@ export function parseKnowledgeMarkdown(md: string, fallbackTopic: string): Knowl
     const conceptsSection      = extractSection(md, "Concepts");
     const difficultySection    = extractSection(md, "Difficulty");
 
-    const questions            = parseQuestions(questionsSection);
+    const questions            = parseQuestionTexts(questionsSection);
+    const questionExercises    = parseQuestionExercises(questionsSection);
     const evaluationCriteria   = parseCriteria(criteriaSection);
     const concepts             = parseConcepts(conceptsSection);
     const questionDifficulties = parseDifficulties(difficultySection);
@@ -197,7 +289,7 @@ export function parseKnowledgeMarkdown(md: string, fallbackTopic: string): Knowl
       return null;
     }
 
-    return { topic, summary, questions, evaluationCriteria, concepts, questionDifficulties, warmupLevels };
+    return { topic, summary, questions, questionExercises, evaluationCriteria, concepts, questionDifficulties, warmupLevels };
   } catch (err) {
     console.error(`[knowledge] failed to parse markdown for ${fallbackTopic}:`, err);
     return null;
