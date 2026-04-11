@@ -15,6 +15,12 @@ export default function NavBar() {
           Topics
         </NavLink>
         <NavLink
+          to="/arena"
+          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        >
+          Crisis Mode
+        </NavLink>
+        <NavLink
           to="/sessions"
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >

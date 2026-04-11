@@ -1,0 +1,780 @@
+*** Begin Patch
+*** Add File: ui/src/pages/ForgeArenaPage.tsx
++import { useEffect, useMemo, useState } from 'react'
++
++type MetricKey = 'latency' | 'reliability' | 'cost' | 'confidence'
++
++type ActionEffect = {
++  latency?: number
++  reliability?: number
++  cost?: number
++  confidence?: number
++  score: number
++}
++
++type ActionOption = {
++  id: string
++  label: string
++  rationale: string
++  effect: ActionEffect
++  result: string
++}
++
++type CrisisScenario = {
++  id: string
++  title: string
++  prompt: string
++  context: string[]
++  bestMove: string
++  actions: ActionOption[]
++}
++
++type Metrics = Record<MetricKey, number>
++
++const STARTING_TIMER = 35
++
++const INITIAL_METRICS: Metrics = {
++  latency: 52,
++  reliability: 61,
++  cost: 40,
++  confidence: 45,
++}
++
++const SCENARIOS: CrisisScenario[] = [
++  {
++    id: 'traffic-spike',
++    title: 'Checkout spike on a flash sale',
++    prompt: 'Traffic jumped 12x in 6 minutes. Checkout is timing out and carts are expiring.',
++    context: [
++      'Single primary database for orders and inventory.',
++      'Reads and writes both hit the same hot tables.',
++      'You have 35 seconds to pick the first move.',
++    ],
++    bestMove: 'cache-read-model',
++    actions: [
++      {
++        id: 'cache-read-model',
++        label: 'Add a read-through cache for catalog and inventory lookups',
++        rationale: 'Take heat off the primary database without changing the write path yet.',
++        effect: { latency: 18, reliability: 8, cost: 6, confidence: 10, score: 140 },
++        result: 'Reads drop sharply on the database. Checkout still writes to the primary store, but p95 recovers fast enough to stabilize the flow.',
++      },
++      {
++        id: 'split-microservices',
++        label: 'Split checkout into three new microservices immediately',
++        rationale: 'A long-term architecture move, but too much change under incident pressure.',
++        effect: { latency: -8, reliability: -12, cost: 14, confidence: -10, score: 45 },
++        result: 'You introduced deployment and coordination risk during the incident. The architecture is cleaner on paper, but recovery got slower.',
++      },
++      {
++        id: 'vertical-scale',
++        label: 'Vertically scale the database only',
++        rationale: 'Buys some time, but keeps the hot path coupled and expensive.',
++        effect: { latency: 8, reliability: 3, cost: 12, confidence: 2, score: 90 },
++        result: 'The database survives the spike for now, but cost climbs and the core bottleneck is still there.',
++      },
++    ],
++  },
++  {
++    id: 'analytics-backpressure',
++    title: 'Event pipeline is choking the app',
++    prompt: 'Every user action emits synchronous analytics writes. The app feels slow and users are dropping.',
++    context: [
++      'Product wants analytics preserved.',
++      'The write path cannot block the customer request.',
++      'You only get one move this round.',
++    ],
++    bestMove: 'queue-decouple',
++    actions: [
++      {
++        id: 'queue-decouple',
++        label: 'Move analytics emission behind a queue with async consumers',
++        rationale: 'Preserves events while removing non-critical work from the request path.',
++        effect: { latency: 16, reliability: 9, cost: 5, confidence: 10, score: 145 },
++        result: 'User requests return quickly again. Analytics become eventually consistent, which is a good trade under load.',
++      },
++      {
++        id: 'drop-analytics',
++        label: 'Disable analytics completely',
++        rationale: 'Fast relief, but breaks a stated business constraint.',
++        effect: { latency: 12, reliability: 4, cost: 2, confidence: -5, score: 85 },
++        result: 'The app recovers, but stakeholders lose critical visibility and the move feels too blunt for a design interview answer.',
++      },
++      {
++        id: 'bigger-api-nodes',
++        label: 'Scale API nodes without changing the flow',
++        rationale: 'More capacity, same blocking architecture.',
++        effect: { latency: 5, reliability: 3, cost: 11, confidence: 1, score: 75 },
++        result: 'More nodes help a bit, but every request still waits on analytics I/O.',
++      },
++    ],
++  },
++  {
++    id: 'global-search',
++    title: 'Users in Europe complain about slow search',
++    prompt: 'Your search API is hosted in one region. European traffic has grown and search feels laggy.',
++    context: [
++      'Write traffic is light. Read traffic is huge.',
++      'Freshness matters, but sub-second search matters more.',
++      'Think in interview trade-offs, not perfect architecture.',
++    ],
++    bestMove: 'replicate-read-region',
++    actions: [
++      {
++        id: 'replicate-read-region',
++        label: 'Add a regional read replica and route search locally',
++        rationale: 'Improves latency where users are without overcomplicating the write model.',
++        effect: { latency: 17, reliability: 7, cost: 8, confidence: 9, score: 138 },
++        result: 'Search gets much faster for European users. Replica lag is acceptable for this read-heavy workload.',
++      },
++      {
++        id: 'move-everything-global',
++        label: 'Migrate the full system to active-active across regions',
++        rationale: 'Powerful but oversized for the problem and expensive to reason about in a first pass.',
++        effect: { latency: 6, reliability: -4, cost: 18, confidence: -6, score: 58 },
++        result: 'You reached for a heavyweight design before justifying the simpler option. The panel will push on complexity fast.',
++      },
++      {
++        id: 'cdn-api',
++        label: 'Put the search API behind a CDN only',
++        rationale: 'CDNs help static content more than dynamic search responses.',
++        effect: { latency: 3, reliability: 1, cost: 4, confidence: -2, score: 62 },
++        result: 'Some edge caching helps repeated requests, but the core search latency problem remains mostly unchanged.',
++      },
++    ],
++  },
++]
++
++function clamp(value: number) {
++  return Math.max(0, Math.min(100, value))
++}
++
++function applyEffect(metrics: Metrics, effect: ActionEffect): Metrics {
++  return {
++    latency: clamp(metrics.latency + (effect.latency ?? 0)),
++    reliability: clamp(metrics.reliability + (effect.reliability ?? 0)),
++    cost: clamp(metrics.cost + (effect.cost ?? 0)),
++    confidence: clamp(metrics.confidence + (effect.confidence ?? 0)),
++  }
++}
++
++function getHealthLabel(value: number) {
++  if (value >= 80) return 'Strong'
++  if (value >= 60) return 'Stable'
++  if (value >= 40) return 'Shaky'
++  return 'Critical'
++}
++
++export default function ForgeArenaPage() {
++  const [roundIndex, setRoundIndex] = useState(0)
++  const [timer, setTimer] = useState(STARTING_TIMER)
++  const [score, setScore] = useState(0)
++  const [metrics, setMetrics] = useState<Metrics>(INITIAL_METRICS)
++  const [selectedActionId, setSelectedActionId] = useState<string | null>(null)
++  const [history, setHistory] = useState<Array<{ scenario: string; action: string; score: number }>>([])
++
++  const scenario = SCENARIOS[roundIndex]
++  const selectedAction = scenario.actions.find((action) => action.id === selectedActionId) ?? null
++  const finished = roundIndex >= SCENARIOS.length - 1 && selectedAction !== null
++
++  useEffect(() => {
++    if (selectedActionId) return
++
++    const intervalId = window.setInterval(() => {
++      setTimer((current) => {
++        if (current <= 1) {
++          window.clearInterval(intervalId)
++          return 0
++        }
++        return current - 1
++      })
++    }, 1000)
++
++    return () => window.clearInterval(intervalId)
++  }, [roundIndex, selectedActionId])
++
++  useEffect(() => {
++    if (timer !== 0 || selectedActionId) return
++    const fallback = scenario.actions[0]
++    handleAction(fallback)
++  }, [timer, selectedActionId, scenario])
++
++  const interviewReadiness = useMemo(() => {
++    return Math.round((metrics.latency + metrics.reliability + metrics.confidence - metrics.cost * 0.35) / 2.65)
++  }, [metrics])
++
++  function handleAction(action: ActionOption) {
++    if (selectedActionId) return
++
++    setSelectedActionId(action.id)
++    setMetrics((current) => applyEffect(current, action.effect))
++    setScore((current) => current + action.effect.score + timer)
++    setHistory((current) => [
++      ...current,
++      {
++        scenario: scenario.title,
++        action: action.label,
++        score: action.effect.score + timer,
++      },
++    ])
++  }
++
++  function handleNextRound() {
++    if (roundIndex >= SCENARIOS.length - 1) return
++    setRoundIndex((current) => current + 1)
++    setSelectedActionId(null)
++    setTimer(STARTING_TIMER)
++  }
++
++  function handleReset() {
++    setRoundIndex(0)
++    setTimer(STARTING_TIMER)
++    setScore(0)
++    setMetrics(INITIAL_METRICS)
++    setSelectedActionId(null)
++    setHistory([])
++  }
++
++  return (
++    <div className="arena-page">
++      <div className="arena-hero card">
++        <div>
++          <div className="arena-eyebrow">Prototype</div>
++          <h1 className="arena-title">System Design Crisis Mode</h1>
++          <p className="arena-subtitle">
++            A lightweight game loop on top of interview-forge: you get a failing system,
++            limited time, and one high-leverage move.
++          </p>
++        </div>
++        <div className="arena-hero-actions">
++          <div className={`arena-timer ${timer <= 10 && !selectedAction ? 'danger' : ''}`}>
++            ⏱ {selectedAction ? 'Locked' : `${timer}s`}
++          </div>
++          <button className="btn-secondary" onClick={handleReset}>Restart run</button>
++        </div>
++      </div>
++
++      <div className="arena-layout">
++        <section className="arena-main">
++          <div className="arena-round card">
++            <div className="arena-round-header">
++              <div>
++                <div className="arena-round-label">Round {roundIndex + 1} / {SCENARIOS.length}</div>
++                <h2 className="arena-round-title">{scenario.title}</h2>
++              </div>
++              <div className="arena-best-move-hint">Goal: pick the best first move under pressure</div>
++            </div>
++
++            <p className="arena-prompt">{scenario.prompt}</p>
++
++            <div className="arena-context-list">
++              {scenario.context.map((item) => (
++                <div key={item} className="arena-context-item">{item}</div>
++              ))}
++            </div>
++
++            <div className="arena-actions-grid">
++              {scenario.actions.map((action) => {
++                const isSelected = selectedActionId === action.id
++                const revealBest = selectedActionId !== null && action.id === scenario.bestMove
++
++                return (
++                  <button
++                    key={action.id}
++                    className={`arena-action-card ${isSelected ? 'selected' : ''} ${revealBest ? 'best' : ''}`}
++                    onClick={() => handleAction(action)}
++                    disabled={selectedActionId !== null}
++                  >
++                    <div className="arena-action-top">
++                      <span className="arena-action-name">{action.label}</span>
++                      {isSelected && <span className="arena-chip">Chosen</span>}
++                      {!isSelected && revealBest && <span className="arena-chip success">Best first move</span>}
++                    </div>
++                    <div className="arena-action-rationale">{action.rationale}</div>
++                  </button>
++                )
++              })}
++            </div>
++
++            {selectedAction && (
++              <div className="arena-result-panel">
++                <div className="arena-result-header">
++                  <div>
++                    <div className="arena-result-label">Round feedback</div>
++                    <h3>{selectedAction.label}</h3>
++                  </div>
++                  <div className="arena-score-burst">+{selectedAction.effect.score + timer} pts</div>
++                </div>
++                <p className="arena-result-copy">{selectedAction.result}</p>
++                <div className="arena-effect-list">
++                  <span>Latency {selectedAction.effect.latency && selectedAction.effect.latency > 0 ? '↑' : '↓'} {Math.abs(selectedAction.effect.latency ?? 0)}</span>
++                  <span>Reliability {selectedAction.effect.reliability && selectedAction.effect.reliability > 0 ? '↑' : '↓'} {Math.abs(selectedAction.effect.reliability ?? 0)}</span>
++                  <span>Cost {selectedAction.effect.cost && selectedAction.effect.cost > 0 ? '↑' : '↓'} {Math.abs(selectedAction.effect.cost ?? 0)}</span>
++                  <span>Confidence {selectedAction.effect.confidence && selectedAction.effect.confidence > 0 ? '↑' : '↓'} {Math.abs(selectedAction.effect.confidence ?? 0)}</span>
++                </div>
++                <div className="arena-result-actions">
++                  {finished ? (
++                    <button className="btn-secondary" onClick={handleReset}>Play again</button>
++                  ) : (
++                    <button className="btn-secondary" onClick={handleNextRound}>Next crisis</button>
++                  )}
++                </div>
++              </div>
++            )}
++          </div>
++        </section>
++
++        <aside className="arena-sidebar">
++          <div className="arena-scoreboard card">
++            <div className="arena-scoreboard-title">Run status</div>
++            <div className="arena-big-score">{score}</div>
++            <div className="arena-big-score-label">Total score</div>
++
++            <div className="arena-metrics">
++              {([
++                ['latency', 'Latency'],
++                ['reliability', 'Reliability'],
++                ['cost', 'Cost control'],
++                ['confidence', 'Interview confidence'],
++              ] as const).map(([key, label]) => (
++                <div key={key} className="arena-metric-row">
++                  <div className="arena-metric-meta">
++                    <span>{label}</span>
++                    <strong>{metrics[key]}</strong>
++                  </div>
++                  <div className="arena-metric-track">
++                    <div className="arena-metric-fill" style={{ width: `${metrics[key]}%` }} />
++                  </div>
++                </div>
++              ))}
++            </div>
++
++            <div className="arena-readiness-box">
++              <div className="arena-readiness-label">Panel read</div>
++              <div className="arena-readiness-score">{interviewReadiness}</div>
++              <div className="arena-readiness-copy">{getHealthLabel(interviewReadiness)} design signal</div>
++            </div>
++          </div>
++
++          <div className="arena-history card">
++            <div className="arena-scoreboard-title">Decision trail</div>
++            {history.length === 0 ? (
++              <div className="arena-history-empty">Your round choices will stack here.</div>
++            ) : (
++              <div className="arena-history-list">
++                {history.map((entry, index) => (
++                  <div key={`${entry.scenario}-${index}`} className="arena-history-item">
++                    <div className="arena-history-step">R{index + 1}</div>
++                    <div>
++                      <div className="arena-history-scenario">{entry.scenario}</div>
++                      <div className="arena-history-action">{entry.action}</div>
++                    </div>
++                    <div className="arena-history-score">+{entry.score}</div>
++                  </div>
++                ))}
++              </div>
++            )}
++          </div>
++        </aside>
++      </div>
++    </div>
++  )
++}
+*** Update File: ui/src/App.tsx
+@@
+ import TopicsPage from './pages/TopicsPage'
+ import ProgressPage from './pages/ProgressPage'
++import ForgeArenaPage from './pages/ForgeArenaPage'
+@@
+           <Route path="/topics" element={<TopicsPage />} />
++          <Route path="/arena" element={<ForgeArenaPage />} />
+         </Routes>
+       </main>
+     </div>
+*** Update File: ui/src/components/NavBar.tsx
+@@
+         <NavLink
++          to="/arena"
++          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
++        >
++          Crisis Mode
++        </NavLink>
++        <NavLink
+           to="/sessions"
+           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+         >
+           Sessions
+*** Update File: ui/src/index.css
+@@
+ @media (max-width: 720px) {
+   .progress-header {
+@@
+   .progress-bar-value {
+     text-align: left;
+   }
+ }
++
++/* ── Crisis mode prototype ─────────────────────────────────────────────────── */
++
++.arena-page {
++  display: flex;
++  flex-direction: column;
++  gap: 18px;
++}
++
++.arena-hero {
++  display: flex;
++  align-items: flex-start;
++  justify-content: space-between;
++  gap: 16px;
++  background: linear-gradient(180deg, rgba(24, 36, 61, 0.98), rgba(11, 18, 32, 0.96));
++}
++
++.arena-eyebrow {
++  display: inline-flex;
++  align-items: center;
++  padding: 4px 8px;
++  border-radius: 999px;
++  border: 1px solid rgba(79, 209, 197, 0.28);
++  background: rgba(24, 58, 68, 0.38);
++  color: var(--accent);
++  font-size: 0.72rem;
++  font-weight: 800;
++  letter-spacing: 0.06em;
++  text-transform: uppercase;
++  margin-bottom: 10px;
++}
++
++.arena-title {
++  font-size: 1.6rem;
++  font-weight: 800;
++  color: var(--ink);
++}
++
++.arena-subtitle {
++  margin-top: 8px;
++  max-width: 68ch;
++  color: var(--muted);
++  line-height: 1.6;
++}
++
++.arena-hero-actions {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  flex-wrap: wrap;
++}
++
++.arena-timer {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  min-width: 88px;
++  padding: 10px 14px;
++  border-radius: 999px;
++  border: 1px solid rgba(79, 209, 197, 0.28);
++  background: rgba(24, 58, 68, 0.4);
++  color: #d9fffb;
++  font-weight: 800;
++}
++
++.arena-timer.danger {
++  border-color: rgba(248, 113, 113, 0.42);
++  background: rgba(127, 29, 29, 0.26);
++  color: #fecaca;
++}
++
++.arena-layout {
++  display: grid;
++  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
++  gap: 18px;
++}
++
++.arena-main,
++.arena-sidebar {
++  display: flex;
++  flex-direction: column;
++  gap: 18px;
++}
++
++.arena-round-header,
++.arena-result-header,
++.arena-history-item,
++.arena-metric-meta {
++  display: flex;
++  align-items: flex-start;
++  justify-content: space-between;
++  gap: 12px;
++}
++
++.arena-round-label,
++.arena-result-label,
++.arena-scoreboard-title,
++.arena-readiness-label {
++  color: var(--muted);
++  font-size: 0.74rem;
++  font-weight: 800;
++  letter-spacing: 0.08em;
++  text-transform: uppercase;
++}
++
++.arena-round-title {
++  margin-top: 8px;
++  font-size: 1.2rem;
++  font-weight: 800;
++}
++
++.arena-best-move-hint {
++  color: #bfdbfe;
++  font-size: 0.8rem;
++  font-weight: 700;
++}
++
++.arena-prompt {
++  margin-top: 16px;
++  color: var(--ink);
++  font-size: 1rem;
++  line-height: 1.6;
++}
++
++.arena-context-list,
++.arena-effect-list,
++.arena-history-list {
++  display: flex;
++  flex-direction: column;
++  gap: 10px;
++}
++
++.arena-context-list {
++  margin-top: 16px;
++}
++
++.arena-context-item {
++  padding: 10px 12px;
++  border-radius: 12px;
++  border: 1px solid rgba(42, 57, 87, 0.9);
++  background: rgba(11, 18, 32, 0.75);
++  color: var(--muted);
++  line-height: 1.45;
++}
++
++.arena-actions-grid {
++  display: grid;
++  grid-template-columns: 1fr;
++  gap: 12px;
++  margin-top: 18px;
++}
++
++.arena-action-card {
++  text-align: left;
++  border: 1px solid var(--line);
++  border-radius: 16px;
++  background: linear-gradient(180deg, rgba(18, 28, 49, 0.98), rgba(11, 18, 32, 0.94));
++  color: inherit;
++  padding: 14px;
++  cursor: pointer;
++  transition: border-color .15s, transform .15s, background .15s;
++}
++
++.arena-action-card:hover:not(:disabled) {
++  border-color: rgba(79, 209, 197, 0.42);
++  transform: translateY(-1px);
++}
++
++.arena-action-card.selected {
++  border-color: rgba(96, 165, 250, 0.48);
++  background: rgba(30, 64, 175, 0.2);
++}
++
++.arena-action-card.best {
++  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.3);
++}
++
++.arena-action-top {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  flex-wrap: wrap;
++}
++
++.arena-action-name {
++  font-size: 0.94rem;
++  font-weight: 800;
++  color: var(--ink);
++}
++
++.arena-action-rationale {
++  margin-top: 8px;
++  color: var(--muted);
++  line-height: 1.5;
++}
++
++.arena-chip {
++  display: inline-flex;
++  align-items: center;
++  padding: 4px 8px;
++  border-radius: 999px;
++  border: 1px solid rgba(96, 165, 250, 0.28);
++  background: rgba(30, 64, 175, 0.22);
++  color: #dbeafe;
++  font-size: 0.68rem;
++  font-weight: 800;
++}
++
++.arena-chip.success {
++  border-color: rgba(134, 239, 172, 0.3);
++  background: rgba(20, 83, 45, 0.34);
++  color: #dcfce7;
++}
++
++.arena-result-panel {
++  margin-top: 18px;
++  padding: 16px;
++  border-radius: 16px;
++  border: 1px solid rgba(79, 209, 197, 0.24);
++  background: linear-gradient(180deg, rgba(24, 58, 68, 0.38), rgba(11, 18, 32, 0.94));
++}
++
++.arena-score-burst {
++  color: var(--accent);
++  font-size: 1rem;
++  font-weight: 800;
++}
++
++.arena-result-copy {
++  margin-top: 12px;
++  color: var(--ink);
++  line-height: 1.6;
++}
++
++.arena-effect-list {
++  margin-top: 14px;
++  gap: 8px;
++}
++
++.arena-effect-list span {
++  padding: 8px 10px;
++  border-radius: 10px;
++  border: 1px solid rgba(42, 57, 87, 0.9);
++  background: rgba(11, 18, 32, 0.7);
++  color: var(--muted);
++  font-size: 0.82rem;
++  font-weight: 700;
++}
++
++.arena-result-actions {
++  margin-top: 16px;
++  display: flex;
++  justify-content: flex-end;
++}
++
++.arena-big-score {
++  margin-top: 10px;
++  font-size: 2.2rem;
++  font-weight: 800;
++  color: var(--accent);
++}
++
++.arena-big-score-label {
++  color: var(--muted);
++  font-size: 0.82rem;
++}
++
++.arena-metrics {
++  margin-top: 18px;
++  display: flex;
++  flex-direction: column;
++  gap: 12px;
++}
++
++.arena-metric-track {
++  margin-top: 6px;
++  height: 10px;
++  border-radius: 999px;
++  background: rgba(42, 57, 87, 0.85);
++  overflow: hidden;
++}
++
++.arena-metric-fill {
++  height: 100%;
++  border-radius: 999px;
++  background: linear-gradient(90deg, var(--accent), #7dd3fc);
++}
++
++.arena-readiness-box {
++  margin-top: 18px;
++  padding: 14px;
++  border-radius: 14px;
++  border: 1px solid rgba(96, 165, 250, 0.22);
++  background: rgba(17, 26, 46, 0.72);
++}
++
++.arena-readiness-score {
++  margin-top: 8px;
++  font-size: 1.5rem;
++  font-weight: 800;
++  color: #dbeafe;
++}
++
++.arena-readiness-copy,
++.arena-history-empty,
++.arena-history-action {
++  color: var(--muted);
++  line-height: 1.5;
++}
++
++.arena-history-list {
++  margin-top: 14px;
++}
++
++.arena-history-item {
++  align-items: center;
++  padding: 10px 0;
++  border-bottom: 1px solid rgba(42, 57, 87, 0.85);
++}
++
++.arena-history-item:last-child {
++  border-bottom: none;
++}
++
++.arena-history-step,
++.arena-history-score {
++  font-size: 0.78rem;
++  font-weight: 800;
++}
++
++.arena-history-step {
++  color: var(--accent);
++}
++
++.arena-history-score {
++  color: #bfdbfe;
++}
++
++.arena-history-scenario {
++  color: var(--ink);
++  font-weight: 700;
++}
++
++@media (max-width: 980px) {
++  .arena-layout {
++    grid-template-columns: 1fr;
++  }
++}
++
++@media (max-width: 760px) {
++  .arena-hero,
++  .arena-round-header,
++  .arena-result-header {
++    flex-direction: column;
++  }
++
++  .arena-result-actions {
++    justify-content: stretch;
++  }
++
++  .arena-result-actions .btn-secondary {
++    width: 100%;
++  }
++}
+*** End Patch

@@ -7,6 +7,7 @@ import FlashcardsPage from './pages/FlashcardsPage'
 import MistakesPage from './pages/MistakesPage'
 import TopicsPage from './pages/TopicsPage'
 import ProgressPage from './pages/ProgressPage'
+import ForgeArenaPage from './pages/ForgeArenaPage'
 
 export default function App() {
   const location = useLocation()
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/flashcards" element={<FlashcardsPage />} />
           <Route path="/mistakes" element={<MistakesPage />} />
           <Route path="/topics" element={<TopicsPage />} />
+          <Route path="/arena" element={<ForgeArenaPage />} />
         </Routes>
       </main>
     </div>

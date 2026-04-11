@@ -4,7 +4,7 @@
 
 # interview-forge
 
-A stateful mock interview system that turns interviews, drills, flashcards, reports, and rewards into one continuous learning loop.
+A stateful mock interview system that turns interviews, drills, flashcards, exercises, reports, and rewards into one continuous learning loop.
 
 ## Why it's different
 
