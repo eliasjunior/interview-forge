@@ -482,6 +482,31 @@ app.get("/api/flashcards/:id/history", (req, res) => {
   res.json(history);
 });
 
+app.get("/api/flashcard-answers/pending", (_req, res) => {
+  const cardsById = new Map(loadFlashcards().map((card) => [card.id, card]));
+  const items = repositories.flashcardAnswers
+    .listByState("Pending")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((answer) => {
+      const card = cardsById.get(answer.flashcardId);
+      return {
+        ...answer,
+        flashcard: card
+          ? {
+              id: card.id,
+              topic: card.topic,
+              front: card.front,
+              back: card.back,
+              difficulty: card.difficulty,
+              archivedAt: card.archivedAt,
+            }
+          : null,
+      };
+    });
+
+  res.json({ total: items.length, items });
+});
+
 app.post("/api/flashcards/:id/review", (req, res) => {
   const cards = loadFlashcards();
   const idx = cards.findIndex(c => c.id === req.params.id);
@@ -495,6 +520,39 @@ app.post("/api/flashcards/:id/review", (req, res) => {
   cards[idx] = { ...cards[idx], ...srs, lastReviewedAt: new Date().toISOString() };
   saveFlashcards(cards);
   res.json(cards[idx]);
+});
+
+app.post("/api/flashcards/:id/review-answer", (req, res) => {
+  const flashcardId = req.params.id;
+  const cards = loadFlashcards();
+  const idx = cards.findIndex(c => c.id === flashcardId);
+  if (idx === -1) { res.status(404).json({ error: "Card not found" }); return; }
+  if (cards[idx]?.archivedAt) { res.status(409).json({ error: "Card is archived" }); return; }
+
+  const rating = Number(req.body.rating) as ReviewRating;
+  if (![1, 2, 3, 4].includes(rating)) { res.status(400).json({ error: "rating must be 1–4" }); return; }
+
+  const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
+  if (!content) { res.status(400).json({ error: "content is required and must not be empty" }); return; }
+
+  const answer: FlashcardAnswer = {
+    id: randomUUID(),
+    flashcardId,
+    content,
+    state: "Pending",
+    smRating: rating,
+    createdAt: new Date().toISOString(),
+  };
+
+  const srs = applySM2(cards[idx], rating);
+  cards[idx] = { ...cards[idx], ...srs, lastReviewedAt: new Date().toISOString() };
+  saveFlashcards(cards);
+  repositories.flashcardAnswers.insert(answer);
+
+  res.status(201).json({
+    flashcard: cards[idx],
+    answer,
+  });
 });
 
 app.post("/api/flashcards/:id/archive", (req, res) => {

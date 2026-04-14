@@ -4,7 +4,13 @@
 
 ## Knowledge topics
 
-Knowledge files live in `interview-mcp/data/knowledge/*.md`. Each file follows a fixed structure: `## Summary`, `## Questions`, `## Difficulty`, `## Evaluation Criteria`, and `## Concepts`. The `## Difficulty` section tags every question as `foundation`, `intermediate`, or `advanced`.
+Knowledge files live in `interview-mcp/data/knowledge/*.md`. The current authoring format is:
+
+- required: `# <Topic Title>`, `## Summary`, `## Questions`, `## Concepts`
+- commonly included: `## Difficulty`
+- optional: `## Warm-up Quests`
+
+Question metadata is now authored inline under each numbered question when needed, especially for evaluation notes and question-level exercise guidance. The `## Difficulty` section still tags questions as `foundation`, `intermediate`, or `advanced`.
 
 ## How questions are selected per interview
 
@@ -80,17 +86,31 @@ Warm-up content lives in the `## Warm-up Quests` section of each knowledge file.
 
 ## Questions
 1. <Question>
-2. ...
+   
+   Evaluation criteria:
+   - <What a strong answer must include>
+   - <What a weak answer misses / bonus signal>
+
+   Exercise fit: none | micro | standard
+   Exercise goal: <What the exercise teaches>
+   Exercise owner: <Which layer should own the work>
+   Exercise scope: <The intended implementation slice>
+   Exercise constraints:
+   - <Keep the exercise narrow>
+   - <Explicitly out-of-scope work>
+   Exercise acceptance:
+   - <What must be true when done>
+   - <What test or proof should exist>
+   Exercise seed: <Suggested starting point>
+
+2. <Question without extra metadata>
+3. ...
 
 ## Difficulty
 - Question 1: foundation
 - Question 2: intermediate
 - Question 3: advanced
 ...
-
-## Evaluation Criteria
-- Question 1: <What a strong answer includes. What a weak answer misses. Bonus points.>
-- Question 2: ...
 
 ## Concepts
 - core concepts: word1, word2
@@ -99,7 +119,13 @@ Warm-up content lives in the `## Warm-up Quests` section of each knowledge file.
 - best practices: word7, word8
 ```
 
-Cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
+Notes:
+
+- `## Summary`, `## Questions`, and `## Concepts` are the core sections every file should have.
+- Inline `Evaluation criteria:` blocks are the current authored pattern for richer topics such as `data-access-tradeoffs-growing-complexity.md`.
+- The exercise fields are optional and belong directly under the question they describe.
+- `## Difficulty` is still supported and used to drive progressive selection.
+- Cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
 
 To add warm-up content for a topic, append a `## Warm-up Quests` section:
 

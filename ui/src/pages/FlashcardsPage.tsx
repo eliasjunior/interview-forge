@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { Flashcard, ReviewRating } from '@mock-interview/shared'
-import { dismissFlashcard, getFlashcardHistory, getFlashcardsPage, restoreFlashcard, reviewFlashcard, submitFlashcardAnswer } from '../api'
+import { dismissFlashcard, getFlashcardHistory, getFlashcardsPage, restoreFlashcard, reviewFlashcardWithAnswer } from '../api'
 
 // ── Rating config ────────────────────────────────────────────────────────────
 
@@ -310,11 +310,12 @@ export default function FlashcardsPage() {
     }
     setRating(r)
     try {
-      await reviewFlashcard(cardId, r)
-      await submitFlashcardAnswer(cardId, trimmedAnswer, r)
+      await reviewFlashcardWithAnswer(cardId, r, trimmedAnswer)
     } catch (e) {
       console.error('review or answer submit error', e)
       setError(String(e))
+      setRating(null)
+      return
     }
     setTimeout(() => {
       const next = cursor + 1

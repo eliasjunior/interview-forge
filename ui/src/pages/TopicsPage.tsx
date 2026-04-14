@@ -865,6 +865,12 @@ export default function TopicsPage() {
                       >
                         Weak Slice
                       </button>
+                      <button
+                        className="topic-secondary-btn"
+                        onClick={() => navigate(`/arena?topic=${encodeURIComponent(topic.file)}`)}
+                      >
+                        Crisis Mode
+                      </button>
                       {level !== undefined && <LadderRungs currentLevel={level} />}
                       <div className="topics-plan-progress-block">
                         <div className="topics-plan-progress-title">{getProgressTitle(levelData)}</div>
@@ -964,6 +970,12 @@ export default function TopicsPage() {
                       onClick={() => void openTopicQuestionPicker(topic)}
                     >
                       Weak Slice
+                    </button>
+                    <button
+                      className="topic-secondary-btn"
+                      onClick={() => navigate(`/arena?topic=${encodeURIComponent(topic.file)}`)}
+                    >
+                      Crisis Mode
                     </button>
                   </div>
                 </div>

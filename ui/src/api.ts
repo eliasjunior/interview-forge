@@ -212,6 +212,30 @@ export const submitFlashcardAnswer = (
 ): Promise<FlashcardAnswer> =>
   post(`${BASE}/flashcards/${encodeURIComponent(id)}/answers`, { content, smRating })
 
+export interface ReviewFlashcardWithAnswerResponse {
+  flashcard: Flashcard
+  answer: FlashcardAnswer
+}
+
+export const reviewFlashcardWithAnswer = (
+  id: string,
+  rating: ReviewRating,
+  content: string
+): Promise<ReviewFlashcardWithAnswerResponse> =>
+  post(`${BASE}/flashcards/${encodeURIComponent(id)}/review-answer`, { rating, content })
+
+export interface PendingFlashcardAnswerItem extends FlashcardAnswer {
+  flashcard: Pick<Flashcard, 'id' | 'topic' | 'front' | 'back' | 'difficulty' | 'archivedAt'> | null
+}
+
+export interface PendingFlashcardAnswersResponse {
+  total: number
+  items: PendingFlashcardAnswerItem[]
+}
+
+export const getPendingFlashcardAnswers = (): Promise<PendingFlashcardAnswersResponse> =>
+  req(`${BASE}/flashcard-answers/pending`)
+
 export const dismissFlashcard = (id: string): Promise<Flashcard> =>
   post(`${BASE}/flashcards/${encodeURIComponent(id)}/archive`, {})
 

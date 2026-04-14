@@ -38,6 +38,26 @@ function formatMcqAnswer(answer: string[], choices: string[]): string {
     .join(", ");
 }
 
+function looksLikeCodeSubmission(answer: string): boolean {
+  return (
+    /```[\s\S]*```/.test(answer) ||
+    /\b(class|function|def|public|private|static|const|let|var)\b/.test(answer) ||
+    /\breturn\b/.test(answer) ||
+    /=>/.test(answer) ||
+    /\bfor\s*\(|\bwhile\s*\(|\bif\s*\(/.test(answer)
+  );
+}
+
+function mentionsComplexity(answer: string): boolean {
+  return /\btime complexity\b|\bspace complexity\b|\bbig[- ]?o\b|O\([^)]+\)/i.test(answer);
+}
+
+function shouldFinishCodeInterviewEarly(session: { interviewType?: string; currentQuestionIndex: number; questions: string[] }, answer: string): boolean {
+  if (session.interviewType !== "code") return false;
+  if (session.currentQuestionIndex >= session.questions.length - 1) return false;
+  return looksLikeCodeSubmission(answer) && mentionsComplexity(answer);
+}
+
 export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
     "evaluate_answer",
@@ -161,7 +181,16 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         deeperDive: result.deeperDive,
       };
 
+      const earlyCompletionDetected = shouldFinishCodeInterviewEarly(session, lastAnswer.content);
+      if (earlyCompletionDetected) {
+        evaluation.needsFollowUp = false;
+        evaluation.followUpQuestion = undefined;
+      }
+
       session.evaluations.push(evaluation);
+      if (earlyCompletionDetected) {
+        session.currentQuestionIndex = session.questions.length - 1;
+      }
       session.state = "FOLLOW_UP";
       deps.saveSessions(sessions);
 
@@ -174,11 +203,17 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             score: result.score,
             feedback: result.feedback,
             strongAnswer: resolvedStrongAnswer ?? null,
-            needsFollowUp: result.needsFollowUp,
-            followUpQuestion: result.followUpQuestion ?? null,
-            nextTool: result.needsFollowUp
+            needsFollowUp: earlyCompletionDetected ? false : result.needsFollowUp,
+            followUpQuestion: earlyCompletionDetected ? null : result.followUpQuestion ?? null,
+            earlyCompletionDetected,
+            nextTool: earlyCompletionDetected
+              ? "end_interview"
+              : result.needsFollowUp
               ? "ask_followup  (or next_question to skip follow-up)"
               : "next_question",
+            instruction: earlyCompletionDetected
+              ? "Complete code submission with complexity analysis detected. Do not ask more questions; finish the interview now."
+              : undefined,
           }),
         }],
       };

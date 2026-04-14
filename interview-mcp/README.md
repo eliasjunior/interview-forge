@@ -377,11 +377,15 @@ The server has two operating modes, controlled by a single line in `.env`. **No 
 
 Knowledge files live in `data/knowledge/*.md` and are committed to git. Each file covers one topic and provides:
 
-- **Questions** — 5 progressive interview questions
-- **Evaluation criteria** — per-question rubric used in file-only mode
+- **Summary** — topic context and what a strong candidate should understand
+- **Questions** — numbered interview questions, with optional inline `Evaluation criteria:` and exercise-guidance blocks under a question
+- **Difficulty** — per-question `foundation` / `intermediate` / `advanced` tags used for progressive selection
 - **Concepts** — pre-defined clusters used for the knowledge graph
+- **Warm-up quests** — optional L0/L1/L2 practice content for the topic page ladder
 
-To add a new topic in file-only mode, create a new `.md` file following the format of an existing one (e.g. `java-concurrency.md`) and restart the server.
+The newer authoring pattern keeps richer question notes close to the question itself. For a current example, use `data/knowledge/data-access-tradeoffs-growing-complexity.md` as the reference shape.
+
+To add a new topic in file-only mode, create a new `.md` file following the format of an existing one and restart the server.
 
 ---
 

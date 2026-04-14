@@ -45,6 +45,12 @@ export default function NavBar() {
           Flashcards 🃏
         </NavLink>
         <NavLink
+          to="/flashcards/pending"
+          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        >
+          Pending Eval
+        </NavLink>
+        <NavLink
           to="/mistakes"
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >

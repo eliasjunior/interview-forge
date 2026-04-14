@@ -182,7 +182,7 @@ Business rules
     assert.match(payload.normalizedContent, /# Study Scope: String Rotation/);
     assert.match(payload.normalizedContent, /## Problem Statement/);
     assert.equal(payload.totalQuestions, 7);
-    assert.match(payload.instruction, /must end with a coding implementation question/);
+    assert.match(payload.instruction, /if the candidate submits complete working code earlier/i);
 
     const session = sessions[payload.sessionId];
     assert.ok(session);

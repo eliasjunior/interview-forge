@@ -9,7 +9,7 @@ import { detectGaps } from "./analyzer.js";
 import { extractSpec } from "./parser.js";
 import type { ExtractedSpec } from "./parser.js";
 
-/** Seven structured questions focused on algorithmic thinking, ending with implementation. */
+/** Default seven-step algorithm flow, but sessions may finish earlier once the candidate submits final code plus complexity analysis. */
 export function buildAlgorithmQuestions(topic: string, _content: string, _focus: string): string[] {
   return [
     `Looking at ${topic}, what algorithmic pattern or technique would you apply here, and why? ` +

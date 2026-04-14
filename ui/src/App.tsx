@@ -4,6 +4,7 @@ import SessionsPage from './pages/SessionsPage'
 import ReportPage from './pages/ReportPage'
 import GraphPage from './pages/GraphPage'
 import FlashcardsPage from './pages/FlashcardsPage'
+import PendingFlashcardAnswersPage from './pages/PendingFlashcardAnswersPage'
 import MistakesPage from './pages/MistakesPage'
 import TopicsPage from './pages/TopicsPage'
 import ProgressPage from './pages/ProgressPage'
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/graph" element={<GraphPage />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/flashcards" element={<FlashcardsPage />} />
+          <Route path="/flashcards/pending" element={<PendingFlashcardAnswersPage />} />
           <Route path="/mistakes" element={<MistakesPage />} />
           <Route path="/topics" element={<TopicsPage />} />
           <Route path="/arena" element={<ForgeArenaPage />} />

@@ -138,7 +138,7 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
                 ? "This is a CODE interview session (algorithm problem). " +
                   "Ask the candidate to explain their approach, analyse time/space complexity, and handle edge cases. " +
                   "Probe pattern recognition, correctness reasoning, and boundary conditions — not API or system design. " +
-                  "The session must end with a coding implementation question; do not stop at analysis-only prompts. " +
+                  "The default flow ends with a coding implementation question, but if the candidate submits complete working code earlier and explains time/space complexity, treat that as the final answer: evaluate it and finish the interview instead of forcing the remaining scripted questions. " +
                   "Call ask_question to start. " +
                   (deps.ai
                     ? "AI is enabled — evaluate_answer will score against the Study Scope criteria automatically."

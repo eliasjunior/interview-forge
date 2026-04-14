@@ -362,6 +362,122 @@ describe("askQuestion — uses session.questionCriteria", () => {
   });
 });
 
+describe("code interview early completion", () => {
+  test("evaluate_answer flags early completion when code and complexity are already provided", async () => {
+    const store = makeSessionStore({
+      "code-1": {
+        id: "code-1",
+        topic: "Rotate Matrix",
+        interviewType: "code",
+        state: "EVALUATE_ANSWER",
+        currentQuestionIndex: 1,
+        questions: [
+          "Explain your approach.",
+          "Walk through the invariant.",
+          "Analyse complexity.",
+          "Discuss edge cases.",
+          "Common mistakes?",
+          "Test cases?",
+          "Now implement Rotate Matrix.",
+        ],
+        messages: [
+          { role: "interviewer", content: "Walk through the invariant.", timestamp: new Date().toISOString() },
+          {
+            role: "candidate",
+            content: [
+              "I would rotate layer by layer.",
+              "Time complexity: O(n^2).",
+              "Space complexity: O(1).",
+              "```java",
+              "void rotate(int[][] matrix) {",
+              "  for (int layer = 0; layer < matrix.length / 2; layer++) {",
+              "    int first = layer;",
+              "    int last = matrix.length - 1 - layer;",
+              "    for (int i = first; i < last; i++) {",
+              "      int offset = i - first;",
+              "      int top = matrix[first][i];",
+              "      matrix[first][i] = matrix[last - offset][first];",
+              "      matrix[last - offset][first] = matrix[last][last - offset];",
+              "      matrix[last][last - offset] = matrix[i][last];",
+              "      matrix[i][last] = top;",
+              "    }",
+              "  }",
+              "}",
+              "```",
+            ].join("\n"),
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store, makeKnowledgeStore(null), {
+      ai: {
+        evaluateAnswer: async () => ({
+          score: 5,
+          feedback: "Strong implementation and reasoning.",
+          needsFollowUp: true,
+          followUpQuestion: "Can you optimize it further?",
+        }),
+      } as ToolDeps["ai"],
+    });
+    const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
+
+    const res = parse(await evaluate({ sessionId: "code-1" }));
+    const session = store.get("code-1");
+
+    assert.equal(res.earlyCompletionDetected, true);
+    assert.equal(res.nextTool, "end_interview");
+    assert.match(res.instruction, /Do not ask more questions/i);
+    assert.equal(res.needsFollowUp, false);
+    assert.equal(session.currentQuestionIndex, session.questions.length - 1);
+    assert.equal(session.evaluations.length, 1);
+    assert.equal(session.evaluations[0]?.needsFollowUp, false);
+  });
+
+  test("next_question immediately finalizes after an early-complete code answer", async () => {
+    const session: Session = {
+      id: "code-2",
+      topic: "Rotate Matrix",
+      interviewType: "code",
+      state: "FOLLOW_UP",
+      currentQuestionIndex: 6,
+      questions: [
+        "Explain your approach.",
+        "Walk through the invariant.",
+        "Analyse complexity.",
+        "Discuss edge cases.",
+        "Common mistakes?",
+        "Test cases?",
+        "Now implement Rotate Matrix.",
+      ],
+      messages: [],
+      evaluations: [
+        {
+          questionIndex: 1,
+          question: "Walk through the invariant.",
+          answer: "Submitted final code with O(n^2) time and O(1) space.",
+          score: 5,
+          feedback: "Strong implementation and reasoning.",
+          needsFollowUp: false,
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      knowledgeSource: "file",
+    };
+    const store = makeSessionStore({ "code-2": session });
+    const deps = makeDeps(store, makeKnowledgeStore(null));
+    const nextQuestion = captureHandler(registerNextQuestionTool, deps);
+
+    const res = parse(await nextQuestion({ sessionId: "code-2" }));
+
+    assert.equal(res.done, true);
+    assert.equal(store.get("code-2").state, "ENDED");
+  });
+});
+
 // ─── evaluateAnswer — questionCriteria ───────────────────────────────────────
 
 describe("evaluateAnswer — uses session.questionCriteria", () => {

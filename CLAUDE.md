@@ -113,12 +113,153 @@ ui/src/
 │   ├── SessionsPage.tsx
 │   ├── ReportPage.tsx
 │   ├── GraphPage.tsx
-│   └── FlashcardsPage.tsx      # Flashcard overview + flip-card review UI
+│   ├── FlashcardsPage.tsx      # Flashcard overview + flip-card review UI
+│   └── ForgeArenaPage.tsx      # Crisis Mode page (front-end only)
 ├── components/
-│   └── NavBar.tsx
+│   ├── NavBar.tsx
+│   └── FloatingPoints.tsx      # Floating +X pts overlay used by Crisis Mode
+├── crisis/
+│   └── topicArena.ts           # Crisis Mode single-topic scenario map
 ├── api.ts                      # Typed fetch helpers for all REST endpoints
 └── index.css
 ```
+
+## Crisis Mode
+
+### Current scope
+
+`Crisis Mode` is currently a **front-end-only** feature in `ui` and is intentionally **not generic yet**.
+
+It is hard-wired to exactly one topic:
+
+- `data-access-tradeoffs-growing-complexity`
+
+The page loads the topic through the existing UI API:
+
+- `getTopicDetails(CRISIS_TOPIC_FILE)` from `ui/src/api.ts`
+
+It does **not** read markdown files directly in the browser.
+
+### Files
+
+- `ui/src/pages/ForgeArenaPage.tsx`
+- `ui/src/crisis/topicArena.ts`
+- `ui/src/components/FloatingPoints.tsx`
+- `ui/src/index.css`
+
+### Behavior
+
+The current implementation uses a **small manual scenario map** derived from the authored topic file.
+
+It is based on a few selected questions from `data-access-tradeoffs-growing-complexity`, currently covering:
+
+- full dataset browse pressure / bounded pagination
+- deep pagination / cursor pagination
+- caching trade-offs
+- freshness under peak load
+
+These scenarios are shuffled per run, but they are still sourced from this one topic only.
+
+### Interview loop
+
+Current loop:
+
+`decision -> follow-up prompt -> answer -> concept feedback -> improve once -> twist -> done`
+
+The interview round includes:
+
+- crisis decision selection
+- topic-specific follow-up prompt
+- one normal answer submission
+- concept-based feedback (`Covered` / `Missed`)
+- one optional improvement attempt
+- one static twist prompt per selected question
+- visible sidebar progress (`Decision`, `Grade`, `Concept coverage`, `Improve used`, `Twist answered`)
+
+### Evaluation model
+
+Evaluation is **deterministic** and **not AI-based**.
+
+For each selected scenario, `ui/src/crisis/topicArena.ts` defines:
+
+- `expectedConcepts[]`
+- `twistPrompt`
+- fixed decision options and their outcomes
+
+Each concept has a small keyword list. The page checks whether the submitted answer contains any of those keywords.
+
+Helpers currently used in the page:
+
+- `evaluateConceptCoverage(answer, concepts)`
+- `getGrade(coverage)`
+- `compareAttempts(first, second)`
+
+Grade thresholds:
+
+- `Strong` = coverage >= 80%
+- `Decent` = coverage >= 40%
+- `Weak` = coverage < 40%
+
+### Points / scoring
+
+There are two separate point visuals in the current UI:
+
+1. **Decision selection points**
+   - triggered when the user clicks one of the 3 crisis options
+   - uses the existing decision score already shown in the round (`base score + remaining timer`)
+
+2. **Answer submission points**
+   - triggered only for the **normal first answer submission**
+   - mapping:
+     - `Weak -> +5 pts`
+     - `Decent -> +15 pts`
+     - `Strong -> +30 pts`
+   - intentionally **not** used for improvement, combos, or bonus systems
+
+### Floating points animation
+
+The floating `+X pts` effect is implemented with:
+
+- component: `ui/src/components/FloatingPoints.tsx`
+- CSS: `.floating-points` and `@keyframes floating-points-pop` in `ui/src/index.css`
+
+Important implementation detail:
+
+- the floating element only appears if React state survives long enough to render
+- a previous bug came from clearing floating state inside `resetInterviewState()`
+- another bug came from failing to remount the component properly for repeated animations
+- the current implementation uses a changing React `key` at the call site to force animation replay
+
+Current positioning behavior:
+
+- decision-click animation is positioned from the clicked button coordinates
+- the answer-submission animation still uses the same floating overlay system and may need further anchoring refinement if UI polish work continues
+
+### Constraints for future work
+
+Until explicitly changed, keep these constraints:
+
+- do **not** generalize Crisis Mode to all topics yet
+- do **not** introduce AI evaluation
+- do **not** add backend persistence for Crisis Mode state
+- do **not** move this into MCP tools yet
+- keep the feature deterministic and easy to debug
+
+### If a fresh agent continues this work
+
+Start by checking:
+
+1. `ui/src/crisis/topicArena.ts`
+2. `ui/src/pages/ForgeArenaPage.tsx`
+3. `ui/src/components/FloatingPoints.tsx`
+4. `.floating-points` styles in `ui/src/index.css`
+
+If the user reports that the floating points animation is "not visible", verify in this order:
+
+1. whether `.floating-points` is actually inserted into the DOM
+2. whether React state is being cleared too early
+3. whether the component is being remounted so the CSS animation restarts
+4. whether the overlay position is anchored near the intended UI element
 
 ## interview-mcp — State Machine & Tools
 
