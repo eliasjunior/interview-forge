@@ -13,6 +13,13 @@ function getModeLabel(session: Session): string {
   return "interview";
 }
 
+function getSessionTitle(session: Session): string {
+  if (session.problemTitle && session.problemTitle !== session.topic) {
+    return `${session.topic} — ${session.problemTitle}`;
+  }
+  return session.topic;
+}
+
 export function buildSessionLaunchPrompt(session: Session): SessionLaunchPrompt {
   const action = session.state === "ENDED" ? "review" : "start or resume";
   const modeLabel = getModeLabel(session);
@@ -24,7 +31,7 @@ export function buildSessionLaunchPrompt(session: Session): SessionLaunchPrompt 
 
   return {
     sessionId: session.id,
-    title: `${session.topic} — ${modeLabel}`,
+    title: `${getSessionTitle(session)} — ${modeLabel}`,
     prompt,
     nextTool: "get_session",
   };

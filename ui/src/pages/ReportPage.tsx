@@ -41,6 +41,13 @@ function extractProblemStatement(customContent: string): string | null {
   return match ? match[1].trim() : null
 }
 
+function getSessionLabel(session: Session): string {
+  if (session.problemTitle && session.problemTitle !== session.topic) {
+    return `${session.topic} · ${session.problemTitle}`
+  }
+  return session.topic
+}
+
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -172,7 +179,7 @@ export default function ReportPage() {
       {/* Header */}
       <div className="report-header">
         <div>
-          <div className="report-title">{session.topic}</div>
+          <div className="report-title">{getSessionLabel(session)}</div>
           <div className="report-meta-row">
             <span>{formatDate(session.createdAt)}</span>
             <span>·</span>

@@ -89,6 +89,7 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
     session: {
       id: session.id,
       topic: session.topic,
+      problemTitle: session.problemTitle,
       interviewType: session.interviewType,
       sessionKind: session.sessionKind,
       studyCategory: session.studyCategory,
@@ -145,6 +146,7 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
   return {
     id: rows.session.id,
     topic: rows.session.topic,
+    problemTitle: rows.session.problemTitle ?? undefined,
     interviewType: (rows.session.interviewType as InterviewType | null) ?? undefined,
     sessionKind: (rows.session.sessionKind as SessionKind | null) ?? undefined,
     studyCategory: (rows.session.studyCategory as StudyCategory | null) ?? undefined,

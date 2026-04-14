@@ -110,6 +110,7 @@ export const getSessions = (): Promise<Session[]> => req(`${BASE}/sessions`)
 
 export interface ScopedInterviewStartRequest {
   topic: string
+  problemTitle?: string
   content: string
   focus?: string
 }
@@ -118,6 +119,7 @@ export interface ScopedInterviewStartResponse {
   sessionId: string
   state: Session['state']
   topic: string
+  problemTitle?: string | null
   focusArea: string
   source: string
   parsed:

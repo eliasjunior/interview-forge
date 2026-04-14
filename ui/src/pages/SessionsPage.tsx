@@ -85,6 +85,13 @@ function getInterviewType(session: Session): string {
   return type === 'code' ? '💻 Code' : '🏗️ Design'
 }
 
+function getSessionLabel(session: Session): string {
+  if (session.problemTitle && session.problemTitle !== session.topic) {
+    return `${session.topic} · ${session.problemTitle}`
+  }
+  return session.topic
+}
+
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
@@ -173,7 +180,7 @@ function SessionCard({ session, onClick }: { session: Session; onClick: () => vo
 
   return (
     <div className={`card card-hover${isStudy ? ' study-card' : ''}`} onClick={onClick}>
-      <div className="session-card-topic">{session.topic}</div>
+      <div className="session-card-topic">{getSessionLabel(session)}</div>
 
       <div style={{ fontSize: '0.83rem', color: 'var(--muted)' }}>
         {formatDate(session.createdAt)}

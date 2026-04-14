@@ -4,6 +4,7 @@ import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlit
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
   topic: text("topic").notNull(),
+  problemTitle: text("problem_title"),
   interviewType: text("interview_type"),
   sessionKind: text("session_kind"),
   studyCategory: text("study_category"),

@@ -173,21 +173,26 @@ Business rules
     const handlers = captureTool(registerStartScopedInterviewTool, deps);
 
     const payload = parse(await handlers.get("start_scoped_interview")!({
-      topic: "String Rotation",
+      topic: "Linked Lists",
+      problemTitle: "Delete Middle Node",
       focus: "algorithmic reasoning and edge cases",
       content: "Assume you have a method isSubstring which checks if one word is a substring of another. Given two strings, s1 and s2, write code to check if s2 is a rotation of s1 using only one call to isSubstring.",
     }));
 
     assert.equal(payload.parsed.contentType, "algorithm");
-    assert.match(payload.normalizedContent, /# Study Scope: String Rotation/);
+    assert.equal(payload.problemTitle, "Delete Middle Node");
+    assert.match(payload.normalizedContent, /# Study Scope: Delete Middle Node/);
+    assert.match(payload.normalizedContent, /## Subject Area\nLinked Lists/);
     assert.match(payload.normalizedContent, /## Problem Statement/);
     assert.equal(payload.totalQuestions, 7);
     assert.match(payload.instruction, /if the candidate submits complete working code earlier/i);
 
     const session = sessions[payload.sessionId];
     assert.ok(session);
+    assert.equal(session.topic, "Linked Lists");
+    assert.equal(session.problemTitle, "Delete Middle Node");
     assert.match(session.customContent ?? "", /## Evaluation Criteria/);
     assert.match(session.customContent ?? "", /\*\*implementation\*\*/);
-    assert.match(session.questions.at(-1) ?? "", /Now implement String Rotation/);
+    assert.match(session.questions.at(-1) ?? "", /Now implement Delete Middle Node/);
   });
 });

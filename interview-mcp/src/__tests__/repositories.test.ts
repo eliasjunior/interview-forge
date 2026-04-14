@@ -174,6 +174,7 @@ function normalizeSession(session: Session | null) {
     ...session,
     seeded: session.seeded ?? false,
     customContent: session.customContent,
+    problemTitle: session.problemTitle,
     focusArea: session.focusArea,
     sessionKind: session.sessionKind,
     studyCategory: session.studyCategory,
@@ -224,7 +225,10 @@ describe("sqlite repositories", () => {
     const { sqlite, repositories } = setupRepositories();
 
     try {
-      const session = makeSession();
+      const session = makeSession({
+        topic: "Linked Lists",
+        problemTitle: "Delete Middle Node",
+      });
       const flashcard = makeFlashcard();
       const graph = makeGraph();
 

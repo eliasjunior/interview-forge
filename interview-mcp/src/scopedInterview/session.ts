@@ -17,6 +17,7 @@ type ParsedPayload =
 
 export interface ScopedInterviewBuildInput {
   topic: string;
+  problemTitle?: string;
   rawContent: string;
   generateId: () => string;
   focus?: string;
@@ -47,14 +48,19 @@ function inferScopedContentType(rawContent: string): "algorithm" | "api" {
   return looksLikeApiSpec(rawContent) ? "api" : "algorithm";
 }
 
-function buildAlgorithmScope(topic: string, rawContent: string, focus: string): string {
+function buildAlgorithmScope(topic: string, problemTitle: string | undefined, rawContent: string, focus: string): string {
   const trimmed = rawContent.trim();
   if (/^#\s+Study Scope:/i.test(trimmed) || /##\s+Problem Statement/i.test(trimmed)) {
     return trimmed;
   }
 
+  const problemLabel = problemTitle?.trim() || topic;
+
   return [
-    `# Study Scope: ${topic}`,
+    `# Study Scope: ${problemLabel}`,
+    "",
+    "## Subject Area",
+    topic,
     "",
     "## Focus Areas",
     "- recognizing the core problem pattern",
@@ -85,7 +91,7 @@ function buildAlgorithmScope(topic: string, rawContent: string, focus: string): 
     "- unrelated optimizations that do not change the core approach",
     "",
     "## Session Goal",
-    `Candidate can solve ${topic} with a clear explanation focused on ${focus}, then implement the solution correctly.`,
+    `Candidate can solve ${problemLabel} with a clear explanation focused on ${focus}, then implement the solution correctly.`,
     "",
     "## Problem Statement",
     trimmed,
@@ -94,6 +100,7 @@ function buildAlgorithmScope(topic: string, rawContent: string, focus: string): 
 
 export function createScopedInterviewSession({
   topic,
+  problemTitle,
   rawContent,
   generateId,
   focus = DEFAULT_FOCUS,
@@ -101,19 +108,22 @@ export function createScopedInterviewSession({
 }: ScopedInterviewBuildInput): ScopedInterviewBuildResult {
   const contentType = inferScopedContentType(rawContent);
   const isAlgorithm = contentType === "algorithm";
+  const trimmedProblemTitle = problemTitle?.trim() || undefined;
+  const promptLabel = trimmedProblemTitle ?? topic;
   const normalizedContent = isAlgorithm
-    ? buildAlgorithmScope(topic, rawContent, focus)
+    ? buildAlgorithmScope(topic, trimmedProblemTitle, rawContent, focus)
     : rawContent;
   const spec = isAlgorithm ? { endpoints: [], models: [], rules: [], notes: [] } : extractSpec(normalizedContent);
   const gaps = isAlgorithm ? [] : detectGaps(normalizedContent);
   const polished = isAlgorithm ? normalizedContent : polishContent(topic, normalizedContent, focus);
   const questions = isAlgorithm
-    ? buildAlgorithmQuestions(topic, normalizedContent, focus)
+    ? buildAlgorithmQuestions(promptLabel, normalizedContent, focus)
     : buildQuestions(topic, spec, gaps, focus);
 
   const session: Session = {
     id: generateId(),
     topic,
+    ...(trimmedProblemTitle && { problemTitle: trimmedProblemTitle }),
     interviewType: isAlgorithm ? "code" : "design",
     ...(isAlgorithm && { studyCategory: "algorithm" }),
     sessionKind: "interview",

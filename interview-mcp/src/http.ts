@@ -274,6 +274,9 @@ app.get("/api/sessions", (_req, res) => {
 
 app.post("/api/scoped-interviews", (req, res) => {
   const topic = typeof req.body?.topic === "string" ? req.body.topic.trim() : "";
+  const problemTitle = typeof req.body?.problemTitle === "string" && req.body.problemTitle.trim().length > 0
+    ? req.body.problemTitle.trim()
+    : undefined;
   const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
   const focus = typeof req.body?.focus === "string" && req.body.focus.trim().length > 0
     ? req.body.focus.trim()
@@ -291,6 +294,7 @@ app.post("/api/scoped-interviews", (req, res) => {
 
   const result = createScopedInterviewSession({
     topic,
+    problemTitle,
     rawContent: content,
     focus,
     generateId: () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -302,6 +306,7 @@ app.post("/api/scoped-interviews", (req, res) => {
     sessionId: result.session.id,
     state: result.session.state,
     topic: result.session.topic,
+    problemTitle: result.session.problemTitle ?? null,
     interviewType: result.session.interviewType,
     focusArea: result.focusArea,
     source: result.source,

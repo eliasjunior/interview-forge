@@ -35,6 +35,7 @@ export class SQLiteSessionRepository implements SessionRepository {
         target: sessions.id,
         set: {
           topic: record.session.topic,
+          problemTitle: record.session.problemTitle,
           interviewType: record.session.interviewType,
           sessionKind: record.session.sessionKind,
           studyCategory: record.session.studyCategory,
@@ -72,6 +73,7 @@ export class SQLiteSessionRepository implements SessionRepository {
           target: sessions.id,
           set: {
             topic: record.session.topic,
+            problemTitle: record.session.problemTitle,
             interviewType: record.session.interviewType,
             sessionKind: record.session.sessionKind,
             studyCategory: record.session.studyCategory,

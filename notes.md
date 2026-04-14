@@ -1,5 +1,5 @@
 
-pesudo code
+pseudo code
 
 find kth(k) {
 

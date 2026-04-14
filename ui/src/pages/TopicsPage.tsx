@@ -168,6 +168,7 @@ type TopicAction = {
 
 type CustomInterviewDraft = {
   topic: string
+  problemTitle: string
   focus: string
   content: string
 }
@@ -358,7 +359,7 @@ function CustomInterviewModal({
         <div className="graph-modal-header">
           <div>
             <h2 className="topics-plan-title">Start Interview With Content</h2>
-            <p className="topics-plan-subtitle">Paste an algorithm prompt, project spec, or architecture note. The backend will normalize it into scoped interview context before creating the session.</p>
+            <p className="topics-plan-subtitle">Paste an algorithm prompt, project spec, or architecture note. For algorithms, use Topic for the broader subject and Problem for the exact challenge.</p>
           </div>
           <button className="btn-back" onClick={onClose}>✕ Close</button>
         </div>
@@ -370,7 +371,18 @@ function CustomInterviewModal({
               className="custom-interview-input"
               value={draft.topic}
               onChange={(event) => onChange({ ...draft, topic: event.target.value })}
-              placeholder="String Rotation"
+              placeholder="Linked Lists"
+              disabled={busy}
+            />
+          </label>
+
+          <label className="custom-interview-field">
+            <span className="custom-interview-label">Problem</span>
+            <input
+              className="custom-interview-input"
+              value={draft.problemTitle}
+              onChange={(event) => onChange({ ...draft, problemTitle: event.target.value })}
+              placeholder="Delete Middle Node"
               disabled={busy}
             />
           </label>
@@ -655,6 +667,7 @@ export default function TopicsPage() {
   function openCustomInterview(topic = '') {
     setCustomInterviewDraft({
       topic,
+      problemTitle: '',
       focus: 'algorithmic reasoning, edge cases, and complexity trade-offs',
       content: '',
     })
@@ -699,6 +712,7 @@ export default function TopicsPage() {
       setCustomInterviewError(null)
       const created = await createScopedInterview({
         topic: customInterviewDraft.topic,
+        problemTitle: customInterviewDraft.problemTitle.trim() || undefined,
         focus: customInterviewDraft.focus,
         content: customInterviewDraft.content,
       })
@@ -706,7 +720,7 @@ export default function TopicsPage() {
         ...prev,
         {
           id: `${created.sessionId}-created`,
-          message: `Created ${created.detectedContentType} interview: ${created.topic}`,
+          message: `Created ${created.detectedContentType} interview: ${created.problemTitle ?? created.topic}`,
           level: 1,
         },
       ])

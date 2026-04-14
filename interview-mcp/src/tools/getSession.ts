@@ -14,6 +14,8 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
       const instruction =
         session.interviewType === "code"
           ? "This is a CODE interview session (algorithm problem). " +
+            `Topic/category: "${session.topic}". ` +
+            (session.problemTitle ? `Concrete problem: "${session.problemTitle}". ` : "") +
             "The problem is in customContent under '## Problem Statement'. " +
             "Flow: (1) present the problem to the candidate, (2) ask them to explain their approach before coding, " +
             "(3) probe pattern recognition, time/space complexity, and edge cases, " +

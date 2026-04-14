@@ -98,6 +98,8 @@ export interface Concept {
 export interface Session {
   id: string
   topic: string
+  /** Optional narrower problem label within the broader topic/category, e.g. topic="Linked Lists", problemTitle="Delete Middle Node". */
+  problemTitle?: string
   /** Interview type — 'design' (default) or 'code' (future). Absent on legacy sessions → treat as 'design'. */
   interviewType?: InterviewType
   sessionKind?: SessionKind
