@@ -76,13 +76,13 @@ function getSessionKind(session: Session): SessionKind {
   return session.sessionKind ?? 'interview'
 }
 
-function getStudyCategory(session: Session): 'topic' | 'algorithm' {
-  return session.studyCategory ?? 'topic'
-}
-
 function getInterviewType(session: Session): string {
   const type = session.interviewType ?? 'design'
   return type === 'code' ? '💻 Code' : '🏗️ Design'
+}
+
+function isCodeStyleSession(session: Session): boolean {
+  return (session.interviewType ?? 'design') === 'code'
 }
 
 function getSessionLabel(session: Session): string {
@@ -173,9 +173,9 @@ function SessionCard({ session, onClick }: { session: Session; onClick: () => vo
   const avg = calcAvg(session)
   const isEnded = session.state === 'ENDED'
   const isStudy = getSessionKind(session) === 'study'
-  const studyCategory = getStudyCategory(session)
+  const isCodeStyle = isCodeStyleSession(session)
   const detail = isStudy
-    ? `${session.questions.length} study prompts · ${studyCategory === 'algorithm' ? 'algorithm walkthrough' : 'topic notes'}`
+    ? `${session.questions.length} prompts · ${isCodeStyle ? 'algorithm walkthrough' : 'design notes'}`
     : `${session.evaluations.length} of ${session.questions.length} questions answered`
 
   return (
@@ -193,11 +193,11 @@ function SessionCard({ session, onClick }: { session: Session; onClick: () => vo
       <div className="session-card-meta">
         <ScoreBadge score={avg} />
         <span className={`tag ${isStudy ? 'tag-study' : isEnded ? 'tag-ended' : 'tag-active'}`}>
-          {isStudy ? 'Study' : isEnded ? '✓ Completed' : '⏳ In progress'}
+          {isStudy ? 'Design' : isEnded ? '✓ Completed' : '⏳ In progress'}
         </span>
         {isStudy && (
-          <span className={`tag ${studyCategory === 'algorithm' ? 'tag-algorithm' : 'tag-topic'}`}>
-            {studyCategory === 'algorithm' ? 'Algorithm' : 'Topic'}
+          <span className={`tag ${isCodeStyle ? 'tag-algorithm' : 'tag-topic'}`}>
+            {isCodeStyle ? 'Algorithm' : 'Design'}
           </span>
         )}
         {!isStudy && (

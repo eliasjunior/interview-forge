@@ -32,13 +32,13 @@ function getSessionKind(session: Session): SessionKind {
   return session.sessionKind ?? 'interview'
 }
 
-function getStudyCategory(session: Session): 'topic' | 'algorithm' {
-  return session.studyCategory ?? 'topic'
-}
-
 function extractProblemStatement(customContent: string): string | null {
   const match = customContent.match(/##\s+Problem Statement\s*\n([\s\S]+?)(?=\n##|$)/i)
   return match ? match[1].trim() : null
+}
+
+function isCodeStyleSession(session: Session): boolean {
+  return (session.interviewType ?? 'design') === 'code'
 }
 
 function getSessionLabel(session: Session): string {
@@ -124,7 +124,7 @@ export default function ReportPage() {
 
   const avg = calcAvg(session.evaluations)
   const isStudy = getSessionKind(session) === 'study'
-  const isAlgorithmStudy = isStudy && getStudyCategory(session) === 'algorithm'
+  const isAlgorithmStudy = isStudy && isCodeStyleSession(session)
   const isCodeInterview = session.interviewType === 'code'
   const problemStatement = isCodeInterview && session.customContent
     ? extractProblemStatement(session.customContent)
@@ -186,11 +186,11 @@ export default function ReportPage() {
             <span>ID: <code style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>{session.id}</code></span>
             <span>·</span>
             <span className={`tag ${isStudy ? 'tag-study' : session.state === 'ENDED' ? 'tag-ended' : 'tag-active'}`}>
-              {isStudy ? 'Study Session' : session.state === 'ENDED' ? '✓ Completed' : '⏳ In progress'}
+              {isStudy ? 'Design Session' : session.state === 'ENDED' ? '✓ Completed' : '⏳ In progress'}
             </span>
             {isStudy && (
               <span className={`tag ${isAlgorithmStudy ? 'tag-algorithm' : 'tag-topic'}`}>
-                {isAlgorithmStudy ? 'Algorithm' : 'Topic'}
+                {isAlgorithmStudy ? 'Algorithm' : 'Design'}
               </span>
             )}
             {isCodeInterview && (
@@ -270,10 +270,10 @@ export default function ReportPage() {
           {isStudy && (
             <div className="study-summary-box" style={{ marginBottom: 24 }}>
               <div className="page-subtitle" style={{ marginBottom: 8 }}>
-                {isAlgorithmStudy ? 'Algorithm study note' : 'Study note'}
+                {isAlgorithmStudy ? 'Algorithm design note' : 'Design note'}
               </div>
               <div className="qa-section-text">
-                {session.summary ?? 'Seeded study session with prompts and concepts, but no interview transcript yet.'}
+                {session.summary ?? 'Seeded design session with prompts and concepts, but no interview transcript yet.'}
               </div>
               {(session.sourcePath || session.seeded) && (
                 <div className="study-source-meta">
@@ -331,14 +331,14 @@ export default function ReportPage() {
           )}
 
           {!session.summary && (!session.concepts || session.concepts.length === 0) && (
-            <div className="empty-state">
-              <div className="empty-state-icon">📋</div>
-              <div className="empty-state-msg">
-                {isStudy
-                  ? 'Study session has no summary or concepts yet.'
-                  : 'Session not yet finalized — complete the interview to see the overview.'}
+              <div className="empty-state">
+                <div className="empty-state-icon">📋</div>
+                <div className="empty-state-msg">
+                  {isStudy
+                    ? 'Design session has no summary or concepts yet.'
+                    : 'Session not yet finalized — complete the interview to see the overview.'}
+                </div>
               </div>
-            </div>
           )}
         </div>
       )}
@@ -350,7 +350,7 @@ export default function ReportPage() {
             session.questions.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">🧠</div>
-                <div className="empty-state-msg">No study prompts yet.</div>
+                <div className="empty-state-msg">No design prompts yet.</div>
               </div>
             ) : (
               session.questions.map((question, idx) => (
@@ -460,7 +460,7 @@ function StudyPromptCard({ idx, question, open, onToggle }: {
             <div className="qa-section-text">{question}</div>
           </div>
           <div className="study-callout">
-            This is a seeded study prompt. No interview transcript or scoring has been recorded for this session yet.
+            This is a seeded design prompt. No interview transcript or scoring has been recorded for this session yet.
           </div>
         </div>
       )}

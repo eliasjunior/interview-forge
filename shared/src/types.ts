@@ -15,6 +15,7 @@ export type InterviewState =
   | 'ENDED'
 
 export type SessionKind = 'interview' | 'study' | 'drill' | 'warmup'
+/** @deprecated Use interviewType to distinguish design vs code sessions. */
 export type StudyCategory = 'topic' | 'algorithm'
 export type InterviewType = 'design' | 'code'
 
@@ -103,6 +104,7 @@ export interface Session {
   /** Interview type — 'design' (default) or 'code' (future). Absent on legacy sessions → treat as 'design'. */
   interviewType?: InterviewType
   sessionKind?: SessionKind
+  /** @deprecated Use interviewType to distinguish design vs code sessions. */
   studyCategory?: StudyCategory
   sourcePath?: string
   sourceType?: 'markdown' | 'java'

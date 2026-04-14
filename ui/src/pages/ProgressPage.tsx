@@ -565,7 +565,7 @@ function defaultRecentSummary(weakCount: number, followUpCount: number): string 
 function formatSessionKind(kind: SessionKind): string {
   if (kind === 'warmup') return 'Warm-up'
   if (kind === 'drill') return 'Drill'
-  if (kind === 'study') return 'Study'
+  if (kind === 'study') return 'Design'
   return 'Interview'
 }
 

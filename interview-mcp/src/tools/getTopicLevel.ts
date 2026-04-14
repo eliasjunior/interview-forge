@@ -416,7 +416,7 @@ function buildRewardCopy(
       title: "No ladder progress",
       message: session.sessionKind === "drill"
         ? "Drill sessions sharpen recall but do not change the topic ladder."
-        : "Study sessions do not count toward topic level progression.",
+        : "Design sessions do not count toward topic level progression.",
       whyNoProgress: session.sessionKind === "drill"
         ? "This session helps reinforcement, but only warm-ups and full interviews move the topic ladder."
         : "The topic ladder only advances through warm-up passes and full interview performance.",

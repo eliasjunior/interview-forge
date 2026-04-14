@@ -125,7 +125,6 @@ export function createScopedInterviewSession({
     topic,
     ...(trimmedProblemTitle && { problemTitle: trimmedProblemTitle }),
     interviewType: isAlgorithm ? "code" : "design",
-    ...(isAlgorithm && { studyCategory: "algorithm" }),
     sessionKind: "interview",
     state: "ASK_QUESTION",
     currentQuestionIndex: 0,
