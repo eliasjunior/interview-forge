@@ -23,9 +23,31 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
             "(5) after a complete solution plus complexity, ask at most one problem-aware follow-up if it adds value; otherwise finish, " +
             "(6) do not continue through extra scripted questions once the solution phase is complete, " +
             "(7) end_interview when done. Do NOT run a system-design or API-design interview."
-          : undefined;
+          : "Keep the interview immersive. Ask the question first, then offer answer style naturally. " +
+            "After evaluation, adapt the amount of explanation to the answer mode: " +
+            "brief mode = 2-3 tight sentences plus one focused follow-up, " +
+            "bullets mode = compact structured correction, " +
+            "deep_dive mode = fuller explanation is fine. " +
+            "Do not expose tool chatter or internal workflow details to the candidate.";
 
-      const payload = instruction ? { ...session, instruction } : session;
+      const lastEval = session.evaluations[session.evaluations.length - 1];
+      const activeFollowUp =
+        session.state === "FOLLOW_UP" && lastEval?.needsFollowUp && lastEval.followUpQuestion
+          ? {
+              question: lastEval.followUpQuestion,
+              type: lastEval.followUpType ?? null,
+              focus: lastEval.followUpFocus ?? null,
+              rationale: lastEval.followUpRationale ?? null,
+            }
+          : null;
+
+      const payload = instruction || activeFollowUp
+        ? {
+            ...session,
+            instruction,
+            activeFollowUp,
+          }
+        : session;
       return { content: [{ type: "text" as const, text: JSON.stringify(payload) }] };
     }
   );

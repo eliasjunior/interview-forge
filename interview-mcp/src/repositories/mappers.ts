@@ -135,6 +135,9 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       feedback: evaluation.feedback,
       needsFollowUp: evaluation.needsFollowUp,
       followUpQuestion: evaluation.followUpQuestion,
+      followUpType: evaluation.followUpType ?? null,
+      followUpFocus: evaluation.followUpFocus ?? null,
+      followUpRationale: evaluation.followUpRationale ?? null,
       deeperDive: evaluation.deeperDive,
     })),
     concepts: normalizedConcepts.map((concept) => ({
@@ -186,6 +189,9 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
         feedback: row.feedback,
         needsFollowUp: row.needsFollowUp,
         followUpQuestion: row.followUpQuestion ?? undefined,
+        followUpType: row.followUpType as Session["evaluations"][number]["followUpType"] | undefined,
+        followUpFocus: row.followUpFocus ?? undefined,
+        followUpRationale: row.followUpRationale ?? undefined,
         deeperDive: row.deeperDive ?? undefined,
       })),
     concepts: rows.concepts.length

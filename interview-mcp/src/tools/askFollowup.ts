@@ -33,7 +33,14 @@ export function registerAskFollowupTool(server: McpServer, deps: ToolDeps) {
             sessionId,
             state: session.state,
             followUpQuestion: followUp,
+            followUpType: lastEval?.followUpType ?? null,
+            followUpFocus: lastEval?.followUpFocus ?? null,
+            followUpRationale: lastEval?.followUpRationale ?? null,
             nextTool: "submit_answer",
+            instruction:
+              lastEval?.followUpFocus
+                ? `Keep this follow-up tight. Probe only the identified gap: ${lastEval.followUpFocus}.`
+                : "Keep this follow-up tight and focused on one missing gap from the previous answer.",
           }),
         }],
       };

@@ -70,6 +70,9 @@ export const sessionEvaluations = sqliteTable(
     feedback: text("feedback").notNull(),
     needsFollowUp: integer("needs_follow_up", { mode: "boolean" }).notNull(),
     followUpQuestion: text("follow_up_question"),
+    followUpType: text("follow_up_type"),
+    followUpFocus: text("follow_up_focus"),
+    followUpRationale: text("follow_up_rationale"),
     deeperDive: text("deeper_dive"),
   },
   (table) => ({

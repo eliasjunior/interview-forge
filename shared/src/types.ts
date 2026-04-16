@@ -19,6 +19,14 @@ export type SessionKind = 'interview' | 'study' | 'drill' | 'warmup'
 export type StudyCategory = 'topic' | 'algorithm'
 export type InterviewType = 'design' | 'code'
 export type AnswerMode = 'brief' | 'bullets' | 'deep_dive'
+export type FollowUpType =
+  | 'missing_concept'
+  | 'vague_tradeoff'
+  | 'no_example'
+  | 'shallow_failure_mode'
+  | 'code_complexity'
+  | 'problem_aware'
+  | 'generic'
 
 // ── Warm-up quest levels ───────────────────────────────────────────────────────
 
@@ -90,6 +98,9 @@ export interface Evaluation {
   feedback: string
   needsFollowUp: boolean
   followUpQuestion?: string
+  followUpType?: FollowUpType
+  followUpFocus?: string
+  followUpRationale?: string
   deeperDive?: string     // markdown bullets: "where to go deeper"
 }
 

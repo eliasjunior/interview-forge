@@ -31,6 +31,8 @@ export function buildSessionLaunchPrompt(session: Session): SessionLaunchPrompt 
     "Do not ask the candidate to choose a mode before they see the question.",
     "Avoid mechanical UI-style wording like 'Answer modes:'. Prefer natural interviewer phrasing such as 'You can answer briefly, in bullets, or go deep if you prefer.'",
     "When you call submit_answer, always pass the chosen answerMode so evaluation stays fair for concise answers.",
+    "After evaluate_answer, keep candidate-facing feedback mode-aware: for brief mode use at most 2-3 sentences plus one focused follow-up; for bullets mode keep the correction compact and structured; for deep_dive mode fuller explanation is fine.",
+    "Do not expose tool chatter like tool counts or internal step labels to the candidate.",
   ].join(" ");
 
   return {

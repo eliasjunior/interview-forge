@@ -17,6 +17,7 @@ import { registerSubmitAnswerTool } from "../tools/submitAnswer.js";
 import { registerEvaluateAnswerTool } from "../tools/evaluateAnswer.js";
 import { registerAskFollowupTool } from "../tools/askFollowup.js";
 import { registerNextQuestionTool } from "../tools/nextQuestion.js";
+import { registerGetSessionTool } from "../tools/getSession.js";
 import type { ToolDeps } from "../tools/deps.js";
 import type { KnowledgeStore, KnowledgeTopic } from "../knowledge/port.js";
 
@@ -696,8 +697,120 @@ describe("evaluateAnswer — uses session.questionCriteria", () => {
     assert.equal(calls[0].answerMode, "brief");
     assert.match(calls[0].context ?? "", /brief mode/i);
     assert.equal(res.answerMode, "brief");
+    assert.match(res.candidateDeliveryGuidance, /2-3 tight sentences/i);
     assert.equal(store.get("eval-mode").evaluations[0].answerMode, "brief");
     assert.equal(store.get("eval-mode").pendingAnswerMode, undefined);
+  });
+
+  test("classifies follow-up metadata for trade-off gaps", async () => {
+    const store = makeSessionStore({
+      "eval-followup-type": {
+        id: "eval-followup-type",
+        topic: TOPIC,
+        state: "EVALUATE_ANSWER",
+        currentQuestionIndex: 0,
+        questions: [MOCK_ENTRY.questions[0]],
+        questionCriteria: [MOCK_ENTRY.evaluationCriteria[0]],
+        messages: [
+          { role: "interviewer", content: MOCK_ENTRY.questions[0], timestamp: new Date().toISOString() },
+          { role: "candidate", content: "I would paginate the endpoint.", timestamp: new Date().toISOString() },
+        ],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
+
+    const res = parse(await evaluate({
+      sessionId: "eval-followup-type",
+      score: 3,
+      feedback: "Reasonable start, but you did not justify the main trade-off.",
+      needsFollowUp: true,
+      followUpQuestion: "What trade-off are you making between simplicity and consistency here?",
+    }));
+
+    assert.equal(res.followUpType, "vague_tradeoff");
+    assert.match(res.followUpFocus, /trade-off/i);
+    assert.match(res.followUpRationale, /decision boundary|trade-off|justify/i);
+    assert.equal(store.get("eval-followup-type").evaluations[0].followUpType, "vague_tradeoff");
+  });
+});
+
+describe("follow-up metadata surfaces through the loop", () => {
+  test("ask_followup returns structured follow-up context", async () => {
+    const store = makeSessionStore({
+      "followup-1": {
+        id: "followup-1",
+        topic: TOPIC,
+        state: "FOLLOW_UP",
+        currentQuestionIndex: 0,
+        questions: [MOCK_ENTRY.questions[0]],
+        messages: [],
+        evaluations: [
+          {
+            questionIndex: 0,
+            question: MOCK_ENTRY.questions[0],
+            answer: "I would paginate the endpoint.",
+            score: 3,
+            feedback: "Reasonable start, but you did not justify the main trade-off.",
+            needsFollowUp: true,
+            followUpQuestion: "What trade-off are you making between simplicity and consistency here?",
+            followUpType: "vague_tradeoff",
+            followUpFocus: "the main trade-off and why this design is preferable",
+            followUpRationale: "The answer named an approach but did not make the decision boundary explicit enough.",
+          },
+        ],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const followup = captureHandler(registerAskFollowupTool, deps);
+
+    const res = parse(await followup({ sessionId: "followup-1" }));
+
+    assert.equal(res.followUpType, "vague_tradeoff");
+    assert.match(res.followUpFocus, /trade-off/i);
+    assert.match(res.instruction, /identified gap/i);
+  });
+
+  test("get_session exposes active follow-up context when waiting to ask it", async () => {
+    const store = makeSessionStore({
+      "followup-ctx": {
+        id: "followup-ctx",
+        topic: TOPIC,
+        state: "FOLLOW_UP",
+        currentQuestionIndex: 0,
+        questions: [MOCK_ENTRY.questions[0]],
+        messages: [],
+        evaluations: [
+          {
+            questionIndex: 0,
+            question: MOCK_ENTRY.questions[0],
+            answer: "I would paginate the endpoint.",
+            score: 3,
+            feedback: "Reasonable start, but you did not justify the main trade-off.",
+            needsFollowUp: true,
+            followUpQuestion: "What trade-off are you making between simplicity and consistency here?",
+            followUpType: "vague_tradeoff",
+            followUpFocus: "the main trade-off and why this design is preferable",
+            followUpRationale: "The answer named an approach but did not make the decision boundary explicit enough.",
+          },
+        ],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const getSession = captureHandler(registerGetSessionTool, deps);
+
+    const res = parse(await getSession({ sessionId: "followup-ctx" }));
+
+    assert.equal(res.activeFollowUp.type, "vague_tradeoff");
+    assert.equal(res.activeFollowUp.question, "What trade-off are you making between simplicity and consistency here?");
+    assert.match(res.activeFollowUp.focus, /trade-off/i);
   });
 });
 

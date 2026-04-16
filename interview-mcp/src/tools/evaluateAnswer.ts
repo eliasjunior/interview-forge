@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { AnswerMode, Evaluation } from "@mock-interview/shared";
+import type { AnswerMode, Evaluation, FollowUpType, Session } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
@@ -16,6 +16,103 @@ function getAnswerModeGuidance(answerMode: AnswerMode): string {
     return "Candidate chose bullets mode: judge them on structured coverage and clear key points, not paragraph flow.";
   }
   return "Candidate chose deep_dive mode: expect fuller depth, trade-offs, examples, and edge cases.";
+}
+
+function getCandidateDeliveryGuidance(answerMode: AnswerMode, hasFollowUp: boolean): string {
+  if (answerMode === "brief") {
+    return hasFollowUp
+      ? "Respond to the candidate in 2-3 tight sentences: name the main mistake, give the corrected concept, then ask one focused follow-up."
+      : "Respond to the candidate in 1-2 tight sentences: name the main mistake or success and the corrected concept.";
+  }
+  if (answerMode === "bullets") {
+    return hasFollowUp
+      ? "Respond with 2-4 compact bullets, then ask one focused follow-up."
+      : "Respond with 2-4 compact bullets. Keep the correction structured and brief.";
+  }
+  return hasFollowUp
+    ? "A fuller explanation is acceptable here, but keep it focused before asking one follow-up."
+    : "A fuller explanation is acceptable here, but keep it focused on the highest-value correction.";
+}
+
+function normalizeLower(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function buildFollowUpMetadata(
+  session: Session,
+  question: string,
+  answer: string,
+  feedback: string,
+  followUpQuestion?: string,
+): Pick<Evaluation, "followUpType" | "followUpFocus" | "followUpRationale"> {
+  const followUp = normalizeLower(followUpQuestion);
+  const answerText = normalizeLower(answer);
+  const feedbackText = normalizeLower(feedback);
+  const questionText = normalizeLower(question);
+
+  if (isComplexityFollowUpQuestion(followUpQuestion ?? "")) {
+    return {
+      followUpType: "code_complexity",
+      followUpFocus: "time and space complexity",
+      followUpRationale: "The candidate submitted code without quantifying complexity bounds.",
+    };
+  }
+
+  if (session.interviewType === "code" && followUpQuestion?.trim()) {
+    return {
+      followUpType: "problem_aware",
+      followUpFocus: session.problemTitle?.trim() || session.topic,
+      followUpRationale: "The candidate finished the main solution, so the loop is using one focused problem-aware follow-up instead of another scripted question.",
+    };
+  }
+
+  if (
+    /trade-?off|why|choose|prefer|versus|vs\b|cost/.test(followUp) ||
+    /trade-?off|too generic|didn'?t justify|did not justify/.test(feedbackText)
+  ) {
+    return {
+      followUpType: "vague_tradeoff",
+      followUpFocus: "the main trade-off and why this design is preferable",
+      followUpRationale: "The answer named an approach but did not make the decision boundary or trade-off explicit enough.",
+    };
+  }
+
+  if (
+    /example|scenario|concrete|real[- ]world|walk me through/.test(followUp) ||
+    (/example|scenario/.test(feedbackText) && !/example|scenario/.test(answerText))
+  ) {
+    return {
+      followUpType: "no_example",
+      followUpFocus: "one concrete example or scenario",
+      followUpRationale: "The answer stayed abstract and needs one specific example to prove understanding.",
+    };
+  }
+
+  if (
+    /failure|edge case|under load|timeout|retry|fallback|resilien|incident|outage|stale/.test(followUp) ||
+    /edge case|failure mode|resilien|under load/.test(questionText) ||
+    /edge case|failure mode|resilien|under load/.test(feedbackText)
+  ) {
+    return {
+      followUpType: "shallow_failure_mode",
+      followUpFocus: "the main failure mode or edge case",
+      followUpRationale: "The answer needs deeper reasoning about what breaks under pressure and how the design responds.",
+    };
+  }
+
+  if (followUpQuestion?.trim()) {
+    return {
+      followUpType: "missing_concept",
+      followUpFocus: "the missing core concept from the previous answer",
+      followUpRationale: "The answer was directionally correct but left out a key concept that the follow-up should isolate.",
+    };
+  }
+
+  return {
+    followUpType: "generic",
+    followUpFocus: undefined,
+    followUpRationale: undefined,
+  };
 }
 
 function parseMcqAnswer(answer: string, choiceCount: number): string[] {
@@ -282,6 +379,19 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         }
       }
 
+      if (evaluation.needsFollowUp && evaluation.followUpQuestion) {
+        Object.assign(
+          evaluation,
+          buildFollowUpMetadata(
+            session,
+            lastQuestion.content,
+            lastAnswer.content,
+            result.feedback,
+            evaluation.followUpQuestion,
+          ),
+        );
+      }
+
       session.evaluations.push(evaluation);
       session.pendingAnswerMode = undefined;
       if (earlyCompletionDetected && session.interviewType === "code") {
@@ -302,6 +412,10 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             strongAnswer: resolvedStrongAnswer ?? null,
             needsFollowUp: evaluation.needsFollowUp,
             followUpQuestion: evaluation.followUpQuestion ?? null,
+            followUpType: evaluation.followUpType ?? null,
+            followUpFocus: evaluation.followUpFocus ?? null,
+            followUpRationale: evaluation.followUpRationale ?? null,
+            candidateDeliveryGuidance: getCandidateDeliveryGuidance(answerMode, evaluation.needsFollowUp),
             earlyCompletionDetected,
             nextTool: earlyCompletionDetected
               ? "end_interview"
