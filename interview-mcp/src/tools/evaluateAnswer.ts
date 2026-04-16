@@ -1,11 +1,22 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Evaluation } from "@mock-interview/shared";
+import type { AnswerMode, Evaluation } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
 const CODE_COMPLEXITY_FOLLOW_UP =
   "Before we wrap, quantify your solution: what are the time and space complexities, and why do those bounds hold?";
+const DEFAULT_ANSWER_MODE: AnswerMode = "deep_dive";
+
+function getAnswerModeGuidance(answerMode: AnswerMode): string {
+  if (answerMode === "brief") {
+    return "Candidate chose brief mode: judge them on concise correctness and one solid trade-off, not essay length.";
+  }
+  if (answerMode === "bullets") {
+    return "Candidate chose bullets mode: judge them on structured coverage and clear key points, not paragraph flow.";
+  }
+  return "Candidate chose deep_dive mode: expect fuller depth, trade-offs, examples, and edge cases.";
+}
 
 function parseMcqAnswer(answer: string, choiceCount: number): string[] {
   const normalised = answer.trim().toUpperCase();
@@ -139,6 +150,7 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
 
       const lastQuestion = deps.findLast(session.messages, (m) => m.role === "interviewer");
       const lastAnswer = deps.findLast(session.messages, (m) => m.role === "candidate");
+      const answerMode = session.pendingAnswerMode ?? DEFAULT_ANSWER_MODE;
 
       if (!lastQuestion || !lastAnswer) {
         return deps.stateError("No question/answer pair found to evaluate.");
@@ -195,13 +207,16 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             (session.focusArea ? `\n\nInterview focus: ${session.focusArea}` : "")
           : undefined;
 
-        const context = knowledgeCriteria ?? scopedContext;
-        result = await deps.ai.evaluateAnswer(lastQuestion.content, lastAnswer.content, context);
+        const contextBase = knowledgeCriteria ?? scopedContext;
+        const context = contextBase
+          ? `${contextBase}\n\nAnswer mode guidance:\n${getAnswerModeGuidance(answerMode)}`
+          : `Answer mode guidance:\n${getAnswerModeGuidance(answerMode)}`;
+        result = await deps.ai.evaluateAnswer(lastQuestion.content, lastAnswer.content, context, answerMode);
       } else {
         if (score === undefined || feedback === undefined || needsFollowUp === undefined) {
           return deps.stateError(
             "AI is disabled (AI_ENABLED=false). Provide score, feedback, and needsFollowUp. " +
-            "Evaluate the answer against the evaluationCriteria returned by ask_question."
+            "Evaluate the answer against the evaluationCriteria returned by ask_question and the answer mode guidance."
           );
         }
         result = { score, feedback, strongAnswer, needsFollowUp, followUpQuestion };
@@ -219,6 +234,7 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         questionIndex: session.currentQuestionIndex,
         question: lastQuestion.content,
         answer: lastAnswer.content,
+        answerMode,
         strongAnswer: resolvedStrongAnswer,
         score: result.score,
         feedback: result.feedback,
@@ -267,6 +283,7 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
       }
 
       session.evaluations.push(evaluation);
+      session.pendingAnswerMode = undefined;
       if (earlyCompletionDetected && session.interviewType === "code") {
         session.currentQuestionIndex = session.questions.length - 1;
       }
@@ -279,6 +296,7 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
           text: JSON.stringify({
             sessionId,
             state: session.state,
+            answerMode,
             score: result.score,
             feedback: result.feedback,
             strongAnswer: resolvedStrongAnswer ?? null,

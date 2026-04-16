@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AIProvider } from "./port.js";
-import type { Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
+import type { AnswerMode, Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
 import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -49,9 +49,17 @@ function fallbackQuestions(topic: string): string[] {
   return FALLBACK_QUESTIONS.map((t) => t.replace(/{topic}/g, topic));
 }
 
-function fallbackEvaluate(answer: string): EvaluationResult {
+function fallbackEvaluate(answer: string, answerMode: AnswerMode = "deep_dive"): EvaluationResult {
   const words = answer.trim().split(/\s+/).length;
-  const score = words < 10 ? 1 : words < 30 ? 2 : words < 60 ? 3 : words < 100 ? 4 : 5;
+  const bulletLines = answer
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^[-*]\s+|^\d+\.\s+/.test(line)).length;
+  const score = answerMode === "brief"
+    ? words < 6 ? 1 : words < 14 ? 2 : words < 30 ? 3 : words < 55 ? 4 : 5
+    : answerMode === "bullets"
+    ? bulletLines >= 4 ? (words < 18 ? 3 : words < 45 ? 4 : 5) : words < 12 ? 2 : words < 30 ? 3 : 4
+    : words < 10 ? 1 : words < 30 ? 2 : words < 60 ? 3 : words < 100 ? 4 : 5;
   const feedbacks: Record<number, string> = {
     1: "Too brief — needs significant expansion.",
     2: "Partial — missing important concepts.",
@@ -67,9 +75,25 @@ function fallbackEvaluate(answer: string): EvaluationResult {
       answer,
     }),
     needsFollowUp: score <= 3,
-    followUpQuestion: score <= 3 ? "Can you elaborate further and give a concrete example?" : undefined,
+    followUpQuestion: score <= 3
+      ? answerMode === "brief"
+        ? "Keep it concise, but add the key trade-off or example you left out."
+        : answerMode === "bullets"
+        ? "Add the missing points as bullets, especially the trade-off or failure mode."
+        : "Can you elaborate further and give a concrete example?"
+      : undefined,
     deeperDive: undefined, // fallback — no AI available to generate deeper dive
   };
+}
+
+function buildAnswerModeGuidance(answerMode: AnswerMode): string {
+  if (answerMode === "brief") {
+    return "The candidate intentionally chose brief mode. Reward a concise direct answer if it hits the core decision and one meaningful trade-off. Do not require essay-level detail.";
+  }
+  if (answerMode === "bullets") {
+    return "The candidate intentionally chose bullets mode. Reward structured coverage in bullet form. Do not penalize the absence of prose if the key points are present.";
+  }
+  return "The candidate chose deep_dive mode. Expect fuller reasoning, trade-offs, examples, and edge cases.";
 }
 
 function fallbackConcepts(topic: string, transcript: string): Concept[] {
@@ -135,10 +159,11 @@ Return only a JSON array of strings, e.g. ["Q1", "Q2", "Q3", "Q4", "Q5"]`,
 
   // ── evaluateAnswer ─────────────────────────────────────────────────────────
 
-  async evaluateAnswer(question: string, answer: string, context?: string): Promise<EvaluationResult> {
+  async evaluateAnswer(question: string, answer: string, context?: string, answerMode: AnswerMode = "deep_dive"): Promise<EvaluationResult> {
     const criteriaBlock = context
       ? `\n\nEvaluation criteria for this question:\n${context}`
       : "";
+    const answerModeGuidance = buildAnswerModeGuidance(answerMode);
     try {
       const response = await this.client.messages.create({
         model: MODEL,
@@ -146,10 +171,14 @@ Return only a JSON array of strings, e.g. ["Q1", "Q2", "Q3", "Q4", "Q5"]`,
         system: `You are a strict but fair technical interviewer evaluating a candidate's answer.
 Score honestly. Most answers deserve a 3. Only exceptional ones get 5.
 When evaluation criteria are provided, use them as ground truth for scoring.
+Adjust your expectations to the candidate's answer mode.
 Respond with a JSON object only — no markdown, no extra text.`,
         messages: [{
           role: "user",
           content: `Question: ${question}
+
+Candidate answer mode: ${answerMode}
+Mode guidance: ${answerModeGuidance}
 
 Candidate answer: ${answer}${criteriaBlock}
 
@@ -177,7 +206,7 @@ Evaluate this answer and return a JSON object with exactly these fields:
       return result;
     } catch (err) {
       console.error("[AnthropicAIProvider] evaluateAnswer failed, using fallback:", err);
-      return fallbackEvaluate(answer);
+      return fallbackEvaluate(answer, answerMode);
     }
   }
 

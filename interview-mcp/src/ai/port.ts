@@ -1,4 +1,4 @@
-import type { Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
+import type { AnswerMode, Concept, Evaluation, EvaluationResult } from "@mock-interview/shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AIProvider — the port
@@ -19,7 +19,7 @@ export interface AIProvider {
    *                 passed when a knowledge file for the topic is available,
    *                 giving the model ground truth to score against.
    */
-  evaluateAnswer(question: string, answer: string, context?: string): Promise<EvaluationResult>;
+  evaluateAnswer(question: string, answer: string, context?: string, answerMode?: AnswerMode): Promise<EvaluationResult>;
 
   /** Extract key technical concepts from the full interview transcript. */
   extractConcepts(topic: string, transcript: string): Promise<Concept[]>;

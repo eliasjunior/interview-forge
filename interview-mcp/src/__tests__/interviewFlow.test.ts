@@ -8,7 +8,7 @@
  */
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import type { Session, Flashcard, Mistake, Skill, Exercise, KnowledgeGraph, Concept } from "@mock-interview/shared";
+import type { AnswerMode, Session, Flashcard, Mistake, Skill, Exercise, KnowledgeGraph, Concept } from "@mock-interview/shared";
 import { assertState } from "../stateUtils.js";
 import { calcAvgScore, buildSummary } from "../sessionUtils.js";
 import { selectQuestions, registerStartInterviewTool } from "../tools/startInterview.js";
@@ -360,6 +360,32 @@ describe("askQuestion — uses session.questionCriteria", () => {
     // Should fall back to file criteria at index 0
     assert.equal(res.evaluationCriteria, MOCK_ENTRY.evaluationCriteria[0]);
   });
+
+  test("returns answer mode options for the orchestrator", async () => {
+    const store = makeSessionStore({
+      "modes-1": {
+        id: "modes-1",
+        topic: TOPIC,
+        state: "ASK_QUESTION",
+        currentQuestionIndex: 0,
+        questions: [MOCK_ENTRY.questions[0]],
+        messages: [],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const ask = captureHandler(registerAskQuestionTool, deps);
+
+    const res = parse(await ask({ sessionId: "modes-1" }));
+
+    assert.equal(res.defaultAnswerMode, "deep_dive");
+    assert.deepEqual(
+      res.answerModes.map((mode: { id: string }) => mode.id),
+      ["brief", "bullets", "deep_dive"]
+    );
+  });
 });
 
 describe("code interview early completion", () => {
@@ -534,6 +560,34 @@ describe("code interview early completion", () => {
 // ─── evaluateAnswer — questionCriteria ───────────────────────────────────────
 
 describe("evaluateAnswer — uses session.questionCriteria", () => {
+  test("submit_answer stores the chosen answer mode before evaluation", async () => {
+    const store = makeSessionStore({
+      "submit-mode": {
+        id: "submit-mode",
+        topic: TOPIC,
+        state: "WAIT_FOR_ANSWER",
+        currentQuestionIndex: 0,
+        questions: [MOCK_ENTRY.questions[0]],
+        messages: [],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const submit = captureHandler(registerSubmitAnswerTool, deps);
+
+    const res = parse(await submit({
+      sessionId: "submit-mode",
+      answer: "- Use a GET endpoint\n- Return rates with timestamps\n- Keep validation at the boundary",
+      answerMode: "bullets",
+    }));
+
+    assert.equal(res.answerMode, "bullets");
+    assert.equal(store.get("submit-mode").pendingAnswerMode, "bullets");
+    assert.equal(store.get("submit-mode").state, "EVALUATE_ANSWER");
+  });
+
   test("AI-disabled: accepts score+feedback from orchestrator and persists evaluation", async () => {
     const store = makeSessionStore();
     const deps = makeDeps(store);
@@ -565,7 +619,10 @@ describe("evaluateAnswer — uses session.questionCriteria", () => {
 
     assert.equal(res.score, 4);
     assert.equal(res.needsFollowUp, false);
+    assert.equal(res.answerMode, "deep_dive");
     assert.equal(store.get("eval-1").evaluations.length, 1);
+    assert.equal(store.get("eval-1").evaluations[0].answerMode, "deep_dive");
+    assert.equal(store.get("eval-1").pendingAnswerMode, undefined);
     assert.equal(store.get("eval-1").state, "FOLLOW_UP");
   });
 
@@ -597,6 +654,50 @@ describe("evaluateAnswer — uses session.questionCriteria", () => {
     assert.equal(saved.evaluations[0].questionIndex, 2);
     assert.equal(saved.evaluations[0].score, 3);
     assert.equal(saved.evaluations[0].needsFollowUp, true);
+  });
+
+  test("passes answerMode through to AI evaluation and stores it on the evaluation", async () => {
+    const store = makeSessionStore({
+      "eval-mode": {
+        id: "eval-mode",
+        topic: TOPIC,
+        state: "EVALUATE_ANSWER",
+        currentQuestionIndex: 0,
+        pendingAnswerMode: "brief",
+        questions: [MOCK_ENTRY.questions[0]],
+        questionCriteria: [MOCK_ENTRY.evaluationCriteria[0]],
+        messages: [
+          { role: "interviewer", content: MOCK_ENTRY.questions[0], timestamp: new Date().toISOString() },
+          { role: "candidate", content: "Use a GET endpoint with clear response fields and one fallback.", timestamp: new Date().toISOString() },
+        ],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const calls: Array<{ context?: string; answerMode?: string }> = [];
+    const deps = makeDeps(store, makeKnowledgeStore(), {
+      ai: {
+        evaluateAnswer: async (_question: string, _answer: string, context?: string, answerMode?: AnswerMode) => {
+          calls.push({ context, answerMode });
+          return {
+            score: 4,
+            feedback: "Concise and correct.",
+            needsFollowUp: false,
+          };
+        },
+      } as unknown as ToolDeps["ai"],
+    });
+    const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
+
+    const res = parse(await evaluate({ sessionId: "eval-mode" }));
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].answerMode, "brief");
+    assert.match(calls[0].context ?? "", /brief mode/i);
+    assert.equal(res.answerMode, "brief");
+    assert.equal(store.get("eval-mode").evaluations[0].answerMode, "brief");
+    assert.equal(store.get("eval-mode").pendingAnswerMode, undefined);
   });
 });
 

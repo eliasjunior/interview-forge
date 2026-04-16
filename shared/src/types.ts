@@ -18,6 +18,7 @@ export type SessionKind = 'interview' | 'study' | 'drill' | 'warmup'
 /** @deprecated Use interviewType to distinguish design vs code sessions. */
 export type StudyCategory = 'topic' | 'algorithm'
 export type InterviewType = 'design' | 'code'
+export type AnswerMode = 'brief' | 'bullets' | 'deep_dive'
 
 // ── Warm-up quest levels ───────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export interface Evaluation {
   questionIndex: number
   question: string
   answer: string
+  answerMode?: AnswerMode
   strongAnswer?: string
   score: number           // 1–5
   feedback: string
@@ -113,6 +115,8 @@ export interface Session {
   customContent?: string
   /** The interview angle for a scoped session, e.g. "robustness, reliability, and extensibility" */
   focusArea?: string
+  /** Answer mode for the currently submitted answer awaiting evaluation. */
+  pendingAnswerMode?: AnswerMode
   /** Warm-up quest level recorded on warm-up sessions. In practice warm-up sessions use 0–2 only. */
   questLevel?: WarmUpLevel
   /** Question format used in this warm-up session. */

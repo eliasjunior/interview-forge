@@ -176,6 +176,7 @@ function normalizeSession(session: Session | null) {
     customContent: session.customContent,
     problemTitle: session.problemTitle,
     focusArea: session.focusArea,
+    pendingAnswerMode: session.pendingAnswerMode,
     sessionKind: session.sessionKind,
     studyCategory: session.studyCategory,
     sourcePath: session.sourcePath,
@@ -186,6 +187,7 @@ function normalizeSession(session: Session | null) {
     questAnswers: session.questAnswers,
     evaluations: session.evaluations.map((evaluation) => ({
       ...evaluation,
+      answerMode: evaluation.answerMode,
       strongAnswer: evaluation.strongAnswer,
       followUpQuestion: evaluation.followUpQuestion,
       deeperDive: evaluation.deeperDive,

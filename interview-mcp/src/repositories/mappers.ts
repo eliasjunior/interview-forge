@@ -1,4 +1,5 @@
 import type {
+  AnswerMode,
   Flashcard,
   GraphEdge,
   GraphNode,
@@ -98,6 +99,7 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       seeded: session.seeded ?? false,
       customContent: session.customContent,
       focusArea: session.focusArea,
+      pendingAnswerMode: session.pendingAnswerMode ?? null,
       state: session.state,
       currentQuestionIndex: session.currentQuestionIndex,
       summary: session.summary,
@@ -127,6 +129,7 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       questionIndex: evaluation.questionIndex,
       question: evaluation.question,
       answer: evaluation.answer,
+      answerMode: evaluation.answerMode ?? null,
       strongAnswer: evaluation.strongAnswer,
       score: evaluation.score,
       feedback: evaluation.feedback,
@@ -155,6 +158,7 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
     seeded: rows.session.seeded,
     customContent: rows.session.customContent ?? undefined,
     focusArea: rows.session.focusArea ?? undefined,
+    pendingAnswerMode: (rows.session.pendingAnswerMode as AnswerMode | null) ?? undefined,
     state: rows.session.state as Session["state"],
     currentQuestionIndex: rows.session.currentQuestionIndex,
     questions: rows.questions
@@ -176,6 +180,7 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
         questionIndex: row.questionIndex,
         question: row.question,
         answer: row.answer,
+        answerMode: (row.answerMode as AnswerMode | null) ?? undefined,
         strongAnswer: row.strongAnswer ?? undefined,
         score: row.score,
         feedback: row.feedback,

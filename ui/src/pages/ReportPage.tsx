@@ -535,7 +535,9 @@ function QuestionCard({ ev, idx, strongAnswer, open, onToggle }: {
       {open && (
         <div className="question-card-body">
           <div>
-            <div className="qa-section-label">Your answer</div>
+            <div className="qa-section-label">
+              Your answer{ev.answerMode ? ` (${formatAnswerModeLabel(ev.answerMode)})` : ''}
+            </div>
             <div className="qa-section-text">{ev.answer}</div>
           </div>
           <div>
@@ -566,6 +568,13 @@ function QuestionCard({ ev, idx, strongAnswer, open, onToggle }: {
       )}
     </div>
   )
+}
+
+function formatAnswerModeLabel(value: Evaluation['answerMode']) {
+  if (value === 'deep_dive') return 'Deep dive'
+  if (value === 'brief') return 'Brief'
+  if (value === 'bullets') return 'Bullets'
+  return 'Answer'
 }
 
 function ConceptsSection({ concepts }: { concepts: Concept[] }) {
