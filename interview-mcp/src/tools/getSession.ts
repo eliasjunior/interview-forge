@@ -18,10 +18,11 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
             (session.problemTitle ? `Concrete problem: "${session.problemTitle}". ` : "") +
             "The problem is in customContent under '## Problem Statement'. " +
             "Flow: (1) present the problem to the candidate, (2) ask them to explain their approach before coding, " +
-            "(3) probe pattern recognition, time/space complexity, and edge cases, " +
-            "(4) if the candidate already submits complete code plus complexity reasoning, evaluate that answer and finish the session immediately instead of continuing through every remaining scripted question, " +
-            "(5) otherwise continue with ask_question → submit_answer → evaluate_answer → next_question, " +
-            "(6) end_interview when done. Do NOT run a system-design or API-design interview."
+            "(3) hints are allowed when they unblock progress, but never reveal the full solution, " +
+            "(4) if the candidate submits code without time/space complexity, ask for that explicitly after the solution, " +
+            "(5) after a complete solution plus complexity, ask at most one problem-aware follow-up if it adds value; otherwise finish, " +
+            "(6) do not continue through extra scripted questions once the solution phase is complete, " +
+            "(7) end_interview when done. Do NOT run a system-design or API-design interview."
           : undefined;
 
       const payload = instruction ? { ...session, instruction } : session;

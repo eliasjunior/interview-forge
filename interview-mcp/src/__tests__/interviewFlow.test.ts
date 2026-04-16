@@ -363,25 +363,26 @@ describe("askQuestion — uses session.questionCriteria", () => {
 });
 
 describe("code interview early completion", () => {
-  test("evaluate_answer flags early completion when code and complexity are already provided", async () => {
+  test("evaluate_answer keeps one problem-aware follow-up when code and complexity are already provided", async () => {
     const store = makeSessionStore({
       "code-1": {
         id: "code-1",
         topic: "Rotate Matrix",
         interviewType: "code",
+        customContent: [
+          "# Study Scope: Rotate Matrix",
+          "## Common Interview Follow-Ups (interviewer only)",
+          "- Can you make Rotate Matrix work in place, and what changes in the index manipulation?",
+        ].join("\n"),
         state: "EVALUATE_ANSWER",
         currentQuestionIndex: 1,
         questions: [
           "Explain your approach.",
-          "Walk through the invariant.",
-          "Analyse complexity.",
-          "Discuss edge cases.",
-          "Common mistakes?",
-          "Test cases?",
+          "Discuss your approach and edge cases.",
           "Now implement Rotate Matrix.",
         ],
         messages: [
-          { role: "interviewer", content: "Walk through the invariant.", timestamp: new Date().toISOString() },
+          { role: "interviewer", content: "Discuss your approach and edge cases.", timestamp: new Date().toISOString() },
           {
             role: "candidate",
             content: [
@@ -421,20 +422,76 @@ describe("code interview early completion", () => {
           needsFollowUp: true,
           followUpQuestion: "Can you optimize it further?",
         }),
-      } as ToolDeps["ai"],
+      } as unknown as ToolDeps["ai"],
     });
     const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
 
     const res = parse(await evaluate({ sessionId: "code-1" }));
     const session = store.get("code-1");
 
-    assert.equal(res.earlyCompletionDetected, true);
-    assert.equal(res.nextTool, "end_interview");
-    assert.match(res.instruction, /Do not ask more questions/i);
-    assert.equal(res.needsFollowUp, false);
+    assert.equal(res.earlyCompletionDetected, false);
+    assert.equal(res.nextTool, "ask_followup  (or next_question to skip follow-up)");
+    assert.equal(res.needsFollowUp, true);
+    assert.match(res.followUpQuestion, /in place/i);
     assert.equal(session.currentQuestionIndex, session.questions.length - 1);
     assert.equal(session.evaluations.length, 1);
-    assert.equal(session.evaluations[0]?.needsFollowUp, false);
+    assert.equal(session.evaluations[0]?.needsFollowUp, true);
+  });
+
+  test("evaluate_answer asks for complexity when code is submitted without it", async () => {
+    const store = makeSessionStore({
+      "code-complexity": {
+        id: "code-complexity",
+        topic: "Rotate Matrix",
+        interviewType: "code",
+        customContent: [
+          "# Study Scope: Rotate Matrix",
+          "## Common Interview Follow-Ups (interviewer only)",
+          "- Can you make Rotate Matrix work in place, and what changes in the index manipulation?",
+        ].join("\n"),
+        state: "EVALUATE_ANSWER",
+        currentQuestionIndex: 0,
+        questions: [
+          "Explain your approach.",
+          "Discuss your approach and edge cases.",
+          "Now implement Rotate Matrix.",
+        ],
+        messages: [
+          { role: "interviewer", content: "Explain your approach.", timestamp: new Date().toISOString() },
+          {
+            role: "candidate",
+            content: [
+              "```java",
+              "void rotate(int[][] matrix) {",
+              "  // implementation omitted",
+              "}",
+              "```",
+            ].join("\n"),
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store, makeKnowledgeStore(null), {
+      ai: {
+        evaluateAnswer: async () => ({
+          score: 4,
+          feedback: "Implementation seems plausible.",
+          needsFollowUp: false,
+        }),
+      } as unknown as ToolDeps["ai"],
+    });
+    const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
+
+    const res = parse(await evaluate({ sessionId: "code-complexity" }));
+
+    assert.equal(res.earlyCompletionDetected, false);
+    assert.equal(res.needsFollowUp, true);
+    assert.match(res.followUpQuestion, /time and space complexities/i);
+    assert.equal(res.nextTool, "ask_followup  (or next_question to skip follow-up)");
   });
 
   test("next_question immediately finalizes after an early-complete code answer", async () => {
@@ -443,21 +500,17 @@ describe("code interview early completion", () => {
       topic: "Rotate Matrix",
       interviewType: "code",
       state: "FOLLOW_UP",
-      currentQuestionIndex: 6,
+      currentQuestionIndex: 2,
       questions: [
         "Explain your approach.",
-        "Walk through the invariant.",
-        "Analyse complexity.",
-        "Discuss edge cases.",
-        "Common mistakes?",
-        "Test cases?",
+        "Discuss your approach and edge cases.",
         "Now implement Rotate Matrix.",
       ],
       messages: [],
       evaluations: [
         {
-          questionIndex: 1,
-          question: "Walk through the invariant.",
+          questionIndex: 2,
+          question: "Can you make Rotate Matrix work in place, and what changes in the index manipulation?",
           answer: "Submitted final code with O(n^2) time and O(1) space.",
           score: 5,
           feedback: "Strong implementation and reasoning.",

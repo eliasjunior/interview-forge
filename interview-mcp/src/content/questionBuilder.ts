@@ -9,32 +9,63 @@ import { detectGaps } from "./analyzer.js";
 import { extractSpec } from "./parser.js";
 import type { ExtractedSpec } from "./parser.js";
 
-/** Default seven-step algorithm flow, but sessions may finish earlier once the candidate submits final code plus complexity analysis. */
+function pushUnique(target: string[], value: string) {
+  if (!target.includes(value)) target.push(value);
+}
+
+export function buildAlgorithmFollowUpCandidates(topic: string, content: string): string[] {
+  const text = `${topic}\n${content}`.toLowerCase();
+  const candidates: string[] = [];
+
+  if (/\bmatrix\b|\bgrid\b|\b2d\b/.test(text)) {
+    pushUnique(candidates, `Can you make ${topic} work in place, and what changes in the index manipulation?`);
+    pushUnique(candidates, `How would your solution change if the input were not square or had a slightly different traversal constraint?`);
+  }
+
+  if (/\blinked list\b|\blistnode\b|\bnode\b/.test(text)) {
+    pushUnique(candidates, `Can you solve ${topic} in one pass with O(1) extra space, and what invariant would you rely on?`);
+    pushUnique(candidates, `What pointer-update mistake is most likely here, and how would you guard against it while coding?`);
+  }
+
+  if (/\bsorted\b|\bbinary search\b/.test(text)) {
+    pushUnique(candidates, `Which property of the sorted input are you exploiting, and how would the solution change if that guarantee disappeared?`);
+  }
+
+  if (/\bsubstring\b|\bstring\b|\bpalindrome\b|\banagram\b/.test(text)) {
+    pushUnique(candidates, `Can you reduce the extra space for ${topic}, and what trade-off would that introduce?`);
+    pushUnique(candidates, `How would you adapt the solution if the input became streaming instead of fully available upfront?`);
+  }
+
+  if (/\binterval\b|\boverlap\b|\bmerge\b/.test(text)) {
+    pushUnique(candidates, `What ordering assumption makes your interval logic correct, and how would you defend that in a proof sketch?`);
+  }
+
+  if (/\bgraph\b|\bdfs\b|\bbfs\b|\btraversal\b/.test(text)) {
+    pushUnique(candidates, `When would you switch between DFS and BFS for ${topic}, and what trade-off changes?`);
+  }
+
+  if (/\bdp\b|\bdynamic programming\b|\bmemo\b/.test(text)) {
+    pushUnique(candidates, `Can you compress the DP state further, and how would you justify that no required information is lost?`);
+  }
+
+  pushUnique(candidates, `What would you optimize or simplify next in ${topic}, and what trade-off would that change?`);
+  pushUnique(candidates, `How would you convince another engineer that your solution to ${topic} is correct, not just plausible?`);
+
+  return candidates.slice(0, 3);
+}
+
+/** Code-interview flow for algorithm sessions. Further follow-ups are decided dynamically after the solution is submitted. */
 export function buildAlgorithmQuestions(topic: string, _content: string, _focus: string): string[] {
   return [
     `Looking at ${topic}, what algorithmic pattern or technique would you apply here, and why? ` +
     `Walk me through how you recognised the pattern from the problem constraints.`,
 
-    `Describe your step-by-step approach to solving ${topic}. ` +
-    `Focus on: how you set up the initial state, what invariant you maintain through each iteration, ` +
-    `and how you know when to stop.`,
-
-    `Analyse the time and space complexity of your solution to ${topic}. ` +
-    `Justify each bound — don't just state it. ` +
-    `Is there a more space-efficient version, even at a cost to time?`,
-
-    `What edge cases does ${topic} need to handle? ` +
-    `For each one: what goes wrong in a naive implementation, and how does your solution address it?`,
-
-    `What are the most common off-by-one errors or logical mistakes candidates make when implementing ${topic}? ` +
-    `Walk through a specific mistake and show how you would catch it.`,
-
-    `How would you design test cases for ${topic}? ` +
-    `Give at least one minimal example, one edge case, and one large-input scenario.`,
+    `Before you code ${topic}, walk through your approach, the core invariant or reduction, ` +
+    `the edge cases you care about most, and the tests you would use to sanity-check the implementation.`,
 
     `Now implement ${topic}. ` +
     `Write working code or precise pseudocode, narrate the key decisions as you go, ` +
-    `and use the test cases you just designed to sanity-check the implementation before you finish.`,
+    `and if you already know the time and space complexity, include them with the final solution.`,
   ];
 }
 

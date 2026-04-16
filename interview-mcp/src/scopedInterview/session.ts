@@ -1,7 +1,7 @@
 import type { Session } from "@mock-interview/shared";
 import { detectContentType, detectGaps } from "../content/analyzer.js";
 import { extractSpec } from "../content/parser.js";
-import { buildAlgorithmQuestions, buildQuestions, polishContent } from "../content/questionBuilder.js";
+import { buildAlgorithmFollowUpCandidates, buildAlgorithmQuestions, buildQuestions, polishContent } from "../content/questionBuilder.js";
 
 const DEFAULT_FOCUS = "robustness, reliability, and extensibility in a production environment";
 
@@ -45,7 +45,9 @@ function looksLikeApiSpec(rawContent: string): boolean {
 function inferScopedContentType(rawContent: string): "algorithm" | "api" {
   const detected = detectContentType(rawContent);
   if (detected === "algorithm") return detected;
-  return looksLikeApiSpec(rawContent) ? "api" : "algorithm";
+  // Default to "api" (design interview path) for any content that lacks strong algorithm signals.
+  // Only fall through to "algorithm" when detectContentType explicitly flagged it above.
+  return "api";
 }
 
 function buildAlgorithmScope(topic: string, problemTitle: string | undefined, rawContent: string, focus: string): string {
@@ -55,6 +57,7 @@ function buildAlgorithmScope(topic: string, problemTitle: string | undefined, ra
   }
 
   const problemLabel = problemTitle?.trim() || topic;
+  const followUpCandidates = buildAlgorithmFollowUpCandidates(problemLabel, trimmed);
 
   return [
     `# Study Scope: ${problemLabel}`,
@@ -85,6 +88,15 @@ function buildAlgorithmScope(topic: string, problemTitle: string | undefined, ra
     "- jumping straight to the trick without explaining why it works",
     "- missing length checks, empty inputs, or off-by-one style mistakes",
     "- stating complexity without tying it to the actual operations used",
+    "",
+    "## Interviewer Guidance (do not reveal to candidate)",
+    "- This is a code interview. Keep it practical instead of running a long scripted checklist.",
+    "- You may give a light hint if the candidate is stuck, but do not reveal the full solution or exact implementation.",
+    "- If the candidate submits code without time and space complexity, ask for that explicitly before ending the session.",
+    "- After a complete solution plus complexity, ask at most one additional follow-up, and only if the problem naturally supports it.",
+    "",
+    "## Common Interview Follow-Ups (interviewer only)",
+    ...followUpCandidates.map((candidate) => `- ${candidate}`),
     "",
     "## Out of Scope",
     "- advanced string-search internals unless directly needed",

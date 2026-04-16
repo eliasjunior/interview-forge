@@ -41,6 +41,10 @@ function isCodeStyleSession(session: Session): boolean {
   return (session.interviewType ?? 'design') === 'code'
 }
 
+function hasScopedContext(session: Session): boolean {
+  return Boolean(session.customContent || session.focusArea || session.sourcePath)
+}
+
 function getSessionLabel(session: Session): string {
   if (session.problemTitle && session.problemTitle !== session.topic) {
     return `${session.topic} · ${session.problemTitle}`
@@ -126,6 +130,7 @@ export default function ReportPage() {
   const isStudy = getSessionKind(session) === 'study'
   const isAlgorithmStudy = isStudy && isCodeStyleSession(session)
   const isCodeInterview = session.interviewType === 'code'
+  const scopedContextAvailable = hasScopedContext(session)
   const problemStatement = isCodeInterview && session.customContent
     ? extractProblemStatement(session.customContent)
     : null
@@ -153,6 +158,17 @@ export default function ReportPage() {
     try {
       await navigator.clipboard.writeText(launchPrompt.prompt)
       setCopyToast('Launch prompt copied')
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleCopyScopedContext() {
+    const currentSession = session
+    if (!currentSession?.customContent) return
+    try {
+      await navigator.clipboard.writeText(currentSession.customContent)
+      setCopyToast('Scope copied')
     } catch (e) {
       setError(String(e))
     }
@@ -321,6 +337,37 @@ export default function ReportPage() {
                 <div className="summary-box">{session.summary}</div>
               </div>
             </>
+          )}
+
+          {scopedContextAvailable && (
+            <div className="scoped-context-card">
+              <div className="scoped-context-header">
+                <div>
+                  <div className="page-subtitle" style={{ marginBottom: 6 }}>Scoped Context</div>
+                  <div className="scoped-context-title">Persisted interview scope</div>
+                </div>
+                {session.customContent && (
+                  <button className="btn-secondary" onClick={() => void handleCopyScopedContext()}>
+                    Copy scope
+                  </button>
+                )}
+              </div>
+
+              {(session.focusArea || session.sourcePath) && (
+                <div className="scoped-context-meta">
+                  {session.focusArea && <span>Focus: <code>{session.focusArea}</code></span>}
+                  {session.sourcePath && <span>Source: <code>{session.sourcePath}</code></span>}
+                </div>
+              )}
+
+              {session.customContent ? (
+                <pre className="scoped-context-content">{session.customContent}</pre>
+              ) : (
+                <div className="study-callout">
+                  No persisted scope body is attached to this session.
+                </div>
+              )}
+            </div>
           )}
 
           {session.concepts && session.concepts.length > 0 && (

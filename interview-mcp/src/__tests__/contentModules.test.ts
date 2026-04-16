@@ -70,7 +70,7 @@ Space: O(1)
 
     assert.equal(detectContentType(algorithmSpec), "algorithm");
     const questions = buildAlgorithmQuestions("Rotate Matrix", algorithmSpec, "correctness");
-    assert.equal(questions.length, 7);
+    assert.equal(questions.length, 3);
     assert.match(questions.at(-1) ?? "", /Now implement Rotate Matrix/);
   });
 

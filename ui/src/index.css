@@ -635,6 +635,50 @@ html, body, #root {
   color: #d9fffb;
 }
 
+.scoped-context-card {
+  margin-bottom: 24px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.scoped-context-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px;
+}
+
+.scoped-context-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.scoped-context-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 18px 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.scoped-context-content {
+  margin: 0;
+  padding: 18px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card-elev) 80%, transparent);
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
 /* ── Concepts grid ─────────────────────────────────────────────────────────── */
 .concepts-section { margin-top: 8px; }
 .concepts-cluster { margin-bottom: 16px; }

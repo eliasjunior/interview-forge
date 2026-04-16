@@ -184,14 +184,15 @@ Business rules
     assert.match(payload.normalizedContent, /# Study Scope: Delete Middle Node/);
     assert.match(payload.normalizedContent, /## Subject Area\nLinked Lists/);
     assert.match(payload.normalizedContent, /## Problem Statement/);
-    assert.equal(payload.totalQuestions, 7);
-    assert.match(payload.instruction, /if the candidate submits complete working code earlier/i);
+    assert.equal(payload.totalQuestions, 3);
+    assert.match(payload.instruction, /Hints are allowed when they are stuck/i);
 
     const session = sessions[payload.sessionId];
     assert.ok(session);
     assert.equal(session.topic, "Linked Lists");
     assert.equal(session.problemTitle, "Delete Middle Node");
     assert.match(session.customContent ?? "", /## Evaluation Criteria/);
+    assert.match(session.customContent ?? "", /## Common Interview Follow-Ups \(interviewer only\)/);
     assert.match(session.customContent ?? "", /\*\*implementation\*\*/);
     assert.match(session.questions.at(-1) ?? "", /Now implement Delete Middle Node/);
   });

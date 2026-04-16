@@ -4,6 +4,9 @@ import type { Evaluation } from "@mock-interview/shared";
 import type { ToolDeps } from "./deps.js";
 import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 
+const CODE_COMPLEXITY_FOLLOW_UP =
+  "Before we wrap, quantify your solution: what are the time and space complexities, and why do those bounds hold?";
+
 function parseMcqAnswer(answer: string, choiceCount: number): string[] {
   const normalised = answer.trim().toUpperCase();
   if (!normalised) return [];
@@ -52,10 +55,53 @@ function mentionsComplexity(answer: string): boolean {
   return /\btime complexity\b|\bspace complexity\b|\bbig[- ]?o\b|O\([^)]+\)/i.test(answer);
 }
 
-function shouldFinishCodeInterviewEarly(session: { interviewType?: string; currentQuestionIndex: number; questions: string[] }, answer: string): boolean {
-  if (session.interviewType !== "code") return false;
-  if (session.currentQuestionIndex >= session.questions.length - 1) return false;
-  return looksLikeCodeSubmission(answer) && mentionsComplexity(answer);
+function isComplexityFollowUpQuestion(question: string): boolean {
+  return question.startsWith("Before we wrap, quantify your solution:");
+}
+
+function extractBulletSection(content: string | undefined, heading: string): string[] {
+  if (!content) return [];
+
+  const lines = content.split("\n");
+  const headingIndex = lines.findIndex((line) => line.trim().toLowerCase() === heading.toLowerCase());
+  if (headingIndex === -1) return [];
+
+  const bullets: string[] = [];
+  for (let index = headingIndex + 1; index < lines.length; index++) {
+    const line = lines[index]?.trim() ?? "";
+    if (line.startsWith("## ")) break;
+    if (line.startsWith("- ")) bullets.push(line.slice(2).trim());
+  }
+
+  return bullets;
+}
+
+function hasOptionalCodeFollowUpAlready(session: { questions: string[]; evaluations: Evaluation[] }): boolean {
+  const finalIndex = session.questions.length - 1;
+  const finalQuestion = session.questions[finalIndex];
+
+  return session.evaluations.some((evaluation) =>
+    evaluation.questionIndex === finalIndex &&
+    evaluation.question !== finalQuestion &&
+    !isComplexityFollowUpQuestion(evaluation.question)
+  );
+}
+
+function isGenericCodeFollowUp(question: string): boolean {
+  return /optimi[sz]e it further|anything else you would improve|any improvements/i.test(question);
+}
+
+function buildProblemAwareFollowUp(
+  session: { customContent?: string; topic: string; problemTitle?: string },
+  suggested?: string | null,
+): string | undefined {
+  const candidates = extractBulletSection(session.customContent, "## Common Interview Follow-Ups (interviewer only)");
+  if (suggested?.trim() && !isGenericCodeFollowUp(suggested)) return suggested.trim();
+  if (candidates.length > 0) return candidates[0];
+  if (suggested?.trim()) return suggested.trim();
+
+  const label = session.problemTitle?.trim() || session.topic;
+  return `What would you optimize or simplify next in ${label}, and what trade-off would that change?`;
 }
 
 export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
@@ -181,14 +227,47 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         deeperDive: result.deeperDive,
       };
 
-      const earlyCompletionDetected = shouldFinishCodeInterviewEarly(session, lastAnswer.content);
-      if (earlyCompletionDetected) {
-        evaluation.needsFollowUp = false;
-        evaluation.followUpQuestion = undefined;
+      let earlyCompletionDetected = false;
+      if (session.interviewType === "code" && looksLikeCodeSubmission(lastAnswer.content)) {
+        const solvedWithComplexity = mentionsComplexity(lastAnswer.content);
+        const optionalFollowUpAlreadyUsed = hasOptionalCodeFollowUpAlready(session);
+
+        if (session.currentQuestionIndex < session.questions.length - 1) {
+          session.currentQuestionIndex = session.questions.length - 1;
+        }
+
+        if (!solvedWithComplexity) {
+          evaluation.needsFollowUp = true;
+          evaluation.followUpQuestion = CODE_COMPLEXITY_FOLLOW_UP;
+        } else if (!optionalFollowUpAlreadyUsed) {
+          const problemAwareFollowUp = buildProblemAwareFollowUp(session, result.followUpQuestion);
+          evaluation.needsFollowUp = Boolean(result.needsFollowUp && problemAwareFollowUp);
+          evaluation.followUpQuestion = evaluation.needsFollowUp ? problemAwareFollowUp : undefined;
+          earlyCompletionDetected = !evaluation.needsFollowUp;
+        } else {
+          evaluation.needsFollowUp = false;
+          evaluation.followUpQuestion = undefined;
+          earlyCompletionDetected = true;
+        }
+      } else if (
+        session.interviewType === "code" &&
+        isComplexityFollowUpQuestion(lastQuestion.content)
+      ) {
+        const optionalFollowUpAlreadyUsed = hasOptionalCodeFollowUpAlready(session);
+        if (!optionalFollowUpAlreadyUsed) {
+          const problemAwareFollowUp = buildProblemAwareFollowUp(session, result.followUpQuestion);
+          evaluation.needsFollowUp = Boolean(result.needsFollowUp && problemAwareFollowUp);
+          evaluation.followUpQuestion = evaluation.needsFollowUp ? problemAwareFollowUp : undefined;
+          earlyCompletionDetected = !evaluation.needsFollowUp;
+        } else {
+          evaluation.needsFollowUp = false;
+          evaluation.followUpQuestion = undefined;
+          earlyCompletionDetected = true;
+        }
       }
 
       session.evaluations.push(evaluation);
-      if (earlyCompletionDetected) {
+      if (earlyCompletionDetected && session.interviewType === "code") {
         session.currentQuestionIndex = session.questions.length - 1;
       }
       session.state = "FOLLOW_UP";
@@ -203,16 +282,16 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             score: result.score,
             feedback: result.feedback,
             strongAnswer: resolvedStrongAnswer ?? null,
-            needsFollowUp: earlyCompletionDetected ? false : result.needsFollowUp,
-            followUpQuestion: earlyCompletionDetected ? null : result.followUpQuestion ?? null,
+            needsFollowUp: evaluation.needsFollowUp,
+            followUpQuestion: evaluation.followUpQuestion ?? null,
             earlyCompletionDetected,
             nextTool: earlyCompletionDetected
               ? "end_interview"
-              : result.needsFollowUp
+              : evaluation.needsFollowUp
               ? "ask_followup  (or next_question to skip follow-up)"
               : "next_question",
             instruction: earlyCompletionDetected
-              ? "Complete code submission with complexity analysis detected. Do not ask more questions; finish the interview now."
+              ? "Code interview complete. Do not ask more questions; finish the interview now."
               : undefined,
           }),
         }],

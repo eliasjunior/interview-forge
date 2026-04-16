@@ -50,7 +50,7 @@ export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
                   ? {
                       tool: "prepare_flashcards",
                       args: { sessionId },
-                      hint: "Prepare the flashcard drafts, then call create_flashcard once per returned draft.",
+                      hint: "Call prepare_flashcards to build the drafts, then present them to the user for confirmation before creating any card.",
                     }
                   : null,
               },
