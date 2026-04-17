@@ -100,6 +100,7 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       customContent: session.customContent,
       focusArea: session.focusArea,
       pendingAnswerMode: session.pendingAnswerMode ?? null,
+      activeAdaptiveChallenge: session.activeAdaptiveChallenge != null ? JSON.stringify(session.activeAdaptiveChallenge) : null,
       state: session.state,
       currentQuestionIndex: session.currentQuestionIndex,
       summary: session.summary,
@@ -138,6 +139,10 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       followUpType: evaluation.followUpType ?? null,
       followUpFocus: evaluation.followUpFocus ?? null,
       followUpRationale: evaluation.followUpRationale ?? null,
+      adaptiveChallengeType: evaluation.adaptiveChallengeType ?? null,
+      adaptiveChallengePrompt: evaluation.adaptiveChallengePrompt ?? null,
+      adaptiveChallengeGoal: evaluation.adaptiveChallengeGoal ?? null,
+      adaptiveChallengeReward: evaluation.adaptiveChallengeReward ?? null,
       deeperDive: evaluation.deeperDive,
     })),
     concepts: normalizedConcepts.map((concept) => ({
@@ -162,6 +167,10 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
     customContent: rows.session.customContent ?? undefined,
     focusArea: rows.session.focusArea ?? undefined,
     pendingAnswerMode: (rows.session.pendingAnswerMode as AnswerMode | null) ?? undefined,
+    activeAdaptiveChallenge:
+      rows.session.activeAdaptiveChallenge != null
+        ? JSON.parse(rows.session.activeAdaptiveChallenge)
+        : undefined,
     state: rows.session.state as Session["state"],
     currentQuestionIndex: rows.session.currentQuestionIndex,
     questions: rows.questions
@@ -192,6 +201,10 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
         followUpType: row.followUpType as Session["evaluations"][number]["followUpType"] | undefined,
         followUpFocus: row.followUpFocus ?? undefined,
         followUpRationale: row.followUpRationale ?? undefined,
+        adaptiveChallengeType: row.adaptiveChallengeType as Session["evaluations"][number]["adaptiveChallengeType"] | undefined,
+        adaptiveChallengePrompt: row.adaptiveChallengePrompt ?? undefined,
+        adaptiveChallengeGoal: row.adaptiveChallengeGoal ?? undefined,
+        adaptiveChallengeReward: row.adaptiveChallengeReward ?? undefined,
         deeperDive: row.deeperDive ?? undefined,
       })),
     concepts: rows.concepts.length

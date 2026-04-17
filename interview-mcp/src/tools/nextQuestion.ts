@@ -17,6 +17,13 @@ export function registerNextQuestionTool(server: McpServer, deps: ToolDeps) {
       const guard = deps.assertState(session, "next_question");
       if (!guard.ok) return deps.stateError(guard.error);
 
+      if (session.activeAdaptiveChallenge) {
+        return deps.stateError(
+          `A ${session.activeAdaptiveChallenge.type} is still active for question ${session.activeAdaptiveChallenge.sourceQuestionIndex + 1}. ` +
+          `Run ask_followup and let the candidate answer it before advancing.`
+        );
+      }
+
       session.currentQuestionIndex++;
       const done = session.currentQuestionIndex >= session.questions.length;
 

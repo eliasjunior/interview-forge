@@ -115,6 +115,53 @@ function buildFollowUpMetadata(
   };
 }
 
+function buildAdaptiveChallenge(
+  evaluation: Pick<Evaluation, "score" | "needsFollowUp" | "followUpFocus" | "followUpType" | "followUpQuestion">,
+): Pick<Evaluation, "adaptiveChallengeType" | "adaptiveChallengePrompt" | "adaptiveChallengeGoal" | "adaptiveChallengeReward"> {
+  if (!evaluation.needsFollowUp || evaluation.score > 3 || !evaluation.followUpQuestion) {
+    return {
+      adaptiveChallengeType: undefined,
+      adaptiveChallengePrompt: undefined,
+      adaptiveChallengeGoal: undefined,
+      adaptiveChallengeReward: undefined,
+    };
+  }
+
+  const goal = evaluation.followUpFocus ?? "the missing key point from the previous answer";
+  const reward =
+    evaluation.score <= 2
+      ? "Recovery round: win back the point by correcting the core mistake."
+      : "Recovery round: tighten the answer and lock in the missing detail.";
+
+  return {
+    adaptiveChallengeType: "recovery_round",
+    adaptiveChallengePrompt:
+      evaluation.followUpType === "no_example"
+        ? `Recovery round: answer again, but this time anchor it with one concrete example.`
+        : evaluation.followUpType === "vague_tradeoff"
+        ? `Recovery round: tighten the answer by naming the trade-off explicitly and defending your choice.`
+        : evaluation.followUpType === "shallow_failure_mode"
+        ? `Recovery round: tighten the answer by focusing on what breaks first and how you respond.`
+        : `Recovery round: improve the answer by fixing one gap only: ${goal}.`,
+    adaptiveChallengeGoal: goal,
+    adaptiveChallengeReward: reward,
+  };
+}
+
+function buildFallbackRecoveryFollowUp(
+  question: string,
+  answerMode: AnswerMode,
+): string {
+  const brevityHint =
+    answerMode === "brief"
+      ? "Keep it to 2-3 tight sentences."
+      : answerMode === "bullets"
+      ? "Keep it to 3-5 bullets."
+      : "Keep it focused on one missing gap.";
+
+  return `Recovery round: answer again and fix the main missing point in "${question}". ${brevityHint}`;
+}
+
 function parseMcqAnswer(answer: string, choiceCount: number): string[] {
   const normalised = answer.trim().toUpperCase();
   if (!normalised) return [];
@@ -248,6 +295,10 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
       const lastQuestion = deps.findLast(session.messages, (m) => m.role === "interviewer");
       const lastAnswer = deps.findLast(session.messages, (m) => m.role === "candidate");
       const answerMode = session.pendingAnswerMode ?? DEFAULT_ANSWER_MODE;
+      const existingAdaptiveChallenge = session.activeAdaptiveChallenge;
+      const resolvingAdaptiveChallenge =
+        existingAdaptiveChallenge != null &&
+        existingAdaptiveChallenge.sourceQuestionIndex === session.currentQuestionIndex;
 
       if (!lastQuestion || !lastAnswer) {
         return deps.stateError("No question/answer pair found to evaluate.");
@@ -340,6 +391,13 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         deeperDive: result.deeperDive,
       };
 
+      if (evaluation.score <= 3 && session.sessionKind !== "warmup") {
+        evaluation.needsFollowUp = true;
+        evaluation.followUpQuestion =
+          evaluation.followUpQuestion ??
+          buildFallbackRecoveryFollowUp(lastQuestion.content, answerMode);
+      }
+
       let earlyCompletionDetected = false;
       if (session.interviewType === "code" && looksLikeCodeSubmission(lastAnswer.content)) {
         const solvedWithComplexity = mentionsComplexity(lastAnswer.content);
@@ -391,6 +449,31 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
           ),
         );
       }
+      Object.assign(evaluation, buildAdaptiveChallenge(evaluation));
+
+      if (resolvingAdaptiveChallenge) {
+        evaluation.needsFollowUp = false;
+        evaluation.followUpQuestion = undefined;
+        evaluation.followUpType = undefined;
+        evaluation.followUpFocus = undefined;
+        evaluation.followUpRationale = undefined;
+        evaluation.adaptiveChallengeType = undefined;
+        evaluation.adaptiveChallengePrompt = undefined;
+        evaluation.adaptiveChallengeGoal = undefined;
+        evaluation.adaptiveChallengeReward = undefined;
+        session.activeAdaptiveChallenge = undefined;
+      } else if (evaluation.adaptiveChallengeType && evaluation.adaptiveChallengePrompt) {
+        session.activeAdaptiveChallenge = {
+          type: evaluation.adaptiveChallengeType,
+          status: "pending",
+          sourceQuestionIndex: session.currentQuestionIndex,
+          prompt: evaluation.adaptiveChallengePrompt,
+          goal: evaluation.adaptiveChallengeGoal,
+          reward: evaluation.adaptiveChallengeReward,
+        };
+      } else {
+        session.activeAdaptiveChallenge = undefined;
+      }
 
       session.evaluations.push(evaluation);
       session.pendingAnswerMode = undefined;
@@ -415,15 +498,24 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             followUpType: evaluation.followUpType ?? null,
             followUpFocus: evaluation.followUpFocus ?? null,
             followUpRationale: evaluation.followUpRationale ?? null,
+            adaptiveChallengeType: evaluation.adaptiveChallengeType ?? null,
+            adaptiveChallengePrompt: evaluation.adaptiveChallengePrompt ?? null,
+            adaptiveChallengeGoal: evaluation.adaptiveChallengeGoal ?? null,
+            adaptiveChallengeReward: evaluation.adaptiveChallengeReward ?? null,
+            activeAdaptiveChallenge: session.activeAdaptiveChallenge ?? null,
             candidateDeliveryGuidance: getCandidateDeliveryGuidance(answerMode, evaluation.needsFollowUp),
             earlyCompletionDetected,
             nextTool: earlyCompletionDetected
               ? "end_interview"
+              : session.activeAdaptiveChallenge
+              ? "ask_followup"
               : evaluation.needsFollowUp
               ? "ask_followup  (or next_question to skip follow-up)"
               : "next_question",
             instruction: earlyCompletionDetected
               ? "Code interview complete. Do not ask more questions; finish the interview now."
+              : session.activeAdaptiveChallenge
+              ? "A recovery round is active. Do not advance to the next question yet; run ask_followup and let the candidate try to fix the gap."
               : undefined,
           }),
         }],

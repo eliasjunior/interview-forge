@@ -38,6 +38,10 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
               type: lastEval.followUpType ?? null,
               focus: lastEval.followUpFocus ?? null,
               rationale: lastEval.followUpRationale ?? null,
+              adaptiveChallengeType: lastEval.adaptiveChallengeType ?? null,
+              adaptiveChallengePrompt: lastEval.adaptiveChallengePrompt ?? null,
+              adaptiveChallengeGoal: lastEval.adaptiveChallengeGoal ?? null,
+              adaptiveChallengeReward: lastEval.adaptiveChallengeReward ?? null,
             }
           : null;
 

@@ -14,6 +14,7 @@ export const sessions = sqliteTable("sessions", {
   customContent: text("custom_content"),
   focusArea: text("focus_area"),
   pendingAnswerMode: text("pending_answer_mode"),
+  activeAdaptiveChallenge: text("active_adaptive_challenge"),
   state: text("state").notNull(),
   currentQuestionIndex: integer("current_question_index").notNull(),
   summary: text("summary"),
@@ -73,6 +74,10 @@ export const sessionEvaluations = sqliteTable(
     followUpType: text("follow_up_type"),
     followUpFocus: text("follow_up_focus"),
     followUpRationale: text("follow_up_rationale"),
+    adaptiveChallengeType: text("adaptive_challenge_type"),
+    adaptiveChallengePrompt: text("adaptive_challenge_prompt"),
+    adaptiveChallengeGoal: text("adaptive_challenge_goal"),
+    adaptiveChallengeReward: text("adaptive_challenge_reward"),
     deeperDive: text("deeper_dive"),
   },
   (table) => ({

@@ -27,6 +27,17 @@ export type FollowUpType =
   | 'code_complexity'
   | 'problem_aware'
   | 'generic'
+export type AdaptiveChallengeType = 'recovery_round' | 'twist_round'
+export type AdaptiveChallengeStatus = 'pending' | 'asked'
+
+export interface ActiveAdaptiveChallenge {
+  type: AdaptiveChallengeType
+  status: AdaptiveChallengeStatus
+  sourceQuestionIndex: number
+  prompt: string
+  goal?: string
+  reward?: string
+}
 
 // ── Warm-up quest levels ───────────────────────────────────────────────────────
 
@@ -101,6 +112,10 @@ export interface Evaluation {
   followUpType?: FollowUpType
   followUpFocus?: string
   followUpRationale?: string
+  adaptiveChallengeType?: AdaptiveChallengeType
+  adaptiveChallengePrompt?: string
+  adaptiveChallengeGoal?: string
+  adaptiveChallengeReward?: string
   deeperDive?: string     // markdown bullets: "where to go deeper"
 }
 
@@ -128,6 +143,8 @@ export interface Session {
   focusArea?: string
   /** Answer mode for the currently submitted answer awaiting evaluation. */
   pendingAnswerMode?: AnswerMode
+  /** Active adaptive challenge that must be handled before advancing. */
+  activeAdaptiveChallenge?: ActiveAdaptiveChallenge
   /** Warm-up quest level recorded on warm-up sessions. In practice warm-up sessions use 0–2 only. */
   questLevel?: WarmUpLevel
   /** Question format used in this warm-up session. */

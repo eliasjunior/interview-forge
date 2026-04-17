@@ -4,24 +4,27 @@ import type { ToolDeps } from "./deps.js";
 
 const ANSWER_MODE_OPTIONS = [
   {
+    number: 1,
     id: "brief",
-    label: "Brief",
-    guidance: "Answer in 2-4 tight sentences. Prioritize the main decision and one trade-off.",
+    label: "1. Brief",
+    guidance: "2-4 tight sentences. Prioritize the main point and one trade-off.",
   },
   {
+    number: 2,
     id: "bullets",
-    label: "Bullets",
+    label: "2. Bullets",
     guidance: "Answer as 3-5 bullets. Prioritize coverage and structure over prose.",
   },
   {
+    number: 3,
     id: "deep_dive",
-    label: "Deep dive",
+    label: "3. Deep dive",
     guidance: "Answer in fuller detail with trade-offs, examples, and edge cases.",
   },
 ] as const;
 
 const ANSWER_MODE_PROMPT =
-  "After presenting the question, invite the candidate to answer in one of three styles: Brief (2-4 sentences), Bullets (3-5 bullets), or Deep dive (fuller trade-offs and edge cases). Ask for the mode naturally after the question instead of turning it into a separate pre-question step.";
+  "After presenting the question, invite the candidate to answer in one of three styles and let them reply with just the number: 1) Brief — 2-4 tight sentences, main point plus one trade-off; 2) Bullets — 3-5 bullets, coverage and structure; 3) Deep dive — fuller detail with trade-offs and examples. Ask for the mode naturally after the question instead of turning it into a separate pre-question step.";
 
 export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
@@ -43,6 +46,10 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
       const evaluationCriteria =
         session.questionCriteria?.[session.currentQuestionIndex] ??
         deps.knowledge.findByTopic(session.topic)?.evaluationCriteria[session.currentQuestionIndex];
+      const supportsAnswerModes = !(
+        session.sessionKind === "warmup" &&
+        (session.questFormat === "mcq" || session.questFormat === "fill_blank")
+      );
 
       session.messages.push({
         role: "interviewer",
@@ -63,9 +70,9 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
             question,
             choices: choices && choices.length > 0 ? choices : null,
             evaluationCriteria: evaluationCriteria ?? null,
-            answerModes: ANSWER_MODE_OPTIONS,
-            defaultAnswerMode: "deep_dive",
-            answerModePrompt: ANSWER_MODE_PROMPT,
+            answerModes: supportsAnswerModes ? ANSWER_MODE_OPTIONS : null,
+            defaultAnswerMode: supportsAnswerModes ? "deep_dive" : null,
+            answerModePrompt: supportsAnswerModes ? ANSWER_MODE_PROMPT : null,
             nextTool: "submit_answer",
           }),
         }],

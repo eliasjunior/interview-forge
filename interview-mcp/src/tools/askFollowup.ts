@@ -18,6 +18,13 @@ export function registerAskFollowupTool(server: McpServer, deps: ToolDeps) {
       const followUp =
         lastEval?.followUpQuestion ?? "Can you elaborate further on your previous answer?";
 
+      if (session.activeAdaptiveChallenge) {
+        session.activeAdaptiveChallenge = {
+          ...session.activeAdaptiveChallenge,
+          status: "asked",
+        };
+      }
+
       session.messages.push({
         role: "interviewer",
         content: followUp,
@@ -36,9 +43,15 @@ export function registerAskFollowupTool(server: McpServer, deps: ToolDeps) {
             followUpType: lastEval?.followUpType ?? null,
             followUpFocus: lastEval?.followUpFocus ?? null,
             followUpRationale: lastEval?.followUpRationale ?? null,
+            adaptiveChallengeType: lastEval?.adaptiveChallengeType ?? null,
+            adaptiveChallengePrompt: lastEval?.adaptiveChallengePrompt ?? null,
+            adaptiveChallengeGoal: lastEval?.adaptiveChallengeGoal ?? null,
+            adaptiveChallengeReward: lastEval?.adaptiveChallengeReward ?? null,
             nextTool: "submit_answer",
             instruction:
-              lastEval?.followUpFocus
+              lastEval?.adaptiveChallengePrompt
+                ? `${lastEval.adaptiveChallengePrompt} ${lastEval.adaptiveChallengeReward ?? ""}`.trim()
+                : lastEval?.followUpFocus
                 ? `Keep this follow-up tight. Probe only the identified gap: ${lastEval.followUpFocus}.`
                 : "Keep this follow-up tight and focused on one missing gap from the previous answer.",
           }),

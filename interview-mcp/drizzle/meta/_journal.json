@@ -120,6 +120,20 @@
       "when": 1776393600000,
       "tag": "0016_followup_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1776480000000,
+      "tag": "0017_adaptive_challenges",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1776566400000,
+      "tag": "0018_active_adaptive_challenge",
+      "breakpoints": true
     }
   ]
 }

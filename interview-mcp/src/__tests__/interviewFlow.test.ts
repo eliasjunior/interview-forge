@@ -387,6 +387,34 @@ describe("askQuestion — uses session.questionCriteria", () => {
       ["brief", "bullets", "deep_dive"]
     );
   });
+
+  test("does not return answer mode options for warm-up mcq questions", async () => {
+    const store = makeSessionStore({
+      "warmup-modes-off": {
+        id: "warmup-modes-off",
+        topic: TOPIC,
+        sessionKind: "warmup",
+        questFormat: "mcq",
+        questChoices: [["A", "B", "C", "D"]],
+        state: "ASK_QUESTION",
+        currentQuestionIndex: 0,
+        questions: ["Pick A, B, C, or D."],
+        messages: [],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const ask = captureHandler(registerAskQuestionTool, deps);
+
+    const res = parse(await ask({ sessionId: "warmup-modes-off" }));
+
+    assert.equal(res.answerModes, null);
+    assert.equal(res.defaultAnswerMode, null);
+    assert.equal(res.answerModePrompt, null);
+    assert.deepEqual(res.choices, ["A", "B", "C", "D"]);
+  });
 });
 
 describe("code interview early completion", () => {
@@ -657,6 +685,41 @@ describe("evaluateAnswer — uses session.questionCriteria", () => {
     assert.equal(saved.evaluations[0].needsFollowUp, true);
   });
 
+  test("forces a recovery follow-up for low scores even if the host says no follow-up", async () => {
+    const store = makeSessionStore({
+      "eval-force-recovery": {
+        id: "eval-force-recovery",
+        topic: TOPIC,
+        state: "EVALUATE_ANSWER",
+        currentQuestionIndex: 0,
+        pendingAnswerMode: "brief",
+        questions: [MOCK_ENTRY.questions[0]],
+        questionCriteria: [MOCK_ENTRY.evaluationCriteria[0]],
+        messages: [
+          { role: "interviewer", content: MOCK_ENTRY.questions[0], timestamp: new Date().toISOString() },
+          { role: "candidate", content: "Use pagination.", timestamp: new Date().toISOString() },
+        ],
+        evaluations: [],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
+
+    const res = parse(await evaluate({
+      sessionId: "eval-force-recovery",
+      score: 2,
+      feedback: "Too shallow.",
+      needsFollowUp: false,
+    }));
+
+    assert.equal(res.needsFollowUp, true);
+    assert.match(res.followUpQuestion, /Recovery round/i);
+    assert.equal(res.nextTool, "ask_followup");
+    assert.equal(store.get("eval-force-recovery").activeAdaptiveChallenge?.type, "recovery_round");
+  });
+
   test("passes answerMode through to AI evaluation and stores it on the evaluation", async () => {
     const store = makeSessionStore({
       "eval-mode": {
@@ -697,7 +760,7 @@ describe("evaluateAnswer — uses session.questionCriteria", () => {
     assert.equal(calls[0].answerMode, "brief");
     assert.match(calls[0].context ?? "", /brief mode/i);
     assert.equal(res.answerMode, "brief");
-    assert.match(res.candidateDeliveryGuidance, /2-3 tight sentences/i);
+    assert.match(res.candidateDeliveryGuidance, /1-2 tight sentences|2-3 tight sentences/i);
     assert.equal(store.get("eval-mode").evaluations[0].answerMode, "brief");
     assert.equal(store.get("eval-mode").pendingAnswerMode, undefined);
   });
@@ -734,6 +797,12 @@ describe("evaluateAnswer — uses session.questionCriteria", () => {
     assert.equal(res.followUpType, "vague_tradeoff");
     assert.match(res.followUpFocus, /trade-off/i);
     assert.match(res.followUpRationale, /decision boundary|trade-off|justify/i);
+    assert.equal(res.adaptiveChallengeType, "recovery_round");
+    assert.match(res.adaptiveChallengePrompt, /Recovery round/i);
+    assert.match(res.adaptiveChallengeReward, /win back|tighten/i);
+    assert.equal(res.nextTool, "ask_followup");
+    assert.match(res.instruction, /recovery round is active/i);
+    assert.equal(store.get("eval-followup-type").activeAdaptiveChallenge?.type, "recovery_round");
     assert.equal(store.get("eval-followup-type").evaluations[0].followUpType, "vague_tradeoff");
   });
 });
@@ -760,6 +829,10 @@ describe("follow-up metadata surfaces through the loop", () => {
             followUpType: "vague_tradeoff",
             followUpFocus: "the main trade-off and why this design is preferable",
             followUpRationale: "The answer named an approach but did not make the decision boundary explicit enough.",
+            adaptiveChallengeType: "recovery_round",
+            adaptiveChallengePrompt: "Recovery round: tighten the answer by naming the trade-off explicitly and defending your choice.",
+            adaptiveChallengeGoal: "the main trade-off and why this design is preferable",
+            adaptiveChallengeReward: "Recovery round: win back the point by correcting the core mistake.",
           },
         ],
         createdAt: new Date().toISOString(),
@@ -773,7 +846,8 @@ describe("follow-up metadata surfaces through the loop", () => {
 
     assert.equal(res.followUpType, "vague_tradeoff");
     assert.match(res.followUpFocus, /trade-off/i);
-    assert.match(res.instruction, /identified gap/i);
+    assert.equal(res.adaptiveChallengeType, "recovery_round");
+    assert.match(res.instruction, /Recovery round/i);
   });
 
   test("get_session exposes active follow-up context when waiting to ask it", async () => {
@@ -797,6 +871,10 @@ describe("follow-up metadata surfaces through the loop", () => {
             followUpType: "vague_tradeoff",
             followUpFocus: "the main trade-off and why this design is preferable",
             followUpRationale: "The answer named an approach but did not make the decision boundary explicit enough.",
+            adaptiveChallengeType: "recovery_round",
+            adaptiveChallengePrompt: "Recovery round: tighten the answer by naming the trade-off explicitly and defending your choice.",
+            adaptiveChallengeGoal: "the main trade-off and why this design is preferable",
+            adaptiveChallengeReward: "Recovery round: win back the point by correcting the core mistake.",
           },
         ],
         createdAt: new Date().toISOString(),
@@ -811,6 +889,72 @@ describe("follow-up metadata surfaces through the loop", () => {
     assert.equal(res.activeFollowUp.type, "vague_tradeoff");
     assert.equal(res.activeFollowUp.question, "What trade-off are you making between simplicity and consistency here?");
     assert.match(res.activeFollowUp.focus, /trade-off/i);
+    assert.equal(res.activeFollowUp.adaptiveChallengeType, "recovery_round");
+    assert.match(res.activeFollowUp.adaptiveChallengePrompt, /Recovery round/i);
+  });
+
+  test("next_question is blocked until the active recovery round is answered, then clears", async () => {
+    const store = makeSessionStore({
+      "recovery-lock": {
+        id: "recovery-lock",
+        topic: TOPIC,
+        state: "FOLLOW_UP",
+        currentQuestionIndex: 0,
+        activeAdaptiveChallenge: {
+          type: "recovery_round",
+          status: "pending",
+          sourceQuestionIndex: 0,
+          prompt: "Recovery round: tighten the answer by naming the trade-off explicitly and defending your choice.",
+          goal: "the main trade-off and why this design is preferable",
+          reward: "Recovery round: win back the point by correcting the core mistake.",
+        },
+        questions: [MOCK_ENTRY.questions[0], MOCK_ENTRY.questions[1]],
+        messages: [],
+        evaluations: [
+          {
+            questionIndex: 0,
+            question: MOCK_ENTRY.questions[0],
+            answer: "I would paginate the endpoint.",
+            score: 3,
+            feedback: "Reasonable start, but you did not justify the main trade-off.",
+            needsFollowUp: true,
+            followUpQuestion: "What trade-off are you making between simplicity and consistency here?",
+            followUpType: "vague_tradeoff",
+            followUpFocus: "the main trade-off and why this design is preferable",
+            followUpRationale: "The answer named an approach but did not make the decision boundary explicit enough.",
+            adaptiveChallengeType: "recovery_round",
+            adaptiveChallengePrompt: "Recovery round: tighten the answer by naming the trade-off explicitly and defending your choice.",
+            adaptiveChallengeGoal: "the main trade-off and why this design is preferable",
+            adaptiveChallengeReward: "Recovery round: win back the point by correcting the core mistake.",
+          },
+        ],
+        createdAt: new Date().toISOString(),
+        knowledgeSource: "file",
+      },
+    });
+    const deps = makeDeps(store);
+    const nextQuestion = captureHandler(registerNextQuestionTool, deps);
+    const followup = captureHandler(registerAskFollowupTool, deps);
+    const submit = captureHandler(registerSubmitAnswerTool, deps);
+    const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
+
+    const blocked = await nextQuestion({ sessionId: "recovery-lock" });
+    assert.match(blocked.content[0].text, /still active/i);
+
+    await followup({ sessionId: "recovery-lock" });
+    await submit({ sessionId: "recovery-lock", answer: "The trade-off is simpler paging now versus stronger consistency guarantees." });
+    const evalRes = parse(await evaluate({
+      sessionId: "recovery-lock",
+      score: 4,
+      feedback: "Much clearer.",
+      needsFollowUp: false,
+    }));
+
+    assert.equal(evalRes.activeAdaptiveChallenge, null);
+    assert.equal(store.get("recovery-lock").activeAdaptiveChallenge, undefined);
+
+    const advanced = parse(await nextQuestion({ sessionId: "recovery-lock" }));
+    assert.equal(advanced.nextTool, "ask_question");
   });
 });
 
