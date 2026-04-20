@@ -30,6 +30,7 @@ export function buildSessionLaunchPrompt(session: Session): SessionLaunchPrompt 
     "When asking each question, ask the question first, then naturally offer three numbered answer styles so the candidate can reply with 1, 2, or 3.",
     "Do not ask the candidate to choose a mode before they see the question.",
     "Avoid mechanical UI-style wording like 'Answer modes:'. Prefer natural interviewer phrasing such as 'You can answer 1) Brief, 2) Bullets, or 3) Deep dive.'",
+    "If ask_question returns responseTimeLimitSec, tell the candidate 'Take up to N seconds' in natural interviewer language. This is soft pressure only, not a hard cutoff.",
     "When you call submit_answer, always pass the chosen answerMode so evaluation stays fair for concise answers.",
     "After evaluate_answer, keep candidate-facing feedback mode-aware: for brief mode use at most 2-3 sentences plus one focused follow-up; for bullets mode keep the correction compact and structured; for deep_dive mode fuller explanation is fine.",
     "Do not expose tool chatter like tool counts or internal step labels to the candidate.",

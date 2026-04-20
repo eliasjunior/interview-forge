@@ -104,6 +104,8 @@ export interface Evaluation {
   question: string
   answer: string
   answerMode?: AnswerMode
+  answerElapsedSec?: number
+  responseTimeLimitSec?: number
   strongAnswer?: string
   score: number           // 1–5
   feedback: string
@@ -143,6 +145,12 @@ export interface Session {
   focusArea?: string
   /** Answer mode for the currently submitted answer awaiting evaluation. */
   pendingAnswerMode?: AnswerMode
+  /** Suggested timer for the currently active question. */
+  pendingResponseTimeLimitSec?: number
+  /** When the current question timer started. */
+  pendingResponseStartedAt?: string
+  /** Candidate answer latency for the current answer awaiting evaluation. */
+  pendingAnswerElapsedSec?: number
   /** Active adaptive challenge that must be handled before advancing. */
   activeAdaptiveChallenge?: ActiveAdaptiveChallenge
   /** Warm-up quest level recorded on warm-up sessions. In practice warm-up sessions use 0–2 only. */

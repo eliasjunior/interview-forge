@@ -26,6 +26,17 @@ const ANSWER_MODE_OPTIONS = [
 const ANSWER_MODE_PROMPT =
   "After presenting the question, invite the candidate to answer in one of three styles and let them reply with just the number: 1) Brief — 2-4 tight sentences, main point plus one trade-off; 2) Bullets — 3-5 bullets, coverage and structure; 3) Deep dive — fuller detail with trade-offs and examples. Ask for the mode naturally after the question instead of turning it into a separate pre-question step.";
 
+function getResponseTimeLimitSec(session: {
+  sessionKind?: string;
+  questFormat?: string;
+}): number {
+  if (session.sessionKind === "warmup") {
+    if (session.questFormat === "mcq" || session.questFormat === "fill_blank") return 20;
+    return 45;
+  }
+  return 60;
+}
+
 export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
     "ask_question",
@@ -50,12 +61,17 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
         session.sessionKind === "warmup" &&
         (session.questFormat === "mcq" || session.questFormat === "fill_blank")
       );
+      const responseTimeLimitSec = getResponseTimeLimitSec(session);
+      const responseStartedAt = new Date().toISOString();
 
       session.messages.push({
         role: "interviewer",
         content: question,
-        timestamp: new Date().toISOString(),
+        timestamp: responseStartedAt,
       });
+      session.pendingResponseTimeLimitSec = responseTimeLimitSec;
+      session.pendingResponseStartedAt = responseStartedAt;
+      session.pendingAnswerElapsedSec = undefined;
       session.state = "WAIT_FOR_ANSWER";
       deps.saveSessions(sessions);
 
@@ -73,6 +89,7 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
             answerModes: supportsAnswerModes ? ANSWER_MODE_OPTIONS : null,
             defaultAnswerMode: supportsAnswerModes ? "deep_dive" : null,
             answerModePrompt: supportsAnswerModes ? ANSWER_MODE_PROMPT : null,
+            responseTimeLimitSec,
             nextTool: "submit_answer",
           }),
         }],

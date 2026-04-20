@@ -45,6 +45,27 @@ Optional later:
 - `Team confidence`
 - `Data correctness`
 
+## Add a service contract layer: SLI, SLO, SLA
+
+Yes, these fit well, but they should not replace the top-level health stats.
+
+They should explain *why* the health stats are moving and when product damage turns into business damage.
+
+Recommended structure:
+
+- top layer: game-readable health bars
+- middle layer: operational indicators and targets
+- bottom layer: business consequence
+
+In practice:
+
+- `Latency`, `Reliability`, `Cost control`, and `Failure` remain the main game HUD
+- `SLI` is the measured signal behind the scenes
+- `SLO` is the target the player is trying to keep
+- `SLA` is the penalty trigger when missed objectives become customer-visible
+
+That keeps the mode readable and still teaches real production thinking.
+
 ## What each field means
 
 ### Latency
@@ -119,6 +140,51 @@ Examples:
 
 If `Failure` reaches a threshold, the run ends.
 
+## How SLI, SLO, and SLA fit the game
+
+### SLI
+
+The `Service Level Indicator` is the measured value.
+
+Examples for an Order Service:
+
+- `GET /orders` p95 latency
+- `GET /orders/:id` success rate
+- `POST /orders` success rate
+- duplicate order rate
+- stale-read rate
+
+SLIs should be the concrete numbers that rise or fall after decisions.
+
+### SLO
+
+The `Service Level Objective` is the target.
+
+Examples:
+
+- `GET /orders` p95 latency under `300ms`
+- `POST /orders` success rate at or above `99.9%`
+- duplicate order rate below `0.1%`
+- stale-read rate below a defined threshold for non-critical reads
+
+SLOs create tension in the run because the player is no longer optimizing vaguely. The player is trying to keep the service within explicit operating boundaries.
+
+### SLA
+
+The `Service Level Agreement` is the external consequence layer.
+
+This is where missed objectives stop being an internal engineering concern and become a product or customer problem.
+
+Examples:
+
+- support tickets spike
+- enterprise customer complains
+- checkout partner escalates
+- refund risk rises
+- contract breach penalty applies
+
+In gameplay terms, an SLA miss should usually increase `Failure` sharply, trigger story consequences, or unlock harder rounds.
+
 ## Why failure matters
 
 Right now the arena feels score-first.
@@ -156,6 +222,13 @@ Then the game advances through small business and technical events:
 The player is not solving random disconnected crises.
 
 The player is shaping one system over time.
+
+As the story evolves, the game can reveal more explicit indicators and objectives:
+
+- early game: broad health stats only
+- mid game: show specific SLIs
+- later game: attach SLO targets to important flows
+- advanced rounds: trigger SLA consequences when the player repeatedly misses what matters
 
 ## Micro-round design
 
@@ -204,6 +277,7 @@ The player sees a stat change now.
 Example:
 
 - adding pagination improves latency immediately
+- adding idempotency improves `POST /orders` reliability immediately
 
 ### Deferred impact
 
@@ -213,6 +287,7 @@ Example:
 
 - using a weak read contract early seems harmless
 - later it hurts caching, semantics, and client behavior
+- missing instrumentation early means the player later sees weak SLI visibility and slower incident response
 
 This is how the game can teach product thinking instead of pure quiz logic.
 
@@ -242,6 +317,12 @@ Teaching point:
 
 At small scale, some imperfect choices survive. The point is not "wrong immediately". The point is "future cost".
 
+Possible hidden state:
+
+- `usesGenericReadQuery`
+- `missingReadSemantics`
+- `thinInstrumentation`
+
 ### Round 2: browse arrives
 
 Story:
@@ -259,6 +340,14 @@ Expected impact:
 - full list hurts `Latency`, `Cost control`, and raises `Failure`
 - bounded pagination improves `Latency` and `Cost control`
 - generic search may be mixed: flexible now, but may create complexity later
+
+Possible SLI revealed:
+
+- `GET /orders` p95 latency
+
+Possible SLO introduced:
+
+- keep browse p95 under `300ms`
 
 ### Round 3: filtering and sorting
 
@@ -278,6 +367,11 @@ Expected impact:
 - pushing filters down is strong
 - one-off endpoints may help short term but create design sprawl later
 
+Possible SLI revealed:
+
+- query error rate
+- average database work per request
+
 ### Round 4: write pressure
 
 Story:
@@ -296,6 +390,15 @@ Expected impact:
 - idempotency improves `Reliability`
 - client discipline alone is weak
 
+Possible SLI revealed:
+
+- duplicate order rate
+- `POST /orders` success rate
+
+Possible SLO introduced:
+
+- duplicate order rate below `0.1%`
+
 ### Round 5: read scale
 
 Story:
@@ -313,6 +416,22 @@ Expected impact:
 - scaling app only is mixed
 - explicit cache policy is strong
 - database-only reads may preserve correctness but damage cost and latency under load
+
+Possible SLI revealed:
+
+- cache hit ratio
+- stale-read rate
+- read success rate
+
+Possible SLO introduced:
+
+- stale-read rate below agreed threshold for standard reads
+- critical reads must bypass stale cache path
+
+Possible SLA risk:
+
+- a large customer depends on freshness for operational reporting
+- repeated stale critical reads trigger a customer-visible incident
 
 ## Proposed stat behavior
 
@@ -335,6 +454,18 @@ Rules:
 - severe mistakes can spike `Failure`
 - if `Failure >= 100`, the run ends
 - if `Latency` or `Reliability` fall too low, failure can tick up passively in later rounds
+
+Second layer:
+
+- each chapter can reveal one or more `SLIs`
+- key chapters can add `SLO` targets
+- repeated missed `SLO`s can convert into `SLA` penalties
+
+Example:
+
+- one bad latency round may only lower `Latency`
+- repeated bad latency after the SLO is visible may increase `Failure`
+- repeated misses after a customer-facing commitment exists may trigger an SLA event and cause a major failure spike
 
 ## Suggested UI interpretation
 
@@ -360,6 +491,12 @@ The panel should answer:
 - What kind of damage am I accumulating?
 - Which trade-off am I currently paying for?
 
+A secondary panel or expandable section can answer:
+
+- Which indicators are failing?
+- Which SLOs are currently at risk?
+- Have I caused an SLA breach yet?
+
 ## Current Crisis Mode -> smallest useful upgrade
 
 Do not rewrite the whole mode yet.
@@ -381,6 +518,7 @@ Minimal implementation:
 - label each round as a chapter in the same Order Service journey
 - change `Run status` copy to make it explicit that these are product health stats
 - add `Failure`
+- add a compact indicators panel with 1 or 2 visible SLIs
 
 ## Step 2
 
@@ -391,6 +529,7 @@ Minimal implementation:
 - each action shows stat deltas after selection
 - not only `strong/mixed/weak`
 - feedback copy explains trade-offs
+- when relevant, show which SLI moved and whether the current SLO is now at risk
 
 ## Step 3
 
@@ -403,7 +542,15 @@ Minimal implementation:
   - `skippedPagination`
   - `ignoredIdempotency`
   - `addedCacheWithoutPolicy`
+  - `weakObservability`
 - later rounds inspect those flags and modify choices or penalties
+
+Later, those flags can also influence:
+
+- which SLIs are available
+- how noisy incidents are
+- how quickly SLO breaches are detected
+- how severe SLA penalties become
 
 ## Step 4
 
@@ -417,11 +564,13 @@ The smallest solid version is:
 
 1. one story: `Order Service REST API`
 2. four stats: `Latency`, `Reliability`, `Cost control`, `Failure`
-3. 4 to 6 short rounds
-4. each round updates stats
-5. at least 2 choices create deferred consequences
-6. lose condition based on failure
-7. keep existing score as secondary, not primary
+3. 1 to 3 visible SLIs during the run
+4. 1 or 2 explicit SLOs introduced in later chapters
+5. 4 to 6 short rounds
+6. each round updates stats
+7. at least 2 choices create deferred consequences
+8. lose condition based on failure
+9. keep existing score as secondary, not primary
 
 ## Open design questions
 
@@ -429,8 +578,9 @@ These are worth deciding before heavier UI work:
 
 1. Should score remain visible during the run, or only after the run?
 2. Should `Failure` be the only lose condition, or should total collapse also happen if `Latency` or `Reliability` hit zero?
-3. Should the free-text answer phase happen every round, or only after major rounds?
-4. Should the run always use one authored campaign first, or should topic files generate story beats dynamically later?
+3. Which SLIs are worth showing in v1 without making the UI too operationally dense?
+4. Should the free-text answer phase happen every round, or only after major rounds?
+5. Should the run always use one authored campaign first, or should topic files generate story beats dynamically later?
 
 ## Recommendation
 

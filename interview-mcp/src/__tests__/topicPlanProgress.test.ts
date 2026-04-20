@@ -1,7 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import type { TopicLevelSnapshot, WarmUpLevel } from "@mock-interview/shared";
-import { shouldRecordTopicLevelUp } from "../topicPlanProgress.js";
+import type { Session, TopicLevelSnapshot, WarmUpLevel } from "@mock-interview/shared";
+import { inferLastLevelUpAt, shouldRecordTopicLevelUp } from "../topicPlanProgress.js";
 
 function snapshot(level: WarmUpLevel): TopicLevelSnapshot {
   return {
@@ -53,5 +53,63 @@ describe("shouldRecordTopicLevelUp", () => {
     });
 
     assert.equal(result, false);
+  });
+});
+
+describe("inferLastLevelUpAt", () => {
+  test("ignores legacy warmup sessions without explicit quest levels when backfilling timestamps", () => {
+    const sessions: Record<string, Session> = {
+      legacyA: {
+        id: "legacyA",
+        topic: "CI/CD Release Flow for Backend Engineers",
+        sessionKind: "warmup",
+        interviewType: "design",
+        state: "ENDED",
+        currentQuestionIndex: 1,
+        questions: ["Q1"],
+        messages: [],
+        evaluations: [{ questionIndex: 0, question: "Q1", answer: "A", score: 4, feedback: "good", needsFollowUp: false }],
+        createdAt: "2026-03-27T17:15:17.271Z",
+        endedAt: "2026-03-27T18:30:52.427Z",
+        knowledgeSource: "file",
+      },
+      legacyB: {
+        id: "legacyB",
+        topic: "CI/CD Release Flow for Backend Engineers",
+        sessionKind: "warmup",
+        interviewType: "design",
+        state: "ENDED",
+        currentQuestionIndex: 1,
+        questions: ["Q1"],
+        messages: [],
+        evaluations: [{ questionIndex: 0, question: "Q1", answer: "A", score: 4, feedback: "good", needsFollowUp: false }],
+        createdAt: "2026-03-27T22:04:38.489Z",
+        endedAt: "2026-03-27T23:01:47.093Z",
+        knowledgeSource: "file",
+      },
+      warmupL0: {
+        id: "warmupL0",
+        topic: "CI/CD Release Flow for Backend Engineers",
+        sessionKind: "warmup",
+        questLevel: 0,
+        interviewType: "design",
+        state: "ENDED",
+        currentQuestionIndex: 1,
+        questions: ["Q1"],
+        messages: [],
+        evaluations: [{ questionIndex: 0, question: "Q1", answer: "A", score: 4, feedback: "good", needsFollowUp: false }],
+        createdAt: "2026-04-17T07:18:04.784Z",
+        endedAt: "2026-04-17T07:35:57.347Z",
+        knowledgeSource: "file",
+      },
+    };
+
+    const inferred = inferLastLevelUpAt({
+      topic: "CI/CD Release Flow for Backend Engineers",
+      sessions,
+      hasWarmupContent: true,
+    });
+
+    assert.equal(inferred, "2026-04-17T07:35:57.347Z");
   });
 });

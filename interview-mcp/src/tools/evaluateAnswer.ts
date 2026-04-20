@@ -34,6 +34,28 @@ function getCandidateDeliveryGuidance(answerMode: AnswerMode, hasFollowUp: boole
     : "A fuller explanation is acceptable here, but keep it focused on the highest-value correction.";
 }
 
+function getTimingGuidance(
+  answerElapsedSec: number | undefined,
+  responseTimeLimitSec: number | undefined,
+): string | undefined {
+  if (answerElapsedSec == null && responseTimeLimitSec == null) return undefined;
+
+  if (answerElapsedSec == null) {
+    return `Suggested time limit: ${responseTimeLimitSec} seconds. Use this as soft pressure context only; do not penalize timing by itself.`;
+  }
+
+  if (responseTimeLimitSec == null) {
+    return `Candidate took about ${answerElapsedSec} seconds to answer. Use this as soft pressure context only; do not score timing directly.`;
+  }
+
+  const timingStatus =
+    answerElapsedSec <= responseTimeLimitSec
+      ? `Candidate answered in about ${answerElapsedSec} seconds, within the suggested ${responseTimeLimitSec}-second window.`
+      : `Candidate answered in about ${answerElapsedSec} seconds, over the suggested ${responseTimeLimitSec}-second window.`;
+
+  return `${timingStatus} Use this as soft pressure context only; evaluate answer quality first and mention timing only if it adds useful coaching context.`;
+}
+
 function normalizeLower(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
@@ -295,6 +317,8 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
       const lastQuestion = deps.findLast(session.messages, (m) => m.role === "interviewer");
       const lastAnswer = deps.findLast(session.messages, (m) => m.role === "candidate");
       const answerMode = session.pendingAnswerMode ?? DEFAULT_ANSWER_MODE;
+      const answerElapsedSec = session.pendingAnswerElapsedSec;
+      const responseTimeLimitSec = session.pendingResponseTimeLimitSec;
       const existingAdaptiveChallenge = session.activeAdaptiveChallenge;
       const resolvingAdaptiveChallenge =
         existingAdaptiveChallenge != null &&
@@ -356,9 +380,13 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
           : undefined;
 
         const contextBase = knowledgeCriteria ?? scopedContext;
-        const context = contextBase
-          ? `${contextBase}\n\nAnswer mode guidance:\n${getAnswerModeGuidance(answerMode)}`
-          : `Answer mode guidance:\n${getAnswerModeGuidance(answerMode)}`;
+        const timingGuidance = getTimingGuidance(answerElapsedSec, responseTimeLimitSec);
+        const contextParts = [
+          contextBase,
+          `Answer mode guidance:\n${getAnswerModeGuidance(answerMode)}`,
+          timingGuidance ? `Timing context:\n${timingGuidance}` : undefined,
+        ].filter((value): value is string => Boolean(value));
+        const context = contextParts.join("\n\n");
         result = await deps.ai.evaluateAnswer(lastQuestion.content, lastAnswer.content, context, answerMode);
       } else {
         if (score === undefined || feedback === undefined || needsFollowUp === undefined) {
@@ -383,6 +411,8 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         question: lastQuestion.content,
         answer: lastAnswer.content,
         answerMode,
+        answerElapsedSec,
+        responseTimeLimitSec,
         strongAnswer: resolvedStrongAnswer,
         score: result.score,
         feedback: result.feedback,
@@ -477,6 +507,9 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
 
       session.evaluations.push(evaluation);
       session.pendingAnswerMode = undefined;
+      session.pendingResponseTimeLimitSec = undefined;
+      session.pendingResponseStartedAt = undefined;
+      session.pendingAnswerElapsedSec = undefined;
       if (earlyCompletionDetected && session.interviewType === "code") {
         session.currentQuestionIndex = session.questions.length - 1;
       }
@@ -490,6 +523,8 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
             sessionId,
             state: session.state,
             answerMode,
+            answerElapsedSec: evaluation.answerElapsedSec ?? null,
+            responseTimeLimitSec: evaluation.responseTimeLimitSec ?? null,
             score: result.score,
             feedback: result.feedback,
             strongAnswer: resolvedStrongAnswer ?? null,

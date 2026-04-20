@@ -100,6 +100,9 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       customContent: session.customContent,
       focusArea: session.focusArea,
       pendingAnswerMode: session.pendingAnswerMode ?? null,
+      pendingResponseTimeLimitSec: session.pendingResponseTimeLimitSec ?? null,
+      pendingResponseStartedAt: session.pendingResponseStartedAt ?? null,
+      pendingAnswerElapsedSec: session.pendingAnswerElapsedSec ?? null,
       activeAdaptiveChallenge: session.activeAdaptiveChallenge != null ? JSON.stringify(session.activeAdaptiveChallenge) : null,
       state: session.state,
       currentQuestionIndex: session.currentQuestionIndex,
@@ -131,6 +134,8 @@ export function mapSessionToNormalizedRecord(session: Session): NormalizedSessio
       question: evaluation.question,
       answer: evaluation.answer,
       answerMode: evaluation.answerMode ?? null,
+      answerElapsedSec: evaluation.answerElapsedSec ?? null,
+      responseTimeLimitSec: evaluation.responseTimeLimitSec ?? null,
       strongAnswer: evaluation.strongAnswer,
       score: evaluation.score,
       feedback: evaluation.feedback,
@@ -167,6 +172,9 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
     customContent: rows.session.customContent ?? undefined,
     focusArea: rows.session.focusArea ?? undefined,
     pendingAnswerMode: (rows.session.pendingAnswerMode as AnswerMode | null) ?? undefined,
+    pendingResponseTimeLimitSec: rows.session.pendingResponseTimeLimitSec ?? undefined,
+    pendingResponseStartedAt: rows.session.pendingResponseStartedAt ?? undefined,
+    pendingAnswerElapsedSec: rows.session.pendingAnswerElapsedSec ?? undefined,
     activeAdaptiveChallenge:
       rows.session.activeAdaptiveChallenge != null
         ? JSON.parse(rows.session.activeAdaptiveChallenge)
@@ -193,6 +201,8 @@ export function mapSessionAggregateToDomain(rows: SessionAggregateRows): Session
         question: row.question,
         answer: row.answer,
         answerMode: (row.answerMode as AnswerMode | null) ?? undefined,
+        answerElapsedSec: row.answerElapsedSec ?? undefined,
+        responseTimeLimitSec: row.responseTimeLimitSec ?? undefined,
         strongAnswer: row.strongAnswer ?? undefined,
         score: row.score,
         feedback: row.feedback,

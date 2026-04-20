@@ -215,11 +215,16 @@ export function detectTopicLevel(
   }
 
   // Determine highest warmup level passed
-  const warmupSessions = topicSessions.filter((s) => s.sessionKind === "warmup");
+  // Legacy warm-up sessions created before quest levels existed should not
+  // count toward the modern L0/L1/L2 ladder, otherwise they can suppress
+  // fresh unlock timestamps for real scoped warm-up progress.
+  const warmupSessions = topicSessions.filter(
+    (s) => s.sessionKind === "warmup" && s.questLevel !== undefined
+  );
 
   // Walk levels 0 → 1 → 2 and find the first one not yet passed
   for (const lvl of [0, 1, 2] as const) {
-    const levelSessions = warmupSessions.filter((s) => (s.questLevel ?? 0) === lvl);
+    const levelSessions = warmupSessions.filter((s) => s.questLevel === lvl);
     const levelProgress = getWarmupLevelProgress(levelSessions);
     if (!levelProgress.passed) {
       const attempted = levelProgress.bestAvg !== null;

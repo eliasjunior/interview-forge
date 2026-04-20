@@ -17,6 +17,7 @@ import type {
   GraphInspectionResult,
   GraphInspectionSession,
   ProgressSessionKind,
+  TopicPlan,
   TopicPlanPriority,
 } from "@mock-interview/shared";
 import { randomUUID } from "crypto";
@@ -38,6 +39,7 @@ import {
   listKnowledgeTopics,
   normalizeTopicPlanKey,
 } from "./http/topicDetails.js";
+import { inferLastLevelUpAt } from "./topicPlanProgress.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -62,6 +64,41 @@ function loadSessions(): Record<string, Session> {
   return Object.fromEntries(
     repositories.sessions.list().map((session) => [session.id, session])
   );
+}
+
+function hasWarmupContentForTopic(topic: string): boolean {
+  const normalizedTopic = normalizeTopicPlanKey(KNOWLEDGE_DIR, topic);
+  const topicEntry = listKnowledgeTopics(KNOWLEDGE_DIR).find((entry) => entry.file === normalizedTopic);
+  if (!topicEntry) return false;
+
+  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
+  const knowledgeTopic = store.findByTopic(topicEntry.displayName);
+  return knowledgeTopic != null &&
+    knowledgeTopic.warmupLevels != null &&
+    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+}
+
+function getTopicDisplayName(topic: string): string {
+  const normalizedTopic = normalizeTopicPlanKey(KNOWLEDGE_DIR, topic);
+  const topicEntry = listKnowledgeTopics(KNOWLEDGE_DIR).find((entry) => entry.file === normalizedTopic);
+  return topicEntry?.displayName ?? topic;
+}
+
+function repairTopicPlanLevelUpTimestamp(plan: TopicPlan): TopicPlan {
+  if (plan.lastLevelUpAt || plan.lastUnlockedLevel === undefined) return plan;
+
+  const inferredLastLevelUpAt = inferLastLevelUpAt({
+    topic: getTopicDisplayName(plan.topic),
+    sessions: loadSessions(),
+    hasWarmupContent: hasWarmupContentForTopic(plan.topic),
+  });
+
+  if (!inferredLastLevelUpAt) return plan;
+
+  return repositories.topicPlans.upsert({
+    ...plan,
+    lastLevelUpAt: inferredLastLevelUpAt,
+  });
 }
 
 function loadFlashcards(): Flashcard[] {
@@ -210,10 +247,13 @@ app.get("/api/topics/:topic/level", (req, res) => {
 
 app.get("/api/topic-plans", (_req, res) => {
   res.json(
-    repositories.topicPlans.list().map((plan) => ({
-      ...plan,
-      topic: normalizeTopicPlanKey(KNOWLEDGE_DIR, plan.topic),
-    }))
+    repositories.topicPlans.list().map((plan) => {
+      const repairedPlan = repairTopicPlanLevelUpTimestamp(plan);
+      return {
+        ...repairedPlan,
+        topic: normalizeTopicPlanKey(KNOWLEDGE_DIR, repairedPlan.topic),
+      };
+    })
   );
 });
 

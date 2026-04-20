@@ -5,6 +5,13 @@ import type { ToolDeps } from "./deps.js";
 
 const DEFAULT_ANSWER_MODE: AnswerMode = "deep_dive";
 
+function computeElapsedSeconds(startedAt?: string): number | undefined {
+  if (!startedAt) return undefined;
+  const startedMs = new Date(startedAt).getTime();
+  if (Number.isNaN(startedMs)) return undefined;
+  return Math.max(0, Math.round((Date.now() - startedMs) / 1000));
+}
+
 export function registerSubmitAnswerTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
     "submit_answer",
@@ -31,6 +38,7 @@ export function registerSubmitAnswerTool(server: McpServer, deps: ToolDeps) {
         timestamp: new Date().toISOString(),
       });
       session.pendingAnswerMode = (answerMode ?? DEFAULT_ANSWER_MODE) as AnswerMode;
+      session.pendingAnswerElapsedSec = computeElapsedSeconds(session.pendingResponseStartedAt);
       session.state = "EVALUATE_ANSWER";
       deps.saveSessions(sessions);
 
@@ -41,6 +49,8 @@ export function registerSubmitAnswerTool(server: McpServer, deps: ToolDeps) {
             sessionId,
             state: session.state,
             answerMode: session.pendingAnswerMode,
+            answerElapsedSec: session.pendingAnswerElapsedSec ?? null,
+            responseTimeLimitSec: session.pendingResponseTimeLimitSec ?? null,
             nextTool: "evaluate_answer",
           }),
         }],

@@ -24,6 +24,7 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
             "(6) do not continue through extra scripted questions once the solution phase is complete, " +
             "(7) end_interview when done. Do NOT run a system-design or API-design interview."
           : "Keep the interview immersive. Ask the question first, then offer answer style naturally. " +
+            "If ask_question returns a responseTimeLimitSec value, present it as soft timing pressure like 'Take up to 60 seconds.' " +
             "After evaluation, adapt the amount of explanation to the answer mode: " +
             "brief mode = 2-3 tight sentences plus one focused follow-up, " +
             "bullets mode = compact structured correction, " +

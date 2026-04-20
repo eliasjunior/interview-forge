@@ -382,6 +382,7 @@ describe("askQuestion — uses session.questionCriteria", () => {
     const res = parse(await ask({ sessionId: "modes-1" }));
 
     assert.equal(res.defaultAnswerMode, "deep_dive");
+    assert.equal(res.responseTimeLimitSec, 60);
     assert.deepEqual(
       res.answerModes.map((mode: { id: string }) => mode.id),
       ["brief", "bullets", "deep_dive"]
@@ -413,6 +414,7 @@ describe("askQuestion — uses session.questionCriteria", () => {
     assert.equal(res.answerModes, null);
     assert.equal(res.defaultAnswerMode, null);
     assert.equal(res.answerModePrompt, null);
+    assert.equal(res.responseTimeLimitSec, 20);
     assert.deepEqual(res.choices, ["A", "B", "C", "D"]);
   });
 });
@@ -763,6 +765,70 @@ describe("evaluateAnswer — uses session.questionCriteria", () => {
     assert.match(res.candidateDeliveryGuidance, /1-2 tight sentences|2-3 tight sentences/i);
     assert.equal(store.get("eval-mode").evaluations[0].answerMode, "brief");
     assert.equal(store.get("eval-mode").pendingAnswerMode, undefined);
+  });
+
+  test("submit_answer records elapsed time and evaluate_answer stores it with timing context", async () => {
+    const originalNow = Date.now;
+    Date.now = () => new Date("2026-04-17T10:01:05.000Z").getTime();
+    try {
+      const store = makeSessionStore({
+        "timed-1": {
+          id: "timed-1",
+          topic: TOPIC,
+          state: "WAIT_FOR_ANSWER",
+          currentQuestionIndex: 0,
+          pendingAnswerMode: "brief",
+          pendingResponseStartedAt: "2026-04-17T10:00:00.000Z",
+          pendingResponseTimeLimitSec: 60,
+          questions: [MOCK_ENTRY.questions[0]],
+          questionCriteria: [MOCK_ENTRY.evaluationCriteria[0]],
+          messages: [
+            { role: "interviewer", content: MOCK_ENTRY.questions[0], timestamp: "2026-04-17T10:00:00.000Z" },
+          ],
+          evaluations: [],
+          createdAt: "2026-04-17T09:59:00.000Z",
+          knowledgeSource: "file",
+        },
+      });
+
+      const submit = captureHandler(registerSubmitAnswerTool, makeDeps(store));
+      const submitted = parse(await submit({
+        sessionId: "timed-1",
+        answer: "Use pagination and keep response size bounded.",
+        answerMode: "brief",
+      }));
+
+      assert.equal(submitted.answerElapsedSec, 65);
+      assert.equal(submitted.responseTimeLimitSec, 60);
+
+      const calls: Array<{ context?: string }> = [];
+      const deps = makeDeps(store, makeKnowledgeStore(), {
+        ai: {
+          evaluateAnswer: async (_question: string, _answer: string, context?: string) => {
+            calls.push({ context });
+            return {
+              score: 4,
+              feedback: "Good concise answer.",
+              needsFollowUp: false,
+            };
+          },
+        } as unknown as ToolDeps["ai"],
+      });
+      const evaluate = captureHandler(registerEvaluateAnswerTool, deps);
+      const evaluated = parse(await evaluate({ sessionId: "timed-1" }));
+
+      assert.equal(evaluated.answerElapsedSec, 65);
+      assert.equal(evaluated.responseTimeLimitSec, 60);
+      assert.match(calls[0].context ?? "", /about 65 seconds/i);
+      assert.match(calls[0].context ?? "", /60-second window/i);
+      assert.equal(store.get("timed-1").evaluations[0].answerElapsedSec, 65);
+      assert.equal(store.get("timed-1").evaluations[0].responseTimeLimitSec, 60);
+      assert.equal(store.get("timed-1").pendingResponseStartedAt, undefined);
+      assert.equal(store.get("timed-1").pendingResponseTimeLimitSec, undefined);
+      assert.equal(store.get("timed-1").pendingAnswerElapsedSec, undefined);
+    } finally {
+      Date.now = originalNow;
+    }
   });
 
   test("classifies follow-up metadata for trade-off gaps", async () => {

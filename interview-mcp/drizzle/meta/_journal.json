@@ -134,6 +134,13 @@
       "when": 1776566400000,
       "tag": "0018_active_adaptive_challenge",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1776652800000,
+      "tag": "0019_soft_timers",
+      "breakpoints": true
     }
   ]
 }
