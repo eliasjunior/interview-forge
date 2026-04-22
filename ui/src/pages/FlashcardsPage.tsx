@@ -385,12 +385,6 @@ export default function FlashcardsPage() {
         {/* Flip card */}
         <div className="fc-flip-wrapper">
           <div className={`fc-face ${flipped ? 'fc-back' : 'fc-front'}`}>
-            {!flipped && (
-              <div className="fc-face-badge">
-                <span style={{ borderColor: diffColor(card.difficulty), color: diffColor(card.difficulty) }}
-                  className="tag">{card.difficulty}</span>
-              </div>
-            )}
             <div className="fc-face-label">{flipped ? 'Answer' : 'Question'}</div>
             {flipped ? (
               <>
