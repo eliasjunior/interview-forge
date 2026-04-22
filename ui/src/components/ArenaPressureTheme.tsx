@@ -1,3 +1,4 @@
+import './ArenaPressureTheme.css'
 import { PRESSURE_THRESHOLD_SEC, getPressureLevel } from '../crisis/pressureState'
 
 type ArenaPressureThemeProps = {
@@ -15,11 +16,11 @@ export default function ArenaPressureTheme({
   if (!level) return null
 
   return (
-    <div className={`arena-pressure-theme ${level}`} aria-hidden="true">
-      <div className="arena-pressure-vignette" />
-      <div className="arena-pressure-scanlines" />
-      <div className="arena-pressure-grid" />
-      <div className="arena-pressure-edge-glow" />
+    <div className={`crisis-pressure crisis-pressure--${level}`} aria-hidden="true">
+      <div className="crisis-pressure__vignette" />
+      <div className="crisis-pressure__scanlines" />
+      <div className="crisis-pressure__grid" />
+      <div className="crisis-pressure__edge-glow" />
     </div>
   )
 }

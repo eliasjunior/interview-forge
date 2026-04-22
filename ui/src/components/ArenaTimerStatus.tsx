@@ -1,3 +1,4 @@
+import './ArenaTimerStatus.css'
 import { PRESSURE_THRESHOLD_SEC, getPressureLevel } from '../crisis/pressureState'
 
 type ArenaTimerStatusProps = {
@@ -12,22 +13,22 @@ export default function ArenaTimerStatus({
   armed = true,
 }: ArenaTimerStatusProps) {
   if (locked) {
-    return <div className="arena-timer">Locked</div>
+    return <div className="crisis-timer">Locked</div>
   }
 
   if (!armed) {
-    return <div className="arena-timer">Ready</div>
+    return <div className="crisis-timer">Ready</div>
   }
 
   const pressureLevel = getPressureLevel(secondsRemaining, PRESSURE_THRESHOLD_SEC)
 
   if (!pressureLevel) {
-    return <div className="arena-timer">{secondsRemaining}s</div>
+    return <div className="crisis-timer">{secondsRemaining}s</div>
   }
 
   return (
-    <div className={`arena-timer arena-timer-pressure ${pressureLevel}`}>
-      <span className="arena-pressure-label">Pressure rising</span>
+    <div className={`crisis-timer crisis-timer--pressure crisis-timer--${pressureLevel}`}>
+      <span className="crisis-timer__label">Pressure rising</span>
       <strong>{secondsRemaining}s</strong>
     </div>
   )

@@ -1,3 +1,5 @@
+import './FloatingPoints.css'
+
 type FloatingPointsProps = {
   points: number | null
   tone: 'strong' | 'decent' | 'weak' | null
@@ -9,7 +11,7 @@ export default function FloatingPoints({ points, tone, position }: FloatingPoint
 
   return (
     <div
-      className={`floating-points ${tone}`}
+      className={`crisis-floating-points crisis-floating-points--${tone}`}
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
       aria-hidden="true"
     >

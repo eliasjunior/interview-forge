@@ -180,7 +180,7 @@ export default function FlashcardsPage() {
   const [rating, setRating]         = useState<ReviewRating | null>(null)
   const [done, setDone]             = useState(false)
   const [busyCardId, setBusyCardId] = useState<string | null>(null)
-  const [myAnswer, setMyAnswer]     = useState('')
+  const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({})
   const [historyCardId, setHistoryCardId] = useState<string | null>(null)
   const [historyCards, setHistoryCards] = useState<Flashcard[]>([])
   const [historyTopic, setHistoryTopic] = useState('')
@@ -253,7 +253,6 @@ export default function FlashcardsPage() {
     setFlipped(false)
     setRating(null)
     setDone(false)
-    setMyAnswer('')
     setReviewing(true)
   }
 
@@ -266,6 +265,12 @@ export default function FlashcardsPage() {
   const removeVisibleCard = (cardId: string) => {
     setCards(prev => prev.filter(card => card.id !== cardId))
     setQueue(prev => prev.filter(card => card.id !== cardId))
+    setDraftAnswers(prev => {
+      if (!(cardId in prev)) return prev
+      const next = { ...prev }
+      delete next[cardId]
+      return next
+    })
     setTotalCount(prev => Math.max(0, prev - 1))
   }
 
@@ -303,7 +308,7 @@ export default function FlashcardsPage() {
     if (rating !== null) return // already rated, waiting for animation
     setError(null)
     const cardId = queue[cursor].id
-    const trimmedAnswer = myAnswer.trim()
+    const trimmedAnswer = (draftAnswers[cardId] ?? '').trim()
     if (!trimmedAnswer) {
       setError('Answer is required before you rate this flashcard.')
       return
@@ -318,6 +323,12 @@ export default function FlashcardsPage() {
       return
     }
     setTimeout(() => {
+      setDraftAnswers(prev => {
+        if (!(cardId in prev)) return prev
+        const nextAnswers = { ...prev }
+        delete nextAnswers[cardId]
+        return nextAnswers
+      })
       const next = cursor + 1
       if (next >= queue.length) {
         setDone(true)
@@ -326,7 +337,6 @@ export default function FlashcardsPage() {
         setCursor(next)
         setFlipped(false)
         setRating(null)
-        setMyAnswer('')
       }
     }, 400)
   }
@@ -350,6 +360,7 @@ export default function FlashcardsPage() {
 
   if (reviewing && queue.length > 0) {
     const card = queue[cursor]
+    const myAnswer = draftAnswers[card.id] ?? ''
 
     return (
       <div>
@@ -398,7 +409,7 @@ export default function FlashcardsPage() {
                     className="fc-answer-input"
                     placeholder="Edit your answer before rating…"
                     value={myAnswer}
-                    onChange={e => setMyAnswer(e.target.value)}
+                    onChange={e => setDraftAnswers(prev => ({ ...prev, [card.id]: e.target.value }))}
                     rows={5}
                   />
                 </div>
@@ -414,7 +425,7 @@ export default function FlashcardsPage() {
                   className="fc-answer-input"
                   placeholder="Write your answer before revealing…"
                   value={myAnswer}
-                  onChange={e => setMyAnswer(e.target.value)}
+                  onChange={e => setDraftAnswers(prev => ({ ...prev, [card.id]: e.target.value }))}
                   rows={4}
                 />
                 <div className="fc-tap-hint">Answer is required. Use “Show Answer” when you want to flip the card.</div>

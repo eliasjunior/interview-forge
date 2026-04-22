@@ -1,0 +1,51 @@
+.crisis-timer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 88px;
+  padding: 10px 14px;
+  border: 1px solid rgba(79, 209, 197, 0.28);
+  border-radius: 999px;
+  background: rgba(24, 58, 68, 0.4);
+  color: #d9fffb;
+  font-weight: 800;
+}
+
+.crisis-timer--pressure {
+  justify-content: space-between;
+  min-width: 178px;
+  border-color: rgba(248, 113, 113, 0.36);
+  background: rgba(20, 3, 3, 0.66);
+  color: #fecaca;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.08), 0 12px 30px rgba(127, 29, 29, 0.24);
+}
+
+.crisis-timer__label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.crisis-timer--warning {
+  opacity: 0.92;
+}
+
+.crisis-timer--final {
+  animation: crisis-timer-shudder 0.55s steps(2) infinite;
+}
+
+.crisis-timer--critical {
+  animation: crisis-timer-shudder 0.28s steps(2) infinite;
+}
+
+@keyframes crisis-timer-shudder {
+  0%, 100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(1.5px);
+  }
+}

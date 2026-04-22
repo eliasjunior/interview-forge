@@ -1,0 +1,104 @@
+.crisis-pressure {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+
+.crisis-pressure__vignette,
+.crisis-pressure__scanlines,
+.crisis-pressure__grid,
+.crisis-pressure__edge-glow {
+  position: absolute;
+  inset: 0;
+}
+
+.crisis-pressure__vignette {
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0) 48%, rgba(239, 68, 68, 0.06) 76%, rgba(127, 29, 29, 0.22) 100%);
+  animation: crisis-pressure-pulse 1.25s ease-in-out infinite;
+}
+
+.crisis-pressure__scanlines {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(248, 113, 113, 0.06) 0,
+      rgba(248, 113, 113, 0.06) 2px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0) 8px
+    );
+  opacity: 0.18;
+  mix-blend-mode: screen;
+}
+
+.crisis-pressure__grid {
+  background:
+    linear-gradient(180deg, rgba(248, 113, 113, 0.06), rgba(248, 113, 113, 0)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(248, 113, 113, 0.06) 0,
+      rgba(248, 113, 113, 0.06) 1px,
+      rgba(0, 0, 0, 0) 1px,
+      rgba(0, 0, 0, 0) 42px
+    );
+  opacity: 0.12;
+}
+
+.crisis-pressure__edge-glow {
+  background:
+    linear-gradient(180deg, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0) 18%),
+    linear-gradient(0deg, rgba(239, 68, 68, 0.16), rgba(239, 68, 68, 0) 14%);
+  opacity: 0.4;
+}
+
+.crisis-pressure--warning .crisis-pressure__vignette {
+  opacity: 0.65;
+}
+
+.crisis-pressure--final .crisis-pressure__vignette {
+  opacity: 0.88;
+  animation-duration: 0.9s;
+}
+
+.crisis-pressure--final .crisis-pressure__edge-glow {
+  opacity: 0.55;
+}
+
+.crisis-pressure--critical .crisis-pressure__vignette {
+  opacity: 1;
+  animation-duration: 0.55s;
+}
+
+.crisis-pressure--critical .crisis-pressure__grid {
+  opacity: 0.18;
+}
+
+.crisis-pressure--critical .crisis-pressure__edge-glow {
+  opacity: 0.72;
+  animation: crisis-pressure-edge-surge 0.6s ease-in-out infinite;
+}
+
+@keyframes crisis-pressure-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
+
+  50% {
+    transform: scale(1.01);
+    filter: saturate(1.18);
+  }
+}
+
+@keyframes crisis-pressure-edge-surge {
+  0%, 100% {
+    opacity: 0.58;
+    filter: blur(0);
+  }
+
+  50% {
+    opacity: 0.85;
+    filter: blur(1px);
+  }
+}

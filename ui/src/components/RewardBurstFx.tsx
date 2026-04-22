@@ -1,3 +1,4 @@
+import './RewardBurstFx.css'
 import FloatingPoints from './FloatingPoints'
 
 type RewardBurstFxProps = {
@@ -16,15 +17,15 @@ export default function RewardBurstFx({
   if (points == null || tone == null || position == null) return null
 
   return (
-    <div className={`reward-burst-fx ${tone}`} aria-hidden="true">
+    <div className={`crisis-reward-burst crisis-reward-burst--${tone}`} aria-hidden="true">
       <div
         key={`flash-${animationKey}`}
-        className="reward-burst-flash"
+        className="crisis-reward-burst__flash"
         style={{ top: `${position.top}px`, left: `${position.left}px` }}
       />
       <div
         key={`ring-${animationKey}`}
-        className="reward-burst-ring"
+        className="crisis-reward-burst__ring"
         style={{ top: `${position.top}px`, left: `${position.left}px` }}
       />
       <FloatingPoints points={points} tone={tone} position={position} />

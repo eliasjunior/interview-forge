@@ -1,3 +1,4 @@
+import './FailureFlashFx.css'
 import { useEffect, useRef, useState } from 'react'
 
 type FailureFlashFxProps = {
@@ -35,10 +36,10 @@ export default function FailureFlashFx({
   if (!visible) return null
 
   return (
-    <div key={flashKey} className="failure-flash-fx" aria-hidden="true">
-      <div className="failure-flash-wash" />
-      <div className="failure-flash-ring" />
-      <div className="failure-flash-copy">Time window missed</div>
+    <div key={flashKey} className="crisis-failure-flash" aria-hidden="true">
+      <div className="crisis-failure-flash__wash" />
+      <div className="crisis-failure-flash__ring" />
+      <div className="crisis-failure-flash__copy">Time window missed</div>
     </div>
   )
 }

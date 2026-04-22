@@ -1,0 +1,118 @@
+.crisis-sidebar__panel-title,
+.crisis-sidebar__section-label,
+.crisis-history__step,
+.crisis-history__score {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.crisis-sidebar__panel-title,
+.crisis-sidebar__section-label {
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.crisis-sidebar__score {
+  margin-top: 10px;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.crisis-sidebar__score-label,
+.crisis-sidebar__readiness-copy,
+.crisis-history__empty,
+.crisis-history__action {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.crisis-sidebar__metrics {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.crisis-sidebar__metric-meta,
+.crisis-history__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.crisis-sidebar__metric-track {
+  margin-top: 6px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(42, 57, 87, 0.85);
+}
+
+.crisis-sidebar__metric-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #7dd3fc);
+}
+
+.crisis-sidebar__readiness,
+.crisis-sidebar__artifact {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.crisis-sidebar__readiness {
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: rgba(17, 26, 46, 0.72);
+}
+
+.crisis-sidebar__artifact {
+  border: 1px solid rgba(79, 209, 197, 0.2);
+  background: rgba(11, 18, 32, 0.64);
+}
+
+.crisis-sidebar__readiness-score {
+  margin-top: 8px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #dbeafe;
+}
+
+.crisis-sidebar__artifact-copy {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.crisis-history__list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.crisis-history__item {
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(42, 57, 87, 0.85);
+}
+
+.crisis-history__item:last-child {
+  border-bottom: none;
+}
+
+.crisis-history__step {
+  color: var(--accent);
+}
+
+.crisis-history__score {
+  color: #bfdbfe;
+}
+
+.crisis-history__scenario {
+  color: var(--ink);
+  font-weight: 700;
+}

@@ -1,0 +1,92 @@
+.crisis-failure-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  pointer-events: none;
+}
+
+.crisis-failure-flash__wash,
+.crisis-failure-flash__ring {
+  position: absolute;
+  inset: 0;
+}
+
+.crisis-failure-flash__wash {
+  background:
+    radial-gradient(circle at center, rgba(248, 113, 113, 0.26) 0, rgba(153, 27, 27, 0.16) 32%, rgba(0, 0, 0, 0) 70%),
+    linear-gradient(180deg, rgba(127, 29, 29, 0.34), rgba(127, 29, 29, 0) 24%, rgba(127, 29, 29, 0.24) 100%);
+  animation: crisis-failure-flash-wash 900ms ease-out forwards;
+}
+
+.crisis-failure-flash__ring {
+  inset: 10%;
+  border: 2px solid rgba(254, 202, 202, 0.66);
+  border-radius: 28px;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.16), 0 0 48px rgba(153, 27, 27, 0.34);
+  animation: crisis-failure-flash-ring 900ms cubic-bezier(.14, .82, .31, 1) forwards;
+}
+
+.crisis-failure-flash__copy {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  padding: 10px 16px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 999px;
+  background: rgba(20, 3, 3, 0.76);
+  color: #fecaca;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+  animation: crisis-failure-flash-copy 900ms ease-out forwards;
+}
+
+@keyframes crisis-failure-flash-wash {
+  0% {
+    opacity: 0;
+  }
+
+  16% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes crisis-failure-flash-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  22% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes crisis-failure-flash-copy {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
