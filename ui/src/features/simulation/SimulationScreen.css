@@ -1,0 +1,237 @@
+.simulation-screen {
+  display: grid;
+  gap: 18px;
+}
+
+.simulation-hero,
+.simulation-card,
+.simulation-panel,
+.simulation-option,
+.simulation-contributor,
+.simulation-log__item {
+  border: 1px solid rgba(110, 128, 150, 0.22);
+  box-shadow: 0 18px 42px rgba(7, 15, 28, 0.08);
+}
+
+.simulation-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  background: linear-gradient(135deg, rgba(25, 35, 54, 0.98), rgba(17, 62, 71, 0.94));
+  color: #f4f7fb;
+}
+
+.simulation-hero__eyebrow,
+.simulation-card__eyebrow,
+.simulation-panel__title {
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.simulation-hero__title,
+.simulation-card__title {
+  margin: 8px 0;
+}
+
+.simulation-hero__copy,
+.simulation-card__scenario,
+.simulation-option__copy {
+  color: rgba(244, 247, 251, 0.88);
+}
+
+.simulation-hero__actions {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.simulation-debug-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #f4f7fb;
+  font-size: 0.9rem;
+}
+
+.simulation-pill,
+.simulation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 0.85rem;
+}
+
+.simulation-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 2.1fr) minmax(280px, 1fr);
+}
+
+.simulation-main,
+.simulation-sidebar {
+  display: grid;
+  gap: 18px;
+}
+
+.simulation-card,
+.simulation-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 247, 250, 0.98));
+}
+
+.simulation-card__scenario,
+.simulation-option__copy,
+.simulation-metric span,
+.simulation-budget,
+.simulation-log__item span,
+.simulation-empty,
+.simulation-contributor span {
+  color: #536071;
+}
+
+.simulation-options,
+.simulation-contributors,
+.simulation-log,
+.simulation-tests,
+.simulation-tags,
+.simulation-metrics {
+  display: grid;
+  gap: 12px;
+}
+
+.simulation-option {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  border-radius: 16px;
+  padding: 16px;
+  background: #fff;
+}
+
+.simulation-option:hover {
+  transform: translateY(-1px);
+}
+
+.simulation-option__header,
+.simulation-metric,
+.simulation-log__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.simulation-option__title {
+  font-weight: 700;
+  color: #152133;
+}
+
+.simulation-option__budget {
+  color: #3b6477;
+  font-size: 0.9rem;
+}
+
+.simulation-actions {
+  margin-top: 14px;
+}
+
+.simulation-inline-stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 10px 0 16px;
+  color: #2f4055;
+  font-weight: 600;
+}
+
+.simulation-result-lock,
+.simulation-result-block {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.simulation-result-lock__label,
+.simulation-result-block__label {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #51657c;
+}
+
+.simulation-result-lock__value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #162235;
+}
+
+.simulation-status-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #536071;
+}
+
+.simulation-result-block--debug {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(22, 34, 53, 0.04);
+}
+
+.simulation-contributor {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.simulation-contributor--good {
+  border-left: 4px solid #2f8f62;
+}
+
+.simulation-contributor--bad {
+  border-left: 4px solid #c25353;
+}
+
+.simulation-contributor--neutral {
+  border-left: 4px solid #7b8794;
+}
+
+.simulation-budget {
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+.simulation-tags {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.simulation-log__item {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(110, 128, 150, 0.18);
+}
+
+.simulation-log__item:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 960px) {
+  .simulation-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .simulation-hero {
+    flex-direction: column;
+  }
+
+  .simulation-hero__actions {
+    justify-items: start;
+  }
+}

@@ -1,5 +1,5 @@
-import CrisisModeScreen from '../features/crisis-mode/CrisisModeScreen'
+import SimulationScreen from '../features/simulation/SimulationScreen'
 
 export default function ForgeArenaPage() {
-  return <CrisisModeScreen />
+  return <SimulationScreen />
 }
