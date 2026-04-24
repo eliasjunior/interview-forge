@@ -34,7 +34,7 @@ export const orderCreationSubject: SubjectDefinition<OrderVisibleKey, OrderHidde
     operability: 0,
     complexity: 0,
   },
-  initialBudget: 6,
+  initialBudget: 10,
   sequence: [
     'endpoint-design',
     'idempotency',
@@ -150,7 +150,7 @@ export const orderCreationSubject: SubjectDefinition<OrderVisibleKey, OrderHidde
           rationale: 'This adds coordination cost, but it contains a real production failure mode.',
           effects: {
             hidden: { reliability: 3, resilience: 2, complexity: 1 },
-            budget: 2,
+            budget: 3,
             tags: ['idempotent'],
           },
           playerFeedback: {
@@ -233,6 +233,7 @@ export const orderCreationSubject: SubjectDefinition<OrderVisibleKey, OrderHidde
           rationale: 'This keeps orders moving, but it pushes hidden debt into the team.',
           effects: {
             hidden: { resilience: -1, operability: -1, complexity: -1 },
+            budget: 1,
             tags: ['partial-manual'],
           },
           playerFeedback: {
@@ -254,6 +255,7 @@ export const orderCreationSubject: SubjectDefinition<OrderVisibleKey, OrderHidde
           rationale: 'This is more involved, but it makes async behavior survivable under pressure.',
           effects: {
             hidden: { resilience: 2, operability: 1, complexity: 1 },
+            budget: 3,
             tags: ['tracked-retries'],
           },
           playerFeedback: {

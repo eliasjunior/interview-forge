@@ -12,7 +12,7 @@ describe('SimulationScreen', () => {
 
     expect(screen.getByText('Order Creation')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Round 1 — Order API Contract/i })).toBeInTheDocument()
-    expect(screen.getByText('Budget remaining: 6')).toBeInTheDocument()
+    expect(screen.getByText('Budget remaining: 10')).toBeInTheDocument()
     expect(screen.getByText('System Health')).toBeInTheDocument()
     expect(screen.getByText(/Hidden in player view/i)).toBeInTheDocument()
   })
