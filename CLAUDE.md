@@ -402,11 +402,18 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM local t
 
 | Script | Description |
 |---|---|
-| `npm run dev:interview` | Start `interview-mcp` MCP server (stdio) |
-| `npm run dev:http` | Start `interview-mcp` HTTP API on port 3001 |
-| `npm run dev:report` | Start `report-mcp` MCP server (stdio) |
-| `npm run dev:ui` | Start `ui` Vite dev server on port 5173 |
+| `npm run dev` | Start the full dev stack (HTTP API + UI) together via `concurrently`. Both bind to `0.0.0.0` so the UI and API are reachable from any device on the local network (phone, tablet, other laptop). This is the preferred day-to-day command. |
+| `npm run dev:http` | Start only the `interview-mcp` HTTP API on port 3001 (binds `0.0.0.0`). Use when iterating on the backend without the UI. |
+| `npm run dev:ui` | Start only the `ui` Vite dev server on port 5173 (binds `0.0.0.0`). Use when iterating on the frontend without restarting the API. |
+| `npm run dev:interview` | Start `interview-mcp` MCP server (stdio). Claude Desktop spawns this automatically — rarely run manually. |
+| `npm run dev:report` | Start `report-mcp` MCP server (stdio). Claude Desktop spawns this automatically — rarely run manually. |
 | `npm run build` | Build all packages |
+
+### Dev script design notes
+
+- The previous `dev:ui:local`, `dev:ui:network`, and `dev:http:network` variants have been removed. Network-binding (`0.0.0.0`) is the default for both `dev:http` and `dev:ui` because the project is regularly accessed from other devices on the home LAN. If a local-only bind is ever needed, run `npm run dev -w ui` directly (the workspace `dev` script keeps the `127.0.0.1` default) or invoke `tsx watch src/http.ts` inside `interview-mcp/`.
+- `npm run dev` is implemented with `concurrently` (root devDependency). Output from both processes is prefixed `[http]` / `[ui]` so they can be told apart in a single terminal.
+- The UI calls the HTTP API at `http://localhost:3001` by default. When the UI is opened from another device, the API URL must resolve to the host machine's LAN IP — verify the UI's API base config if remote access stops working after a refactor.
 
 ## Important Conventions
 

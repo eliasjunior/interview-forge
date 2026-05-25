@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import {
   asDecisionCard,
   asEventCard,
+  continueRun,
   createRunState,
   getCurrentCard,
   isRunComplete,
@@ -14,25 +15,6 @@ import type { RunState, TurnLog } from '../../game/types'
 import type { OrderHiddenKey, OrderTag, OrderVisibleKey } from '../../game/content/orderCreation'
 
 type OrderRunState = RunState<OrderVisibleKey, OrderHiddenKey, OrderTag>
-type DecisionResultView = {
-  cardTitle: string
-  roundLabel: string
-  optionLabel: string
-  narrative: string[]
-  status: string[]
-  hiddenEffects: Partial<Record<OrderHiddenKey, number>>
-}
-
-type EventResultView = {
-  cardTitle: string
-  roundLabel: string
-  scenario: string
-  outcome: string
-  summary: string
-  contributors: string[]
-  visibleBefore: Record<OrderVisibleKey, number>
-  visibleAfter: Record<OrderVisibleKey, number>
-}
 
 function formatLabel(value: string) {
   return value
@@ -49,8 +31,6 @@ function contributorTone(contribution: number) {
 export default function SimulationScreen() {
   const [run, setRun] = useState<OrderRunState>(() => createRunState(orderCreationSubject))
   const [showDebug, setShowDebug] = useState(false)
-  const [decisionResultView, setDecisionResultView] = useState<DecisionResultView | null>(null)
-  const [eventResultView, setEventResultView] = useState<EventResultView | null>(null)
 
   const currentCard = useMemo(() => getCurrentCard(orderCreationSubject, run), [run])
   const decisionCard = asDecisionCard(currentCard)
@@ -58,59 +38,29 @@ export default function SimulationScreen() {
   const complete = isRunComplete(run)
   const latestLog: TurnLog<OrderVisibleKey, OrderHiddenKey, OrderTag> | null =
     run.log.length > 0 ? run.log[run.log.length - 1] : null
+  const decisionResolution = run.currentDecisionResolution
+  const eventResolution = run.currentEventResolution
+  const decisionResultCard = decisionResolution ? asDecisionCard(orderCreationSubject.cards[decisionResolution.cardId]) : null
+  const decisionResultOption = decisionResultCard?.options.find((candidate) => candidate.id === decisionResolution?.optionId) ?? null
 
   function handleChoose(optionId: string) {
     if (!decisionCard) return
-    const option = decisionCard.options.find((candidate) => candidate.id === optionId)
-    if (!option) return
-
     const result = resolveDecision(orderCreationSubject, run, optionId)
     setRun(result.run)
-    setDecisionResultView({
-      cardTitle: decisionCard.title,
-      roundLabel: `Round ${run.log.length + 1} — Decision Applied`,
-      optionLabel: option.label,
-      narrative: option.playerFeedback?.narrative ?? [option.rationale],
-      status: option.playerFeedback?.status ?? ['Decision recorded'],
-      hiddenEffects: option.effects.hidden ?? {},
-    })
   }
 
   function handleResolveEvent() {
     if (!eventCard) return
     const result = resolveEvent(orderCreationSubject, run)
     setRun(result.run)
-    setEventResultView({
-      cardTitle: eventCard.title,
-      roundLabel: `Round ${run.log.length + 1} — Event`,
-      scenario: eventCard.scenario,
-      outcome: result.resolution.outcome === 'partial' ? 'Partial Failure' : result.resolution.outcome === 'success' ? 'Success' : 'Failure',
-      summary: result.resolution.summary,
-      contributors: result.resolution.contributors
-        .map((contributor) => {
-          if (contributor.type === 'tag') {
-            return `${contributor.contribution >= 0 ? '+' : '-'} ${contributor.reason}`
-          }
-
-          if (contributor.contribution === 0) return null
-
-          const feedback = eventCard.statFeedback?.[contributor.key]
-          if (!feedback) {
-            return `${contributor.contribution >= 0 ? '+' : '-'} ${formatLabel(contributor.key)} influenced the outcome`
-          }
-
-          return `${contributor.contribution >= 0 ? '+' : '-'} ${contributor.contribution >= 0 ? feedback.positive : feedback.negative}`
-        })
-        .filter((value): value is string => Boolean(value)),
-      visibleBefore: result.resolution.visibleBefore,
-      visibleAfter: result.resolution.visibleAfter,
-    })
   }
 
   function handleRestart() {
     setRun(createRunState(orderCreationSubject))
-    setDecisionResultView(null)
-    setEventResultView(null)
+  }
+
+  function handleContinue() {
+    setRun((current) => continueRun(orderCreationSubject, current))
   }
 
   return (
@@ -125,7 +75,7 @@ export default function SimulationScreen() {
         </div>
         <div className="simulation-hero__actions">
           <div className="simulation-pill">
-            Step {Math.min(run.currentCardIndex + 1, run.queue.length)} / {run.queue.length}
+            Round {Math.min(run.roundIndex + 1, orderCreationSubject.rounds.length)} / {orderCreationSubject.rounds.length}
           </div>
           <label className="simulation-debug-toggle">
             <input
@@ -141,10 +91,10 @@ export default function SimulationScreen() {
 
       <div className="simulation-layout">
         <section className="simulation-main">
-          {decisionResultView ? (
+          {decisionResolution && decisionResultCard && decisionResultOption && (run.phase === 'decision_result' || run.phase === 'followup_result') ? (
             <div className="simulation-card card">
               <div className="simulation-card__eyebrow">QuickCart 🚀</div>
-              <h2 className="simulation-card__title">{decisionResultView.roundLabel}</h2>
+              <h2 className="simulation-card__title">Round {run.roundIndex + 1} — Decision Applied</h2>
 
               <div className="simulation-inline-stats">
                 <span>[System] {run.visible.systemHealth}/10</span>
@@ -154,12 +104,12 @@ export default function SimulationScreen() {
 
               <div className="simulation-result-lock">
                 <div className="simulation-result-lock__label">Decision locked in:</div>
-                <div className="simulation-result-lock__value">→ {decisionResultView.optionLabel}</div>
+                <div className="simulation-result-lock__value">→ {decisionResultOption.label}</div>
               </div>
 
               <div className="simulation-result-block">
                 <div className="simulation-result-block__label">Narrative:</div>
-                {decisionResultView.narrative.map((line) => (
+                {(decisionResultOption.playerFeedback?.narrative ?? [decisionResultOption.rationale]).map((line) => (
                   <p key={line} className="simulation-card__scenario">{line}</p>
                 ))}
               </div>
@@ -167,7 +117,7 @@ export default function SimulationScreen() {
               <div className="simulation-result-block">
                 <div className="simulation-result-block__label">Status:</div>
                 <ul className="simulation-status-list">
-                  {decisionResultView.status.map((item) => (
+                  {(decisionResultOption.playerFeedback?.status ?? ['Decision recorded']).map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
@@ -177,10 +127,10 @@ export default function SimulationScreen() {
                 <div className="simulation-result-block simulation-result-block--debug">
                   <div className="simulation-result-block__label">Debug traits:</div>
                   <ul className="simulation-status-list">
-                    {Object.entries(decisionResultView.hiddenEffects).length === 0 ? (
+                    {Object.entries(decisionResultOption.effects.hidden ?? {}).length === 0 ? (
                       <li>No hidden trait changes</li>
                     ) : (
-                      Object.entries(decisionResultView.hiddenEffects).map(([key, value]) => (
+                      Object.entries(decisionResultOption.effects.hidden ?? {}).map(([key, value]) => (
                         <li key={key}>
                           {formatLabel(key)} {value >= 0 ? '+' : ''}{value}
                         </li>
@@ -191,56 +141,74 @@ export default function SimulationScreen() {
               ) : null}
 
               <div className="simulation-actions">
-                <button className="btn-secondary" onClick={() => setDecisionResultView(null)}>Continue</button>
+                <button className="btn-secondary" onClick={handleContinue}>Continue</button>
               </div>
             </div>
-          ) : eventResultView ? (
+          ) : eventResolution && eventCard && run.phase === 'event_result' ? (
             <div className="simulation-card card">
               <div className="simulation-card__eyebrow">QuickCart 🚀</div>
-              <h2 className="simulation-card__title">{eventResultView.roundLabel}</h2>
+              <h2 className="simulation-card__title">Round {run.roundIndex + 1} — Event</h2>
 
               <div className="simulation-inline-stats">
-                <span>[System] {eventResultView.visibleBefore.systemHealth}/10</span>
-                <span>[Business] {eventResultView.visibleBefore.businessHealth}/10</span>
-                <span>[Momentum] {eventResultView.visibleBefore.momentum}</span>
+                <span>[System] {eventResolution.visibleBefore.systemHealth}/10</span>
+                <span>[Business] {eventResolution.visibleBefore.businessHealth}/10</span>
+                <span>[Momentum] {eventResolution.visibleBefore.momentum}</span>
               </div>
 
               <div className="simulation-result-block">
-                <div className="simulation-result-block__label">Event: {eventResultView.cardTitle}</div>
-                <p className="simulation-card__scenario">{eventResultView.scenario}</p>
+                <div className="simulation-result-block__label">Event: {eventCard.title}</div>
+                <p className="simulation-card__scenario">{eventCard.scenario}</p>
               </div>
 
               <div className="simulation-result-block">
                 <div className="simulation-result-block__label">Contributors:</div>
                 <ul className="simulation-status-list">
-                  {eventResultView.contributors.map((item) => (
+                  {eventResolution.contributors
+                    .map((contributor) => {
+                      if (contributor.type === 'tag') {
+                        return `${contributor.contribution >= 0 ? '+' : '-'} ${contributor.reason}`
+                      }
+
+                      if (contributor.contribution === 0) return null
+
+                      const feedback = eventCard.statFeedback?.[contributor.key]
+                      if (!feedback) {
+                        return `${contributor.contribution >= 0 ? '+' : '-'} ${formatLabel(contributor.key)} influenced the outcome`
+                      }
+
+                      return `${contributor.contribution >= 0 ? '+' : '-'} ${contributor.contribution >= 0 ? feedback.positive : feedback.negative}`
+                    })
+                    .filter((value): value is string => Boolean(value))
+                    .map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
               </div>
 
               <div className="simulation-result-block">
-                <div className="simulation-result-block__label">Outcome: {eventResultView.outcome}</div>
-                <p className="simulation-card__scenario">{eventResultView.summary}</p>
+                <div className="simulation-result-block__label">
+                  Outcome: {eventResolution.outcome === 'partial' ? 'Partial Failure' : eventResolution.outcome === 'success' ? 'Success' : 'Failure'}
+                </div>
+                <p className="simulation-card__scenario">{eventResolution.summary}</p>
               </div>
 
               <div className="simulation-result-block">
                 <div className="simulation-result-block__label">Effects:</div>
                 <ul className="simulation-status-list">
-                  <li>System Health: {eventResultView.visibleBefore.systemHealth} → {eventResultView.visibleAfter.systemHealth}</li>
-                  <li>Business Health: {eventResultView.visibleBefore.businessHealth} → {eventResultView.visibleAfter.businessHealth}</li>
-                  <li>Momentum: {eventResultView.visibleBefore.momentum} → {eventResultView.visibleAfter.momentum}</li>
+                  <li>System Health: {eventResolution.visibleBefore.systemHealth} → {eventResolution.visibleAfter.systemHealth}</li>
+                  <li>Business Health: {eventResolution.visibleBefore.businessHealth} → {eventResolution.visibleAfter.businessHealth}</li>
+                  <li>Momentum: {eventResolution.visibleBefore.momentum} → {eventResolution.visibleAfter.momentum}</li>
                 </ul>
               </div>
 
               <div className="simulation-actions">
-                <button className="btn-secondary" onClick={() => setEventResultView(null)}>Continue</button>
+                <button className="btn-secondary" onClick={handleContinue}>Continue</button>
               </div>
             </div>
           ) : decisionCard ? (
             <div className="simulation-card card">
               <div className="simulation-card__eyebrow">Decision</div>
-              <h2 className="simulation-card__title">Round {run.log.length + 1} — {decisionCard.title}</h2>
+              <h2 className="simulation-card__title">Round {run.roundIndex + 1} — {decisionCard.title}</h2>
               <div className="simulation-inline-stats">
                 <span>System Health: {run.visible.systemHealth}</span>
                 <span>Business Health: {run.visible.businessHealth}</span>
@@ -266,10 +234,10 @@ export default function SimulationScreen() {
             </div>
           ) : null}
 
-          {!decisionResultView && !eventResultView && eventCard ? (
+          {eventCard && run.phase === 'event_preview' ? (
             <div className="simulation-card card">
               <div className="simulation-card__eyebrow">QuickCart 🚀</div>
-              <h2 className="simulation-card__title">Round {run.log.length + 1} — Event</h2>
+              <h2 className="simulation-card__title">Round {run.roundIndex + 1} — Event</h2>
               <div className="simulation-inline-stats">
                 <span>System Health: {run.visible.systemHealth}</span>
                 <span>Business Health: {run.visible.businessHealth}</span>
@@ -283,7 +251,7 @@ export default function SimulationScreen() {
             </div>
           ) : null}
 
-          {!decisionResultView && !eventResultView && complete ? (
+          {complete ? (
             <div className="simulation-card card">
               <div className="simulation-card__eyebrow">Run complete</div>
               <h2 className="simulation-card__title">First simulation playable</h2>
@@ -293,7 +261,7 @@ export default function SimulationScreen() {
             </div>
           ) : null}
 
-          {!decisionResultView && !eventResultView && latestLog?.kind === 'event' ? (
+          {latestLog?.kind === 'event' && run.phase === 'complete' ? (
             <div className="simulation-card card">
               <div className="simulation-card__eyebrow">Outcome</div>
               <h2 className="simulation-card__title">{latestLog.resolution.outcome.toUpperCase()}</h2>

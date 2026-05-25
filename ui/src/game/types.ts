@@ -6,6 +6,15 @@ export type CardKind = 'decision' | 'event'
 
 export type EventOutcome = 'success' | 'partial' | 'failure'
 
+export type RunPhase =
+  | 'decision'
+  | 'decision_result'
+  | 'followup_decision'
+  | 'followup_result'
+  | 'event_preview'
+  | 'event_result'
+  | 'complete'
+
 export type WeightedStat<Key extends string> = {
   key: Key
   weight: number
@@ -16,11 +25,6 @@ export type OptionEffect<VisibleKey extends string, HiddenKey extends string, Ta
   hidden?: StatDelta<HiddenKey>
   budget?: number
   tags?: Tag[]
-}
-
-export type FollowupLink = {
-  decisionId: string
-  insert: 'next'
 }
 
 export type PlayerDecisionFeedback = {
@@ -35,7 +39,6 @@ export type DecisionOption<VisibleKey extends string, HiddenKey extends string, 
   rationale: string
   effects: OptionEffect<VisibleKey, HiddenKey, Tag>
   playerFeedback?: PlayerDecisionFeedback
-  followups?: FollowupLink[]
 }
 
 export type DecisionCard<VisibleKey extends string, HiddenKey extends string, Tag extends string> = {
@@ -82,6 +85,18 @@ export type GameCard<VisibleKey extends string, HiddenKey extends string, Tag ex
   | DecisionCard<VisibleKey, HiddenKey, Tag>
   | EventCard<VisibleKey, HiddenKey, Tag>
 
+export type RoundFollowup = {
+  decisionId: string
+  triggerOptionIds: string[]
+}
+
+export type RoundDefinition = {
+  id: string
+  decisionId: string
+  eventId: string
+  followup?: RoundFollowup
+}
+
 export type SubjectDefinition<VisibleKey extends string, HiddenKey extends string, Tag extends string> = {
   id: string
   title: string
@@ -90,7 +105,7 @@ export type SubjectDefinition<VisibleKey extends string, HiddenKey extends strin
   initialVisible: StatMap<VisibleKey>
   initialHidden: StatMap<HiddenKey>
   initialBudget?: number
-  sequence: string[]
+  rounds: RoundDefinition[]
   cards: Record<string, GameCard<VisibleKey, HiddenKey, Tag>>
 }
 
@@ -98,7 +113,6 @@ export type DecisionResolution<VisibleKey extends string, HiddenKey extends stri
   cardId: string
   optionId: string
   effects: OptionEffect<VisibleKey, HiddenKey, Tag>
-  insertedFollowups: string[]
 }
 
 export type EventContributor<HiddenKey extends string, Tag extends string> =
@@ -126,7 +140,9 @@ export type RunState<VisibleKey extends string, HiddenKey extends string, Tag ex
   hidden: StatMap<HiddenKey>
   budget: number
   tags: Tag[]
-  queue: string[]
-  currentCardIndex: number
+  roundIndex: number
+  phase: RunPhase
+  currentDecisionResolution: DecisionResolution<VisibleKey, HiddenKey, Tag> | null
+  currentEventResolution: EventResolution<VisibleKey, HiddenKey, Tag> | null
   log: TurnLog<VisibleKey, HiddenKey, Tag>[]
 }

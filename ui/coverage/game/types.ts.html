@@ -195,7 +195,39 @@
 <a name='L130'></a><a href='#L130'>130</a>
 <a name='L131'></a><a href='#L131'>131</a>
 <a name='L132'></a><a href='#L132'>132</a>
-<a name='L133'></a><a href='#L133'>133</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -335,6 +367,15 @@ export type CardKind = 'decision' | 'event'
 &nbsp;
 export type EventOutcome = 'success' | 'partial' | 'failure'
 &nbsp;
+export type RunPhase =
+  | 'decision'
+  | 'decision_result'
+  | 'followup_decision'
+  | 'followup_result'
+  | 'event_preview'
+  | 'event_result'
+  | 'complete'
+&nbsp;
 export type WeightedStat&lt;Key extends string&gt; = {
   key: Key
   weight: number
@@ -345,11 +386,6 @@ export type OptionEffect&lt;VisibleKey extends string, HiddenKey extends string,
   hidden?: StatDelta&lt;HiddenKey&gt;
   budget?: number
   tags?: Tag[]
-}
-&nbsp;
-export type FollowupLink = {
-  decisionId: string
-  insert: 'next'
 }
 &nbsp;
 export type PlayerDecisionFeedback = {
@@ -364,7 +400,6 @@ export type DecisionOption&lt;VisibleKey extends string, HiddenKey extends strin
   rationale: string
   effects: OptionEffect&lt;VisibleKey, HiddenKey, Tag&gt;
   playerFeedback?: PlayerDecisionFeedback
-  followups?: FollowupLink[]
 }
 &nbsp;
 export type DecisionCard&lt;VisibleKey extends string, HiddenKey extends string, Tag extends string&gt; = {
@@ -411,6 +446,18 @@ export type GameCard&lt;VisibleKey extends string, HiddenKey extends string, Tag
   | DecisionCard&lt;VisibleKey, HiddenKey, Tag&gt;
   | EventCard&lt;VisibleKey, HiddenKey, Tag&gt;
 &nbsp;
+export type RoundFollowup = {
+  decisionId: string
+  triggerOptionIds: string[]
+}
+&nbsp;
+export type RoundDefinition = {
+  id: string
+  decisionId: string
+  eventId: string
+  followup?: RoundFollowup
+}
+&nbsp;
 export type SubjectDefinition&lt;VisibleKey extends string, HiddenKey extends string, Tag extends string&gt; = {
   id: string
   title: string
@@ -419,7 +466,7 @@ export type SubjectDefinition&lt;VisibleKey extends string, HiddenKey extends st
   initialVisible: StatMap&lt;VisibleKey&gt;
   initialHidden: StatMap&lt;HiddenKey&gt;
   initialBudget?: number
-  sequence: string[]
+  rounds: RoundDefinition[]
   cards: Record&lt;string, GameCard&lt;VisibleKey, HiddenKey, Tag&gt;&gt;
 }
 &nbsp;
@@ -427,7 +474,6 @@ export type DecisionResolution&lt;VisibleKey extends string, HiddenKey extends s
   cardId: string
   optionId: string
   effects: OptionEffect&lt;VisibleKey, HiddenKey, Tag&gt;
-  insertedFollowups: string[]
 }
 &nbsp;
 export type EventContributor&lt;HiddenKey extends string, Tag extends string&gt; =
@@ -455,8 +501,10 @@ export type RunState&lt;VisibleKey extends string, HiddenKey extends string, Tag
   hidden: StatMap&lt;HiddenKey&gt;
   budget: number
   tags: Tag[]
-  queue: string[]
-  currentCardIndex: number
+  roundIndex: number
+  phase: RunPhase
+  currentDecisionResolution: DecisionResolution&lt;VisibleKey, HiddenKey, Tag&gt; | null
+  currentEventResolution: EventResolution&lt;VisibleKey, HiddenKey, Tag&gt; | null
   log: TurnLog&lt;VisibleKey, HiddenKey, Tag&gt;[]
 }
 &nbsp;</pre></td></tr></table></pre>
@@ -466,7 +514,7 @@ export type RunState&lt;VisibleKey extends string, HiddenKey extends string, Tag
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-22T20:12:05.189Z
+                at 2026-04-28T09:00:05.083Z
             </div>
         <script src="../prettify.js"></script>
         <script>

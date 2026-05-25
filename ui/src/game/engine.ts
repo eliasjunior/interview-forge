@@ -5,6 +5,7 @@ import type {
   EventContributor,
   EventResolution,
   GameCard,
+  RoundDefinition,
   RunState,
   StatDelta,
   SubjectDefinition,
@@ -24,17 +25,6 @@ function applyDelta<Key extends string>(state: Record<Key, number>, delta?: Stat
   return nextState
 }
 
-function dedupeAppend(queue: string[], insertAt: number, ids: string[]) {
-  if (ids.length === 0) return queue
-
-  const nextQueue = [...queue]
-  const safeIds = ids.filter((id) => !nextQueue.includes(id))
-  if (safeIds.length === 0) return nextQueue
-
-  nextQueue.splice(insertAt, 0, ...safeIds)
-  return nextQueue
-}
-
 export function createRunState<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
   subject: SubjectDefinition<VisibleKey, HiddenKey, Tag>,
 ): RunState<VisibleKey, HiddenKey, Tag> {
@@ -44,19 +34,69 @@ export function createRunState<VisibleKey extends string, HiddenKey extends stri
     hidden: { ...subject.initialHidden },
     budget: subject.initialBudget ?? 0,
     tags: [],
-    queue: [...subject.sequence],
-    currentCardIndex: 0,
+    roundIndex: 0,
+    phase: subject.rounds.length === 0 ? 'complete' : 'decision',
+    currentDecisionResolution: null,
+    currentEventResolution: null,
     log: [],
   }
+}
+
+export function getCurrentRound<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
+  subject: SubjectDefinition<VisibleKey, HiddenKey, Tag>,
+  run: RunState<VisibleKey, HiddenKey, Tag>,
+): RoundDefinition | null {
+  return subject.rounds[run.roundIndex] ?? null
+}
+
+function getCardById<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
+  subject: SubjectDefinition<VisibleKey, HiddenKey, Tag>,
+  cardId: string,
+): GameCard<VisibleKey, HiddenKey, Tag> {
+  const card = subject.cards[cardId]
+  if (!card) throw new Error(`Unknown card "${cardId}"`)
+  return card
 }
 
 export function getCurrentCard<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
   subject: SubjectDefinition<VisibleKey, HiddenKey, Tag>,
   run: RunState<VisibleKey, HiddenKey, Tag>,
 ): GameCard<VisibleKey, HiddenKey, Tag> | null {
-  const cardId = run.queue[run.currentCardIndex]
-  if (!cardId) return null
-  return subject.cards[cardId] ?? null
+  const round = getCurrentRound(subject, run)
+  if (!round) return null
+
+  if (run.phase === 'decision' || run.phase === 'decision_result') {
+    return getCardById(subject, round.decisionId)
+  }
+
+  if (run.phase === 'followup_decision' || run.phase === 'followup_result') {
+    if (!round.followup) return null
+    return getCardById(subject, round.followup.decisionId)
+  }
+
+  if (run.phase === 'event_preview' || run.phase === 'event_result') {
+    return getCardById(subject, round.eventId)
+  }
+
+  return null
+}
+
+function asDecisionCardStrict<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
+  card: GameCard<VisibleKey, HiddenKey, Tag> | null,
+): DecisionCard<VisibleKey, HiddenKey, Tag> {
+  if (!card || card.kind !== 'decision') {
+    throw new Error('Current card is not a decision')
+  }
+  return card
+}
+
+function asEventCardStrict<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
+  card: GameCard<VisibleKey, HiddenKey, Tag> | null,
+): EventCard<VisibleKey, HiddenKey, Tag> {
+  if (!card || card.kind !== 'event') {
+    throw new Error('Current card is not an event')
+  }
+  return card
 }
 
 export function resolveDecision<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
@@ -64,24 +104,16 @@ export function resolveDecision<VisibleKey extends string, HiddenKey extends str
   run: RunState<VisibleKey, HiddenKey, Tag>,
   optionId: string,
 ): { run: RunState<VisibleKey, HiddenKey, Tag>; resolution: DecisionResolution<VisibleKey, HiddenKey, Tag> } {
-  const card = getCurrentCard(subject, run)
-  if (!card || card.kind !== 'decision') {
-    throw new Error('Current card is not a decision')
-  }
-
+  const card = asDecisionCardStrict(getCurrentCard(subject, run))
   const option = card.options.find((candidate) => candidate.id === optionId)
   if (!option) {
     throw new Error(`Unknown option "${optionId}" for decision "${card.id}"`)
   }
 
-  const followupIds = (option.followups ?? []).map((link) => link.decisionId)
-  const nextQueue = dedupeAppend(run.queue, run.currentCardIndex + 1, followupIds)
-
   const resolution: DecisionResolution<VisibleKey, HiddenKey, Tag> = {
     cardId: card.id,
     optionId: option.id,
     effects: option.effects,
-    insertedFollowups: followupIds,
   }
 
   return {
@@ -92,8 +124,8 @@ export function resolveDecision<VisibleKey extends string, HiddenKey extends str
       hidden: applyDelta(run.hidden, option.effects.hidden),
       budget: run.budget - (option.effects.budget ?? 0),
       tags: [...new Set([...run.tags, ...(option.effects.tags ?? [])])],
-      queue: nextQueue,
-      currentCardIndex: run.currentCardIndex + 1,
+      phase: run.phase === 'followup_decision' ? 'followup_result' : 'decision_result',
+      currentDecisionResolution: resolution,
       log: [...run.log, { kind: 'decision', resolution }],
     },
   }
@@ -146,11 +178,7 @@ export function resolveEvent<VisibleKey extends string, HiddenKey extends string
   subject: SubjectDefinition<VisibleKey, HiddenKey, Tag>,
   run: RunState<VisibleKey, HiddenKey, Tag>,
 ): { run: RunState<VisibleKey, HiddenKey, Tag>; resolution: EventResolution<VisibleKey, HiddenKey, Tag> } {
-  const card = getCurrentCard(subject, run)
-  if (!card || card.kind !== 'event') {
-    throw new Error('Current card is not an event')
-  }
-
+  const card = asEventCardStrict(getCurrentCard(subject, run))
   const { score, contributors } = scoreEvent(card as EventCard<string, HiddenKey, Tag>, run as RunState<string, HiddenKey, Tag>)
   const outcome = getEventOutcome(card, score)
   const visibleEffects = card.outcomes[outcome].visible
@@ -171,16 +199,62 @@ export function resolveEvent<VisibleKey extends string, HiddenKey extends string
     run: {
       ...run,
       visible: resolution.visibleAfter,
-      currentCardIndex: run.currentCardIndex + 1,
+      phase: 'event_result',
+      currentEventResolution: resolution,
       log: [...run.log, { kind: 'event', resolution }],
     },
   }
 }
 
+export function continueRun<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
+  subject: SubjectDefinition<VisibleKey, HiddenKey, Tag>,
+  run: RunState<VisibleKey, HiddenKey, Tag>,
+): RunState<VisibleKey, HiddenKey, Tag> {
+  const round = getCurrentRound(subject, run)
+
+  if (!round) return { ...run, phase: 'complete' }
+
+  if (run.phase === 'decision_result') {
+    const triggerFollowup =
+      round.followup &&
+      run.currentDecisionResolution?.cardId === round.decisionId &&
+      round.followup.triggerOptionIds.includes(run.currentDecisionResolution.optionId)
+
+    return {
+      ...run,
+      phase: triggerFollowup ? 'followup_decision' : 'event_preview',
+      currentDecisionResolution: null,
+    }
+  }
+
+  if (run.phase === 'followup_result') {
+    return {
+      ...run,
+      phase: 'event_preview',
+      currentDecisionResolution: null,
+    }
+  }
+
+  if (run.phase === 'event_result') {
+    const nextRoundIndex = run.roundIndex + 1
+    const hasNextRound = nextRoundIndex < subject.rounds.length
+
+    return {
+      ...run,
+      roundIndex: hasNextRound ? nextRoundIndex : run.roundIndex,
+      phase: hasNextRound ? 'decision' : 'complete',
+      currentDecisionResolution: null,
+      currentEventResolution: null,
+    }
+  }
+
+  return run
+}
+
 export function isRunComplete<VisibleKey extends string, HiddenKey extends string, Tag extends string>(
   run: RunState<VisibleKey, HiddenKey, Tag>,
 ) {
-  return run.currentCardIndex >= run.queue.length
+  return run.phase === 'complete'
 }
 
 export function asDecisionCard<VisibleKey extends string, HiddenKey extends string, Tag extends string>(

@@ -35,11 +35,26 @@ export const orderCreationSubject: SubjectDefinition<OrderVisibleKey, OrderHidde
     complexity: 0,
   },
   initialBudget: 10,
-  sequence: [
-    'endpoint-design',
-    'idempotency',
-    'processing-flow',
-    'payment-instability-spike',
+  rounds: [
+    {
+      id: 'round-1',
+      decisionId: 'endpoint-design',
+      eventId: 'duplicate-submission',
+    },
+    {
+      id: 'round-2',
+      decisionId: 'idempotency',
+      eventId: 'retry-replay',
+    },
+    {
+      id: 'round-3',
+      decisionId: 'processing-flow',
+      eventId: 'payment-instability-spike',
+      followup: {
+        decisionId: 'async-failure-handling',
+        triggerOptionIds: ['split-async'],
+      },
+    },
   ],
   cards: {
     'endpoint-design': {
@@ -216,7 +231,6 @@ export const orderCreationSubject: SubjectDefinition<OrderVisibleKey, OrderHidde
               'A follow-up recovery decision is now required',
             ],
           },
-          followups: [{ decisionId: 'async-failure-handling', insert: 'next' }],
         },
       ],
     },
@@ -271,6 +285,96 @@ export const orderCreationSubject: SubjectDefinition<OrderVisibleKey, OrderHidde
           },
         },
       ],
+    },
+    'duplicate-submission': {
+      id: 'duplicate-submission',
+      kind: 'event',
+      title: 'Duplicate Submission',
+      scenario: 'A mobile client retries the same request after a timeout. The system receives the request twice.',
+      tests: [
+        { key: 'reliability', weight: 2 },
+        { key: 'operability', weight: 1 },
+      ],
+      statFeedback: {
+        reliability: {
+          positive: 'The endpoint handled the repeat request in a predictable way.',
+          negative: 'The endpoint made the repeated request harder to reason about.',
+        },
+        operability: {
+          positive: 'The team could explain what happened when support asked.',
+          negative: 'The contract made incident diagnosis slower and more ambiguous.',
+        },
+      },
+      tagRules: [
+        { tag: 'rest', score: 1, reason: 'The resource contract kept the write path understandable.' },
+        { tag: 'custom-action', score: -1, reason: 'The action-style contract introduced some ambiguity under retry pressure.' },
+        { tag: 'unsafe', score: -4, reason: 'Unsafe semantics made duplicate behavior far harder to trust.' },
+      ],
+      thresholds: {
+        success: 3,
+        partial: 0,
+      },
+      outcomes: {
+        success: {
+          visible: { momentum: 1 },
+          summary: 'The retry caused tension, but the contract held together without visible customer damage.',
+        },
+        partial: {
+          visible: { systemHealth: -1, businessHealth: -1 },
+          summary: 'Some duplicate orders were created. Customers were confused and support had to step in.',
+        },
+        failure: {
+          visible: { systemHealth: -2, businessHealth: -2, momentum: -1 },
+          summary: 'The repeated request caused duplicate processing and exposed a contract the team could not fully trust.',
+        },
+      },
+    },
+    'retry-replay': {
+      id: 'retry-replay',
+      kind: 'event',
+      title: 'Retry Replay',
+      scenario: 'Another mobile retry wave hits after a flaky connection window. The system sees the same creation attempts again.',
+      tests: [
+        { key: 'reliability', weight: 2 },
+        { key: 'resilience', weight: 2 },
+        { key: 'complexity', weight: -1 },
+      ],
+      statFeedback: {
+        reliability: {
+          positive: 'Request handling stayed consistent when the same write arrived twice.',
+          negative: 'The same write could still produce conflicting outcomes.',
+        },
+        resilience: {
+          positive: 'The system absorbed uncertainty without creating a second order.',
+          negative: 'The system had no safe buffer against replayed writes.',
+        },
+        complexity: {
+          positive: 'The implementation stayed lean enough to ship cleanly.',
+          negative: 'The solution added coordination cost that the team still had to carry.',
+        },
+      },
+      tagRules: [
+        { tag: 'idempotent', score: 4, reason: 'Idempotency let the API converge repeated submissions into one result.' },
+        { tag: 'non-idempotent', score: -5, reason: 'No replay protection meant duplicates could still escape.' },
+      ],
+      thresholds: {
+        success: 5,
+        partial: 1,
+      },
+      outcomes: {
+        success: {
+          visible: { businessHealth: 1, momentum: 1 },
+          summary: 'The retry wave arrived, but the system returned one coherent outcome instead of creating duplicate orders.',
+        },
+        partial: {
+          visible: { systemHealth: -1, momentum: -1 },
+          summary: 'The system survived, but operators still had to inspect edge cases manually.',
+        },
+        failure: {
+          visible: { systemHealth: -2, businessHealth: -2, momentum: -1 },
+          summary: 'Repeated writes escaped the system and created duplicate work the team had to unwind manually.',
+        },
+      },
     },
     'payment-instability-spike': {
       id: 'payment-instability-spike',
