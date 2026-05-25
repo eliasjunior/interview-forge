@@ -321,6 +321,59 @@ A strong candidate does not jump straight to distributed systems jargon. They sh
 - Question 15: advanced
 - Question 16: advanced
 
+## Warm-up Quests
+
+### Level 0
+
+1. You add server-side pagination to a browse endpoint. Which response shape is safest from day one?
+   A) Return all items with a `total` count so the client can slice what it needs
+   B) Return `{ items, nextCursor }` with a server-enforced max page size and a safe default, silently clamping oversized client requests
+   C) Return items only and let the client track position using the last item's ID
+   D) Return `{ data, page, pageSize }` with no server cap so clients can request exactly the count they need
+   Answer: B
+
+2. A browse endpoint returns the full dataset in one response. In production-scale testing it causes slow responses and high memory usage. What is the correct first redesign move?
+   A) Compress the response with gzip — this reduces transfer size enough for most datasets
+   B) Cache the full dataset in Redis for 5 minutes and return the cached blob to all clients
+   C) Switch to server-side pagination: bounded query parameters, a DB-level LIMIT, and only the current page in the response
+   D) Increase page size to 500 rows so fewer round trips are needed during browsing
+   Answer: C
+
+3. Users browsing a live dataset see items appear twice or disappear between pages. What is the root cause and the right fix?
+   A) The sort column has duplicate values — add a UNIQUE constraint to eliminate ambiguity
+   B) The page size is too small — larger pages cross fewer boundaries and reduce the chance of shifts
+   C) The DB index is fragmented — rebuilding it stabilises row order without changing the API
+   D) Offset-based pagination is unstable under concurrent inserts and updates — switch to cursor pagination on a stable, monotonically increasing key
+   Answer: D
+
+4. An offset-paginated endpoint is fast for the first few pages but degrades badly at page 10,000. Each page still returns only 50 rows. Why?
+   A) The DB engine must scan and discard all preceding rows before returning the requested page — OFFSET 500000 reads 500,000 rows internally regardless of LIMIT
+   B) The network payload grows proportionally with the page number because metadata accumulates in the response
+   C) The application server runs out of connection pool slots when the same query is repeated at depth
+   D) The index stops being used at high offsets because the query planner switches to a full table scan heuristic
+   Answer: A
+
+5. The caching layer returns stale data during a peak traffic window. Product says some screens must show values from the last 30 seconds. What is the most targeted fix?
+   A) Remove all caching from the endpoint — correctness is more important than latency
+   B) Increase the TTL to 60 seconds so the cache refreshes less often and reduces DB pressure
+   C) Add a bypass rule: freshness-sensitive read paths skip the cache or trigger a refresh when the cached entry exceeds the business-defined staleness threshold
+   D) Pre-warm the cache on every write so reads always get the latest value regardless of TTL
+   Answer: C
+
+6. A service calls an upstream supplier API on every user request. During a slow upstream incident, threads pile up and the service becomes unresponsive. What should be addressed first?
+   A) Add a retry with exponential backoff so failed requests eventually succeed without dropping load
+   B) Add a request timeout and a circuit breaker so the service fails fast instead of letting threads pile up waiting on a slow dependency
+   C) Move to an async thread pool so upstream calls do not block the main request thread
+   D) Cache the last successful upstream response and serve it indefinitely until the upstream recovers
+   Answer: B
+
+7. You have pagination, filtering, caching, and resilience logic on one endpoint. Which testing approach is most likely to catch real bugs?
+   A) Unit tests only with mocked DB and cache — fast CI and any failure scenario can be simulated through mocks
+   B) Contract tests only — they verify the API shape matches what consumers expect, which is the most impactful failure mode
+   C) A single end-to-end test that hits the live API — if the full flow passes, all layers are implicitly covered
+   D) Layered tests: unit tests for business rules, integration tests against a real DB for query and cursor correctness, cache freshness tests, and resilience tests for timeout and retry paths
+   Answer: D
+
 ## Concepts
 
 - core concepts: rest-api, spring-boot, pagination, cursor-pagination, offset-pagination, filtering, sorting, database-index, query-planning, caching, sharding, resilience
