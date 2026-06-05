@@ -34,6 +34,8 @@ function getWarmupLevelProgress(sessions: Session[]) {
   let passed = false;
 
   for (const session of sortedSessions) {
+    // Only count sessions where all questions were answered (not ended early)
+    if (session.evaluations.length < session.questions.length) continue;
     const avg = calcAvg(session.evaluations.map((e) => e.score));
     if (avg === null) continue;
     bestAvg = bestAvg === null ? avg : Math.max(bestAvg, avg);

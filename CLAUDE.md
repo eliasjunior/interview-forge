@@ -80,6 +80,19 @@ Claude Desktop / Claude Code (orchestrator LLM)
 - When `AI_ENABLED=false`, the orchestrator may use `evaluationCriteria` to score the answer, but it must keep that rubric hidden while asking the question.
 - The interview flow should remain: ask the question, wait for the candidate's answer, evaluate, then continue. Do not front-load the grading rubric into the candidate prompt.
 
+### Warm-up MCQ Presentation Rule
+
+**STRICT RULE — no exceptions.**
+
+For warm-up sessions (Spark / Padawan levels), questions are authored MCQs. Present every warm-up MCQ **exactly as written in the knowledge file** — question stem and all answer choices verbatim.
+
+- **Do NOT add any scene-setting sentences, scenarios, or framing before the question.** Not one sentence, not a phrase. Nothing.
+- **Do NOT reframe, paraphrase, or expand the question stem in any way.**
+- The only allowed prefix is the question number (e.g. "Question 2 of 5").
+- Present the question stem and choices exactly as they appear in the file, then wait for the answer.
+
+Reframing or adding context changes intent, difficulty, and which choices are correct. The candidate should see the file text and nothing more. This rule overrides any general heuristic about problem-first framing or scene-setting.
+
 ## Key Files & Paths
 
 ```
