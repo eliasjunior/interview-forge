@@ -82,7 +82,7 @@ A strong candidate understands not just the happy path but the failure modes: ca
 
 ## Warm-up Quests
 
-### Level 0 — Spark (MCQ)
+### Level 0 — Spark (MCQ, foundation)
 1. In a large-scale URL shortener, why is the redirect path usually the main thing to optimize?
    A) Because creating short links happens more often than redirects
    B) Because redirect traffic is much higher and directly affects user-perceived latency
@@ -139,46 +139,94 @@ A strong candidate understands not just the happy path but the failure modes: ca
    D) Convert them into admin-owned aliases and log the original owner
    Answer: C
 
-### Level 1 — Padawan (Fill in the Blank)
-1. To keep redirect latency low, shortCode-to-longURL lookups are commonly served from a ___ before falling back to the primary store.
-   Answer: cache
+### Level 1 — Padawan (MCQ multi-select, foundation)
 
-2. If many requests for the same short code miss the cache at once and all hit the database, that failure mode is called a cache ___.
-   Answer: stampede
+1. Which components belong in a practical first version of a URL shortener?
+   A) A shorten endpoint that creates and stores a code-to-URL mapping
+   B) A redirect endpoint that resolves a short code and returns an HTTP redirect
+   C) A persistent store with a uniqueness rule for short codes
+   D) A globally distributed analytics warehouse before the first redirect can work
+   Answer: A,B,C
 
-3. A globally unique numeric ID encoded into a short URL-friendly alphabet is often represented using ___ encoding.
-   Answer: base62
+2. Which statements about short-code generation are correct?
+   A) Random base62 strings need collision handling or a uniqueness constraint
+   B) A distributed unique ID can be encoded in base62 without hashing the long URL
+   C) Truncating a hash makes collisions mathematically impossible
+   D) Code length, coordination cost, predictability, and collision handling are real design trade-offs
+   Answer: A,B,D
 
-4. To keep the redirect path fast, click events are usually recorded ___ through a queue.
-   Answer: asynchronously
+3. Which statements about the redirect read path are correct?
+   A) A cache can serve hot code-to-URL mappings without querying the primary store every time
+   B) A cache miss should fall back to the persistent mapping store
+   C) The redirect response should wait for the analytics database write to finish
+   D) Negative caching can reduce repeated database lookups for invalid short codes
+   Answer: A,B,D
 
-5. When a deleted short code is intentionally kept reserved so it is not immediately reused, it is usually ___.
-   Answer: tombstoned
+4. Which statements correctly describe the 301 versus 302 trade-off?
+   A) A 301 can be cached aggressively by browsers and intermediaries
+   B) A 302 usually preserves more server-side visibility because clients continue hitting the redirect service
+   C) A 301 is always the correct choice for a URL shortener
+   D) The choice depends on whether load reduction or redirect control and analytics matter more
+   Answer: A,B,D
 
-6. Returning the same short code for the same long URL is a form of ___.
-   Answer: deduplication
+5. Which problems can appear when one long URL is always deduplicated to one short code?
+   A) Different owners may need independent expiry or deletion behavior
+   B) Sharing one code can reveal that another user already shortened the destination
+   C) Per-campaign analytics become harder when campaigns share the same code
+   D) The redirect service can no longer use caching
+   Answer: A,B,C
 
-7. A very popular short code that receives disproportionate traffic is often called a hot ___.
-   Answer: key
+6. Which techniques help protect the primary store during a viral-link traffic spike?
+   A) Edge or CDN caching for popular redirects
+   B) Request coalescing so one cache miss loads the mapping while other requests wait
+   C) Cache warming or early refresh for known hot keys
+   D) Expiring the hot mapping more frequently so the database is consulted more often
+   Answer: A,B,C
 
-8. To protect the shorten endpoint from abuse, systems commonly enforce rate ___.
-   Answer: limiting
+7. Which statements about redirect analytics are correct?
+   A) Publishing click events to a queue keeps analytics writes off the redirect critical path
+   B) Analytics consumers can batch writes into a store designed for reporting
+   C) Losing or duplicating events should be considered when designing the event pipeline
+   D) The redirect must fail whenever the analytics system is unavailable
+   Answer: A,B,C
 
-### Level 2 — Forge (Guided Answer)
+8. Which controls belong in a production abuse-prevention design?
+   A) Rate limits by account, API key, or IP
+   B) Validation that permits only supported schemes such as HTTP and HTTPS
+   C) Malware or phishing checks plus a reporting and takedown path
+   D) Trusting any destination once it passes a URL regex
+   Answer: A,B,C
+
+### Level 2 — Forge (Guided Answer, intermediate)
+
 1. Explain the high-level backend architecture of a URL shortener. Use this structure: [shorten path → persistence model → redirect path → analytics offload].
-   Hint: Focus on why the read path and write path have different performance priorities.
+   Hint: Start with a simple version that works, then explain why the redirect and analytics paths should evolve separately.
+   Answer: A strong answer separates the write path from the read path. The shorten service validates the destination, generates a unique code, and stores the mapping. The redirect service resolves the code through cache and then persistent storage before returning a redirect. Click events are published asynchronously so analytics failures or write latency do not delay the redirect.
 
-2. Explain two different short-code generation strategies. Use this structure: [strategy one → strategy two → operational tradeoffs → which one you would choose].
-   Hint: Compare collision handling, coordination cost, code length, and scalability under concurrent writes.
+2. Explain two different short-code generation strategies. Use this structure: [strategy one → strategy two → collision or coordination behavior → which one you would choose].
+   Hint: Compare random base62 codes with a globally unique numeric ID encoded in base62.
+   Answer: A strong answer explains that random base62 codes are simple and hard to predict but require a uniqueness constraint and retry on collision. A distributed counter or Snowflake-style ID produces unique numeric values that can be encoded in base62 without collision retries, but introduces coordination, predictability, or ID-allocation concerns. The choice should follow scale, security, and operational requirements rather than assuming one universal winner.
 
 3. Explain how to keep redirects fast under heavy traffic. Use this structure: [cache hierarchy → origin fallback → hot-key failure mode → mitigation].
-   Hint: Good answers usually mention Redis, CDN or edge caching, single-flight/request coalescing, and protecting the primary store.
+   Hint: Cover both the normal cache-hit path and what happens when a popular key is absent or expires.
+   Answer: A strong answer uses an edge or CDN cache where appropriate, a regional cache such as Redis, and the mapping store as the final fallback. A viral key is cheap while cached but dangerous during expiry or restart because simultaneous misses can overload the origin. Request coalescing, cache warming, early refresh, bounded fallback traffic, and negative caching protect the store.
 
-4. Explain the backend tradeoff between HTTP 301 and 302 in a URL shortener. Use this structure: [browser behavior → load implications → analytics implications → when to prefer each].
-   Hint: This is really a tradeoff between offloading repeated traffic and keeping better server-side visibility.
+4. Explain the backend trade-off between HTTP 301 and 302 in a URL shortener. Use this structure: [client caching → load implications → analytics and control implications → when to prefer each].
+   Hint: Avoid presenting either status code as automatically correct for every product.
+   Answer: A strong answer explains that a 301 can move repeated redirect traffic away from the service through browser or intermediary caching, reducing load but also reducing server-side visibility and making destination changes harder. A 302 keeps clients returning to the service, preserving analytics and redirect control at higher infrastructure cost. The product's mutability, safety, and analytics requirements should drive the choice.
 
-5. Explain whether the same long URL should always return the same short code. Use this structure: [why deduplication is attractive → why isolation is attractive → ownership/expiry/privacy implications → your decision].
-   Hint: A strong answer should argue both sides before choosing a design.
+5. Explain whether the same long URL should always return the same short code. Use this structure: [deduplication benefit → isolation benefit → ownership, expiry, privacy, and analytics → decision].
+   Hint: Treat this as a product and data-ownership decision, not only a storage optimization.
+   Answer: A strong answer recognizes that deduplication saves mappings and gives a stable code, but it couples different users and campaigns to shared ownership, expiry, deletion, privacy, and analytics behavior. Returning a new code per request or owner provides isolation and clearer lifecycle control at the cost of more records. A common practical choice is owner-scoped or idempotency-key-scoped reuse rather than global deduplication.
 
-6. Explain how you would design abuse prevention for a production URL shortener. Use this structure: [write-time validation → rate limiting and identity controls → malicious destination detection → monitoring and response].
-   Hint: Think beyond regex validation. The interesting part is phishing, spam campaigns, bot-driven creation, and post-creation enforcement.
+6. Explain how click analytics should work without slowing redirects. Use this structure: [event creation → queue → consumer and storage → delivery trade-offs].
+   Hint: Include what happens when the analytics dependency is slow or temporarily unavailable.
+   Answer: A strong answer creates a small click event in the redirect service and publishes it asynchronously to a durable queue. Consumers batch or stream events into an analytics-oriented store without competing with mapping lookups. The design acknowledges duplicate or lost-event risks, chooses an appropriate delivery guarantee, and keeps redirect availability independent from analytics availability.
+
+7. Explain how you would support newly created short links across multiple regions. Use this structure: [global routing → regional reads → mapping replication → fresh-link consistency].
+   Hint: The difficult case is a user creating a link in one region and immediately opening it from another.
+   Answer: A strong answer routes users to nearby redirect instances and serves mappings from regional or edge caches. New mappings must propagate through a global database or an asynchronous replication stream. Strong consistency reduces fresh-link failures but costs more latency and coordination; eventual consistency is simpler but needs a mitigation such as routing fresh links to the write region, read-through fallback, or accepting a brief propagation window.
+
+8. Explain how you would design abuse prevention for a production URL shortener. Use this structure: [input validation → identity and rate limits → destination reputation → monitoring and takedown].
+   Hint: Think beyond URL syntax. The system will attract phishing, spam campaigns, automated creation, and attempts to hide malicious redirect chains.
+   Answer: A strong answer validates supported schemes and destination shape, applies quotas and rate limits by identity and network signals, checks destination reputation or scans suspicious links, and follows redirect chains carefully with SSRF protections. It also includes monitoring, user reporting, fast takedown, audit history, and a policy for already cached malicious redirects.

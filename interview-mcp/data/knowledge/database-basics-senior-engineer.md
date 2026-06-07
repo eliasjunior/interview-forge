@@ -1,18 +1,18 @@
 # Database Basics for Senior Backend Engineers
 
 ## Summary
-This topic evaluates the database fundamentals a senior backend engineer must use in day-to-day production work. It focuses on relational modeling, basic SQL, mapping between application and database models, query shape, functions and expressions, temporary structures, indexing, transactions, and basic performance reasoning.
+This topic evaluates the relational database fundamentals a senior backend engineer must apply in production. It focuses on schema invariants, SQL query shape, joins and aggregation, indexing, transactions and concurrency, safe migrations, and evidence-based performance diagnosis.
 
-A strong candidate should not treat the database as a black box behind an ORM. They should understand how data shape, query shape, indexes, constraints, and transactions affect correctness and performance. The expected level is practical: explain the trade-offs clearly, choose simple designs first, and recognize when a seemingly small query or mapping decision becomes expensive or unsafe in production.
+A strong candidate should not treat the database as a black box behind an ORM. They should know which correctness rules belong in the database, how SQL result grain changes through joins and aggregation, how indexes match access patterns, and how transaction behavior differs under concurrency. The expected level is practical: state assumptions, use concrete SQL where useful, distinguish database guarantees from application conventions, verify claims with plans and metrics, and recognize when a locally correct design becomes expensive or unsafe at production scale.
 
 ## Questions
 
-1. You are designing a small order table for an API. What columns, primary key, foreign keys, nullability rules, and constraints would you define first, and why?
+1. Design an `orders` table with customer, status, money, and timestamp fields. Which types and database constraints would protect its core invariants?
 
    Exercise fit: micro
    Exercise goal: Design a minimal relational table for a simple domain object.
    Exercise owner: data model
-   Exercise scope: Define one table with key columns, constraints, and nullability.
+   Exercise scope: Define one table with key columns, constraints, nullability, and one related reference.
    Exercise constraints:
    - Keep this to one table and one related reference.
    - Do not design the full order system.
@@ -21,23 +21,23 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    - The primary key is explicit.
    - Required and optional fields are justified.
    - At least one useful constraint is included.
-   Exercise seed: Start from an `Order` object with `id`, `customerId`, `status`, `totalAmount`, and `createdAt`.
+   Exercise seed: Start from an `Order` object with `id`, `customerId`, `status`, `totalAmount`, `currency`, and `createdAt`.
 
-2. A teammate maps every API response field directly from a database entity. What problems can this create, and how would you separate entity, domain model, DTO, and API response?
+2. A `users` table allows nullable email addresses but requires every non-null normalized email to be unique. How would you model and query this correctly given SQL `NULL` semantics?
 
    Exercise fit: micro
-   Exercise goal: Separate persistence shape from API response shape.
-   Exercise owner: application mapping boundary
-   Exercise scope: Refactor one entity-to-response mapping into an explicit DTO mapper.
+   Exercise goal: Enforce uniqueness for an optional normalized value.
+   Exercise owner: schema and repository layer
+   Exercise scope: Add one normalized email column, uniqueness rule, and lookup query.
    Exercise constraints:
-   - Keep persistence and transport concerns separate.
-   - Do not introduce a large mapping framework.
-   - Do not redesign the whole domain model.
+   - Preserve the ability to store users without an email.
+   - Define how case normalization is performed.
+   - Account for database-specific behavior around multiple nulls and partial indexes.
    Exercise acceptance:
-   - The API response no longer exposes the raw entity.
-   - Internal-only fields are not leaked.
-   - One focused test verifies the mapping.
-   Exercise seed: Start from a controller returning a database entity directly.
+   - Two equivalent non-null emails cannot be stored.
+   - Multiple users without email are handled intentionally.
+   - The lookup predicate can use the supporting index.
+   Exercise seed: Start from a nullable `email` column with application-only duplicate checks.
 
 3. Write a basic query to list active customers created after a given date, sorted newest first, with a maximum of 50 rows. What details matter in this simple query?
 
@@ -107,7 +107,7 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    - A test or log assertion demonstrates the improvement.
    Exercise seed: Start from a list-orders endpoint that lazily loads each customer.
 
-8. You need to show a normalized customer name in the result using a database function. When is using a function in `SELECT` acceptable, and why can using a function in `WHERE` become a performance problem?
+8. Your team has a query `SELECT UPPER(name) FROM customer WHERE LOWER(email) = LOWER(?)`. The `email` column has an index. A colleague says the query is slow even though the index exists. What is causing the slowdown, and how would you fix it while still doing a case-insensitive match?
 
    Exercise fit: micro
    Exercise goal: Refactor a query so filtering remains index-friendly while computed display values stay in the result.
@@ -155,7 +155,7 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    - The trade-off of maintaining the index is explained.
    Exercise seed: Start from `WHERE customer_id = ? AND status = ? ORDER BY created_at DESC LIMIT 50`.
 
-11. You run `EXPLAIN` on a slow query and see a sequential scan over a large table. What does that usually mean, and what steps would you take before changing the schema?
+11. `EXPLAIN ANALYZE` shows a sequential scan and a large gap between estimated and actual rows. How would you determine whether the scan, stale statistics, or the query shape is the real problem?
 
    Exercise fit: micro
    Exercise goal: Use a query plan to reason about one slow query.
@@ -187,23 +187,24 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    - One test covers fetching the next page.
    Exercise seed: Start from an order history endpoint using page number and offset.
 
-13. Two users update the same account balance at nearly the same time and one update is lost. What happened, and how would you prevent it?
+13. Two requests perform a read-modify-write on the same account balance and one update is lost. How would you choose among an atomic conditional update, optimistic locking, and row locking?
 
    Exercise fit: standard
-   Exercise goal: Prevent lost updates in one write flow.
+   Exercise goal: Prevent lost updates while preserving an account invariant.
    Exercise owner: transaction/write path
-   Exercise scope: Add optimistic or pessimistic protection to one update operation.
+   Exercise scope: Add atomic, optimistic, or pessimistic protection to one update operation.
    Exercise constraints:
    - Focus on one record update scenario.
    - Do not build distributed locking.
-   - Explain why the chosen locking strategy fits.
+   - Keep the transaction boundary explicit.
+   - Explain why the chosen atomicity or locking strategy fits.
    Exercise acceptance:
    - Concurrent updates cannot silently overwrite each other.
-   - Conflict handling is explicit.
+   - Insufficient funds or version conflicts are handled explicitly.
    - One test simulates concurrent update attempts.
    Exercise seed: Start from a read-modify-write balance update with no version check.
 
-14. Explain transaction isolation using practical examples. What are dirty reads, non-repeatable reads, phantom reads, and why does isolation level choice affect both correctness and performance?
+14. Explain dirty reads, non-repeatable reads, phantoms, and write skew with practical examples. How would you verify what a specific database actually guarantees at each isolation level?
 
    Exercise fit: none
 
@@ -248,20 +249,20 @@ A strong candidate should not treat the database as a black box behind an ORM. T
 
 ## Evaluation Criteria
 
-- Question 1: Must identify primary key, foreign key, meaningful data types, nullability, and at least one constraint. Strong answer explains constraints as correctness guards, not decoration. Weak answer treats every field as nullable text.
-- Question 2: Must explain why raw entities should not be API contracts: leaking internal fields, coupling schema changes to clients, lazy-loading surprises, and security risk. Strong answer separates persistence entity, domain behavior, DTO/projection, and response model.
+- Question 1: Must identify a primary key, customer foreign key, exact numeric representation for money, currency representation, nullability, status and amount checks, timestamps, and deliberate delete/update actions. Strong answer distinguishes business identifiers from surrogate keys and explains constraints as correctness guards. Weak answer uses floating point for money or leaves invariants entirely to application code.
+- Question 2: Must explain that `NULL` means unknown or absent rather than an ordinary value, that `= NULL` is incorrect, and that uniqueness behavior for nullable columns is database-specific. Strong answer proposes normalized storage plus a unique or partial unique index, uses `IS NULL`, and avoids a check-then-insert race in application code.
 - Question 3: Must include bounded result size, filtering, deterministic ordering, and parameterized inputs. Strong answer mentions that simple queries still need predictable limits and stable ordering.
 - Question 4: Must distinguish `INNER JOIN` as requiring matches on both sides and `LEFT JOIN` as preserving rows from the left side. Strong answer gives a concrete case where optional related data should not remove the parent row.
 - Question 5: Must explain that joining one parent to many children changes the result grain. Strong answer fixes the query by aggregating, selecting the intended grain, or splitting parent and child retrieval intentionally.
 - Question 6: Must explain that `WHERE` filters rows before grouping, while `HAVING` filters aggregate groups after grouping. Strong answer uses a sales summary example correctly.
 - Question 7: Must identify N+1 as one initial query plus one query per row or association. Strong answer discusses detection through logs/metrics and fixes such as projections, join fetch, batch loading, or explicit query design.
-- Question 8: Must explain that functions in `SELECT` can be acceptable for presentation, but wrapping indexed columns in functions inside `WHERE` can prevent normal index usage. Strong answer suggests normalized stored values, expression indexes, or query rewrites.
+- Question 8: Must explain that wrapping an indexed column in a function can make a normal index unusable or less useful. Strong answer preserves semantics through normalized stored values, an expression index, a database-native case-insensitive type or collation, or a justified query rewrite rather than blindly removing the function.
 - Question 9: Must compare subqueries, CTEs, and temporary tables by readability, reuse, optimizer behavior, materialization, and lifetime. Strong answer avoids treating any one option as universally best.
 - Question 10: Must explain composite index design around equality filters followed by sort or range needs. Strong answer explains index maintenance cost, write overhead, storage, and why access patterns drive indexes.
-- Question 11: Must interpret sequential scan as scanning many rows, but not assume it is always wrong. Strong answer checks selectivity, missing predicates, stale statistics, returned columns, data volume, and whether an index would actually help.
+- Question 11: Must not assume a sequential scan is automatically wrong. Strong answer compares estimated and actual rows, checks selectivity, statistics, predicate sargability, data volume, loops, timing, and buffer or I/O evidence where available, then validates any change with another measured plan.
 - Question 12: Must explain that deep offset requires the database to walk or discard preceding rows. Strong answer proposes cursor or seek pagination over stable ordering and explains trade-offs.
-- Question 13: Must identify lost update from unsafe read-modify-write. Strong answer proposes optimistic locking with a version column or pessimistic locking where appropriate, and explains conflict handling.
-- Question 14: Must describe dirty reads, non-repeatable reads, and phantom reads in practical terms. Strong answer connects higher isolation to stronger consistency but more blocking, contention, or reduced concurrency.
+- Question 13: Must identify lost update from unsafe read-modify-write. Strong answer first considers one atomic conditional `UPDATE`, then compares optimistic version checks with `SELECT ... FOR UPDATE`, keeps the transaction short, preserves invariants such as non-negative balance, and explains retry or conflict behavior.
+- Question 14: Must describe dirty reads, non-repeatable reads, phantoms, and write skew in practical terms. Strong answer recognizes that SQL isolation names do not imply identical behavior across engines, distinguishes lock-based and MVCC behavior, and verifies guarantees in the target database documentation and with concurrent tests.
 - Question 15: Must propose phased migration: add nullable column, deploy code that writes both or handles default, backfill, validate, then enforce non-null. Strong answer considers old and new app compatibility and lock risk.
 - Question 16: Must explain denormalization as a deliberate read optimization with consistency cost. Strong answer compares denormalized columns, materialized views, read models, replication lag, refresh strategy, and operational complexity.
 
@@ -317,6 +318,20 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    C) Hiding table names from the application
    D) Automatically creating indexes
    Answer: A
+
+8. Which type is generally appropriate for storing a fixed-precision monetary amount?
+   A) `FLOAT`
+   B) `BOOLEAN`
+   C) `DECIMAL` or an integer in the smallest currency unit
+   D) Unvalidated free-form text
+   Answer: C
+
+9. Which predicate correctly checks for missing values in SQL?
+   A) `email = NULL`
+   B) `email IS NULL`
+   C) `email == NULL`
+   D) `email EQUALS NULL`
+   Answer: B
 
 ### Level 1
 
@@ -404,11 +419,25 @@ A strong candidate should not treat the database as a black box behind an ORM. T
     D) A version column on a row can support optimistic concurrency control
     Answer: A,B,D
 
+13. Which statements about database constraints and concurrent writes are correct?
+    A) An application check followed by an insert can race with another request
+    B) A unique constraint can provide the final concurrency-safe guarantee
+    C) Foreign-key delete behavior should be chosen explicitly
+    D) `NULL = NULL` evaluates to true in normal SQL predicates
+    Answer: A,B,C
+
+14. Which evidence makes an execution-plan diagnosis more reliable?
+    A) Actual row counts compared with estimates
+    B) Loop counts and time spent in plan nodes
+    C) Buffer or I/O information when the database exposes it
+    D) Assuming every sequential scan requires an index
+    Answer: A,B,C
+
 ### Level 2
 
-1. Explain how you would map an `Order` domain object into relational tables. Use this structure: keys and relationships -> required constraints -> what you would not expose directly through the API.
-   Hint: Focus on correctness first, not on advanced scaling.
-   Answer: A strong answer defines an `orders` table with a primary key, a customer foreign key, status, amount, and timestamps. It marks required fields as non-null, uses constraints for valid status or amount where appropriate, and keeps persistence shape separate from API response shape so internal columns and relationships are not leaked accidentally.
+1. Explain how you would model an `orders` table. Use this structure: keys and relationships -> money and status types -> required constraints -> foreign-key actions.
+   Hint: Focus on invariants the database can enforce, including what should happen if a referenced customer is deleted.
+   Answer: A strong answer defines an `orders` table with a primary key, customer foreign key, fixed-precision amount, currency, constrained status, and timestamps. Required fields are non-null, amounts cannot violate domain rules, and delete or update actions are deliberate rather than defaulted accidentally. It distinguishes a surrogate row identifier from any externally meaningful idempotency or order number.
 
 2. Explain how you would diagnose and fix an N+1 query problem. Use this structure: symptom -> detection -> fix options -> trade-off.
    Hint: Name at least two possible fixes instead of assuming one universal ORM setting.
@@ -430,13 +459,13 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    Hint: Focus on what the database must do for OFFSET 500000 vs fetching from a known row position.
    Answer: A strong answer explains that deep offset forces the database to scan and discard all preceding rows, making later pages progressively slower. Cursor pagination uses a stable value from the last fetched row (e.g. id or created_at) as a WHERE anchor, so the next page becomes WHERE id > ? ORDER BY id LIMIT 50 with no scan overhead. It notes the trade-offs: no random page access, and the ordering key must be stable and indexed.
 
-7. Explain how a lost update happens and how you would prevent it. Use this structure: how the bug occurs -> optimistic approach -> pessimistic approach -> when to choose each.
-   Hint: The bug comes from reading a value, computing a new one, and writing it back without checking if someone else wrote in between.
-   Answer: A strong answer identifies that two transactions both read the same row, compute an update from the old value, and write — the second write silently overwrites the first. Optimistic locking adds a version column; the UPDATE checks the version and fails if it changed, requiring a retry. Pessimistic locking uses SELECT FOR UPDATE to hold the row. Optimistic fits low-contention scenarios; pessimistic is better when conflicts are frequent or retries are expensive.
+7. Explain how a lost update happens and how you would prevent it. Use this structure: how the bug occurs -> atomic update -> optimistic approach -> pessimistic approach.
+   Hint: First ask whether the invariant can be enforced in one conditional SQL statement.
+   Answer: A strong answer identifies that two transactions read the same row and later overwrite each other. It first considers an atomic statement such as updating the balance only when sufficient funds remain and checking the affected-row count. Optimistic locking adds a version predicate and retries or reports a conflict when no row is updated. Pessimistic locking uses `SELECT FOR UPDATE` inside a short transaction when conflicts are frequent or the operation spans multiple dependent reads and writes.
 
-8. Explain the three classic read anomalies and how isolation levels address them. Use this structure: dirty read -> non-repeatable read -> phantom read -> practical default.
-   Hint: Frame each as a scenario where you observe data that is wrong or stale, not as a definition to recite.
-   Answer: A strong answer describes a dirty read as seeing uncommitted data from another transaction that may roll back; a non-repeatable read as re-reading the same row mid-transaction and seeing a different committed value; and a phantom read as re-running a range query and seeing new rows inserted by another transaction. Higher isolation prevents more anomalies but increases blocking or snapshot overhead. Most backends run fine at Read Committed; Repeatable Read is needed when a transaction must see a consistent view across multiple reads.
+8. Explain common isolation anomalies. Use this structure: dirty read -> non-repeatable read -> phantom -> write skew -> database-specific verification.
+   Hint: Isolation-level names are not enough; engines may implement them differently.
+   Answer: A strong answer describes a dirty read as observing uncommitted data, a non-repeatable read as seeing a row change between reads, a phantom as seeing a predicate return a different row set, and write skew as concurrent transactions each preserving a local check while jointly violating an invariant. It explains that stronger isolation can add blocking, aborts, or snapshot overhead and verifies exact guarantees for the chosen engine with documentation and concurrent integration tests.
 
 9. Explain the practical difference between INNER JOIN and LEFT JOIN, with a concrete case where the wrong choice silently drops or distorts results. Use this structure: what each does -> the dangerous case -> how to catch it.
    Hint: Think about optional relationships — what happens to the parent row when the related row does not exist yet.
@@ -448,7 +477,7 @@ A strong candidate should not treat the database as a black box behind an ORM. T
 
 ## Concepts
 
-- core concepts: relational-model, table, row, column, primary-key, foreign-key, constraint, nullability, transaction, isolation-level
-- practical usage: select, where, order-by, limit, join, group-by, having, dto-mapping, entity-mapping, projection, cte, temp-table, query-plan, explain
-- tradeoffs: normalization-vs-denormalization, index-read-write-cost, offset-vs-cursor-pagination, eager-vs-lazy-loading, consistency-vs-performance, materialization-cost
-- best practices: parameterized-queries, deterministic-ordering, bounded-reads, explicit-constraints, avoid-n-plus-one, index-by-access-pattern, phased-migrations, observe-slow-queries
+- core concepts: relational-model, primary-key, foreign-key, unique-constraint, check-constraint, null-semantics, three-valued-logic, transaction, isolation-level, mvcc
+- practical usage: select, where, order-by, limit, join, group-by, having, projection, cte, temp-table, atomic-update, optimistic-locking, row-locking, query-plan, explain-analyze
+- tradeoffs: normalization-vs-denormalization, surrogate-vs-natural-key, index-read-write-cost, offset-vs-cursor-pagination, eager-vs-lazy-loading, consistency-vs-concurrency, materialization-cost
+- best practices: exact-money-types, parameterized-queries, deterministic-ordering, bounded-reads, database-enforced-invariants, explicit-foreign-key-actions, avoid-n-plus-one, index-by-access-pattern, phased-migrations, compare-estimated-actual-rows
