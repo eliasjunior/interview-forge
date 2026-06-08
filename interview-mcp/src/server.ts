@@ -273,6 +273,8 @@ const deps: ToolDeps = {
   loadExercises,
   findExerciseByName,
   saveExercise,
+  getCodeChallenge: (sessionId) => repositories.codeChallenges.getBySessionId(sessionId),
+  saveCodeChallenge: (challenge) => repositories.codeChallenges.upsert(challenge),
   exercisesDir: EXERCISES_DIR,
   scopesDir: SCOPES_DIR,
   generateId,

@@ -6,6 +6,7 @@ import type { SessionRepository } from "./sessionRepository.js";
 import type { SkillRepository } from "./skillRepository.js";
 import type { ExerciseRepository } from "./exerciseRepository.js";
 import type { TopicPlanRepository } from "./topicPlanRepository.js";
+import type { CodeChallengeRepository } from "./codeChallengeRepository.js";
 
 export type { SessionRepository } from "./sessionRepository.js";
 export type { FlashcardRepository } from "./flashcardRepository.js";
@@ -15,6 +16,7 @@ export type { MistakeRepository } from "./mistakeRepository.js";
 export type { SkillRepository } from "./skillRepository.js";
 export type { ExerciseRepository } from "./exerciseRepository.js";
 export type { TopicPlanRepository } from "./topicPlanRepository.js";
+export type { CodeChallengeRepository, StoredCodeChallenge } from "./codeChallengeRepository.js";
 
 export interface AppRepositories {
   sessions: SessionRepository;
@@ -25,4 +27,5 @@ export interface AppRepositories {
   skills: SkillRepository;
   exercises: ExerciseRepository;
   topicPlans: TopicPlanRepository;
+  codeChallenges: CodeChallengeRepository;
 }

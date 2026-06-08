@@ -26,6 +26,8 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
           .describe("Broad label for the session, e.g. 'Mortgage API', 'Linked Lists', 'Payments Service'"),
         problemTitle: z.string().optional()
           .describe("Optional narrower problem label, especially for algorithm sessions. Example: 'Delete Middle Node'."),
+        interviewType: z.enum(["code", "design"]).optional()
+          .describe("Explicit interview type. Use 'code' for algorithm/coding problems and 'design' for API, architecture, or project specs."),
         contentPath: z.string().optional()
           .describe(
             "Path to the spec file, relative to interview-mcp/data/. " +
@@ -44,7 +46,7 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
           ),
       },
     },
-    async ({ topic, problemTitle, contentPath, content, focus = DEFAULT_FOCUS }) => {
+    async ({ topic, problemTitle, interviewType, contentPath, content, focus = DEFAULT_FOCUS }) => {
       if (contentPath && content) {
         return deps.stateError("Provide contentPath OR content, not both.");
       }
@@ -106,6 +108,7 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
         problemTitle,
         rawContent,
         focus,
+        interviewType,
         resolvedPath,
         generateId: deps.generateId,
       });

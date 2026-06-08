@@ -17,6 +17,8 @@ import type {
   SessionRewardSummary,
   TopicPlan,
   TopicPlanPriority,
+  CodeChallenge,
+  CodeRunResult,
 } from '@mock-interview/shared'
 
 const BASE = '/api'
@@ -111,6 +113,7 @@ export const getSessions = (): Promise<Session[]> => req(`${BASE}/sessions`)
 export interface ScopedInterviewStartRequest {
   topic: string
   problemTitle?: string
+  interviewType: 'code' | 'design'
   content: string
   focus?: string
 }
@@ -120,6 +123,7 @@ export interface ScopedInterviewStartResponse {
   state: Session['state']
   topic: string
   problemTitle?: string | null
+  interviewType: 'code' | 'design'
   focusArea: string
   source: string
   parsed:
@@ -169,6 +173,16 @@ export interface SessionLaunchPrompt {
 
 export const getSessionLaunchPrompt = (id: string): Promise<SessionLaunchPrompt> =>
   req(`${BASE}/sessions/${encodeURIComponent(id)}/launch-prompt`)
+
+export async function getCodeChallenge(id: string): Promise<CodeChallenge | null> {
+  const res = await fetch(`${BASE}/sessions/${encodeURIComponent(id)}/code-challenge`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`Request failed: ${res.status} ${BASE}/sessions/${encodeURIComponent(id)}/code-challenge`)
+  return res.json() as Promise<CodeChallenge>
+}
+
+export const runCode = (id: string, code: string): Promise<CodeRunResult> =>
+  post(`${BASE}/sessions/${encodeURIComponent(id)}/code-runs`, { code })
 
 export const getSessionDeletePreview = (id: string): Promise<SessionDeletionPreview> =>
   req(`${BASE}/sessions/${encodeURIComponent(id)}/delete-preview`)

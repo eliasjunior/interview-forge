@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { deleteSession, getGeneratedReportUi, getSession, getSessionDeletePreview, getSessionLaunchPrompt, getSessionRewardSummary, type ReportUiDataset, type SessionLaunchPrompt } from '../api'
-import type { Session, Evaluation, Concept, SessionDeletionPreview, SessionKind, SessionRewardSummary } from '@mock-interview/shared'
+import { deleteSession, getCodeChallenge, getGeneratedReportUi, getSession, getSessionDeletePreview, getSessionLaunchPrompt, getSessionRewardSummary, runCode, type ReportUiDataset, type SessionLaunchPrompt } from '../api'
+import type { CodeChallenge, CodeRunResult, Session, Evaluation, Concept, SessionDeletionPreview, SessionKind, SessionRewardSummary } from '@mock-interview/shared'
 import ScoreBadge, { ScoreBar } from '../components/ScoreBadge'
 
 function calcAvg(evals: Evaluation[]): string {
@@ -59,6 +59,11 @@ export default function ReportPage() {
   const [reportUi, setReportUi] = useState<ReportUiDataset | null>(null)
   const [rewardSummary, setRewardSummary] = useState<SessionRewardSummary | null>(null)
   const [launchPrompt, setLaunchPrompt] = useState<SessionLaunchPrompt | null>(null)
+  const [codeChallenge, setCodeChallenge] = useState<CodeChallenge | null>(null)
+  const [candidateCode, setCandidateCode] = useState('')
+  const [codeRun, setCodeRun] = useState<CodeRunResult | null>(null)
+  const [codeRunBusy, setCodeRunBusy] = useState(false)
+  const [visibleHintCount, setVisibleHintCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copyToast, setCopyToast] = useState<string | null>(null)
@@ -84,6 +89,22 @@ export default function ReportPage() {
     getSessionRewardSummary(id)
       .then(setRewardSummary)
       .catch(() => setRewardSummary(null))
+  }, [id, session, refreshTick])
+
+  useEffect(() => {
+    if (!id || !session || session.interviewType !== 'code') {
+      setCodeChallenge(null)
+      return
+    }
+
+    getCodeChallenge(id)
+      .then((challenge) => {
+        setCodeChallenge(challenge)
+        if (challenge) {
+          setCandidateCode((current) => current || challenge.starterCode)
+        }
+      })
+      .catch(() => setCodeChallenge(null))
   }, [id, session, refreshTick])
 
   useEffect(() => {
@@ -171,6 +192,19 @@ export default function ReportPage() {
       setCopyToast('Scope copied')
     } catch (e) {
       setError(String(e))
+    }
+  }
+
+  async function handleRunCode() {
+    if (!id || !candidateCode.trim() || codeRunBusy) return
+    try {
+      setCodeRunBusy(true)
+      setCodeRun(null)
+      setCodeRun(await runCode(id, candidateCode))
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setCodeRunBusy(false)
     }
   }
 
@@ -262,6 +296,70 @@ export default function ReportPage() {
             Use this in Claude Desktop to hand off the session cleanly. Claude should start with <code>get_session</code> and continue from the current state.
           </div>
           <pre className="launch-prompt-code">{launchPrompt.prompt}</pre>
+        </div>
+      )}
+
+      {isCodeInterview && codeChallenge && (
+        <div className="code-workbench-card">
+          <div className="code-workbench-header">
+            <div>
+              <div className="page-subtitle" style={{ marginBottom: 6 }}>Executable challenge</div>
+              <div className="launch-prompt-title">{codeChallenge.functionSignature}</div>
+            </div>
+            <span className="tag tag-algorithm">{codeChallenge.language}</span>
+          </div>
+
+          <div className="code-workbench-warning">
+            Runs locally with a short timeout. Use only trusted practice code; this is not a hardened security sandbox.
+          </div>
+
+          <div className="qa-section-label">Sample cases</div>
+          <ul className="code-sample-list">
+            {codeChallenge.sampleTests.map((test) => <li key={test}>{test}</li>)}
+          </ul>
+
+          <textarea
+            className="code-editor-textarea"
+            value={candidateCode}
+            onChange={(event) => setCandidateCode(event.target.value)}
+            spellCheck={false}
+            aria-label="Candidate code"
+          />
+
+          <div className="code-workbench-actions">
+            <button className="btn-secondary" onClick={() => void handleRunCode()} disabled={codeRunBusy || !candidateCode.trim()}>
+              {codeRunBusy ? 'Running…' : `Run ${codeChallenge.hiddenTestCount} tests`}
+            </button>
+            {visibleHintCount < codeChallenge.hints.length && (
+              <button className="btn-back" onClick={() => setVisibleHintCount((count) => count + 1)}>
+                Reveal next hint
+              </button>
+            )}
+          </div>
+
+          {visibleHintCount > 0 && (
+            <div className="code-hints">
+              <div className="qa-section-label">Progressive hints</div>
+              <ol>
+                {codeChallenge.hints.slice(0, visibleHintCount).map((hint) => <li key={hint}>{hint}</li>)}
+              </ol>
+            </div>
+          )}
+
+          {codeRun && (
+            <div className={`code-run-result ${codeRun.ok ? 'passed' : 'failed'}`}>
+              <strong>{codeRun.ok ? 'All tests passed' : `${codeRun.phase === 'compile' ? 'Compilation' : 'Tests'} failed`}</strong>
+              <span>{codeRun.durationMs} ms{codeRun.timedOut ? ' · timed out' : ''}</span>
+              {codeRun.stdout && <pre>{codeRun.stdout}</pre>}
+              {codeRun.stderr && <pre>{codeRun.stderr}</pre>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {isCodeInterview && !codeChallenge && (
+        <div className="study-callout" style={{ marginBottom: 24 }}>
+          The interview exists, but its executable tests have not been prepared yet. Start it in Claude so the teacher can call <code>configure_code_challenge</code>.
         </div>
       )}
 

@@ -93,6 +93,27 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
           how: "List practice exercises, optionally filtered by topic, max difficulty, or tags. Returns exercises grouped by topic, sorted by difficulty. Use this to find what to practice next.",
           example: { tags: ["matrix"], maxDifficulty: 3 },
         },
+        {
+          name: "configure_code_challenge",
+          how: "Prepare an executable code-interview workbench with starter code, visible samples, progressive hints, and private reference solution/tests. Never reveal the private artifacts.",
+          example: {
+            sessionId: "...",
+            language: "java",
+            functionSignature: "public static int[] twoSum(int[] nums, int target)",
+            starterCode: "public class Solution { ... }",
+            sampleTests: ["[2,7,11,15], 9 -> [0,1]"],
+            hints: ["Track previously seen values."],
+            hiddenTestCount: 8,
+            testHarness: "class TestRunner { public static void main(String[] args) { ... } }",
+            referenceSolution: "private correct implementation",
+            teacherNotes: "Challenge brute force, then guide toward O(n).",
+          },
+        },
+        {
+          name: "run_code",
+          how: "Compile and execute candidate Java or JavaScript code against the private tests for a configured code-interview session.",
+          example: { sessionId: "...", code: "public class Solution { ... }" },
+        },
       ];
 
       const filtered = toolName

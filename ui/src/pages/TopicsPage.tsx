@@ -169,6 +169,7 @@ type TopicAction = {
 type CustomInterviewDraft = {
   topic: string
   problemTitle: string
+  interviewType: 'code' | 'design'
   focus: string
   content: string
 }
@@ -259,20 +260,20 @@ function getRecommendedAction(levelData: TopicLevel, topicFile: string): TopicAc
   }
 }
 
-function getTopicActions(levelData: TopicLevel, topicFile: string): TopicAction[] {
+function getTopicActions(levelData: TopicLevel, topicFile: string, displayName: string): TopicAction[] {
   const recommended = getRecommendedAction(levelData, topicFile)
   const actions: TopicAction[] = [
     recommended,
     {
       key: 'drill',
       label: 'Drill weak spots',
-      prompt: `Drill me on weak spots for "${topicFile}".`,
+      prompt: `Drill me on weak spots for "${displayName}".`,
       helper: 'Good after at least one completed interview.',
     },
     {
       key: 'flashcards',
       label: 'Review flashcards',
-      prompt: `Review my due flashcards for "${topicFile}".`,
+      prompt: `Review my due flashcards for "${displayName}".`,
       helper: 'Quick recall round for weak answers.',
     },
     {
@@ -288,6 +289,7 @@ function getTopicActions(levelData: TopicLevel, topicFile: string): TopicAction[
 
 function TopicActionLauncher({
   topicFile,
+  displayName,
   levelData,
   activeMenu,
   setActiveMenu,
@@ -295,13 +297,14 @@ function TopicActionLauncher({
   compact = false,
 }: {
   topicFile: string
+  displayName: string
   levelData: TopicLevel
   activeMenu: string | null
   setActiveMenu: Dispatch<SetStateAction<string | null>>
   handleCopyPrompt: (topicFile: string, action: TopicAction) => void | Promise<void>
   compact?: boolean
 }) {
-  const actions = getTopicActions(levelData, topicFile)
+  const actions = getTopicActions(levelData, topicFile, displayName)
 
   return (
     <div className={`topic-action-anchor ${compact ? 'compact' : ''}`}>
@@ -374,6 +377,28 @@ function CustomInterviewModal({
               placeholder="Linked Lists"
               disabled={busy}
             />
+          </label>
+
+          <label className="custom-interview-field">
+            <span className="custom-interview-label">Interview type</span>
+            <select
+              className="custom-interview-input"
+              value={draft.interviewType}
+              onChange={(event) => {
+                const interviewType = event.target.value as CustomInterviewDraft['interviewType']
+                onChange({
+                  ...draft,
+                  interviewType,
+                  focus: interviewType === 'code'
+                    ? 'algorithmic reasoning, edge cases, and complexity trade-offs'
+                    : 'robustness, reliability, and extensibility in a production environment',
+                })
+              }}
+              disabled={busy}
+            >
+              <option value="code">Code / algorithm</option>
+              <option value="design">API / architecture design</option>
+            </select>
           </label>
 
           <label className="custom-interview-field">
@@ -668,6 +693,7 @@ export default function TopicsPage() {
     setCustomInterviewDraft({
       topic,
       problemTitle: '',
+      interviewType: 'code',
       focus: 'algorithmic reasoning, edge cases, and complexity trade-offs',
       content: '',
     })
@@ -713,6 +739,7 @@ export default function TopicsPage() {
       const created = await createScopedInterview({
         topic: customInterviewDraft.topic,
         problemTitle: customInterviewDraft.problemTitle.trim() || undefined,
+        interviewType: customInterviewDraft.interviewType,
         focus: customInterviewDraft.focus,
         content: customInterviewDraft.content,
       })

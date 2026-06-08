@@ -41,11 +41,24 @@ export function detectGaps(content: string): string[] {
 }
 
 /**
- * Heuristic: if the content has ≥ 2 algorithm signals (Big-O, pattern:, etc.),
- * treat it as an algorithm problem rather than an API spec.
+ * Classify pasted content when the caller did not choose an interview type.
+ * Strong coding-problem shapes should not need authored markdown headings.
  */
 export function detectContentType(content: string): "algorithm" | "api" {
-  const algorithmSignals = [
+  const strongAlgorithmSignals = [
+    /\bgiven an? (array|string|matrix|linked list|binary tree|graph|integer|number|sequence)\b/i,
+    /\breturn (the )?(indices?|index|length|count|number|array|list|boolean|true|false)\b/i,
+    /\b(write|implement|design) (a |an )?(function|method|algorithm|solution|program|code)\b/i,
+    /\binput\s*:/i,
+    /\boutput\s*:/i,
+    /\byou may assume\b/i,
+    /\bexactly one solution\b/i,
+  ];
+  if (strongAlgorithmSignals.filter((re) => re.test(content)).length >= 2) {
+    return "algorithm";
+  }
+
+  const authoredAlgorithmSignals = [
     /##\s+Problem Statement/i,
     /##\s+Constraints/i,
     /##\s+Expected approach/i,
@@ -57,7 +70,7 @@ export function detectContentType(content: string): "algorithm" | "api" {
     /\binvariant:/i,
     /\bedge cases?\b/i,
   ];
-  const hits = algorithmSignals.filter((re) => re.test(content)).length;
+  const hits = authoredAlgorithmSignals.filter((re) => re.test(content)).length;
   return hits >= 2 ? "algorithm" : "api";
 }
 

@@ -175,6 +175,7 @@ Business rules
     const payload = parse(await handlers.get("start_scoped_interview")!({
       topic: "Linked Lists",
       problemTitle: "Delete Middle Node",
+      interviewType: "code",
       focus: "algorithmic reasoning and edge cases",
       content: "Assume you have a method isSubstring which checks if one word is a substring of another. Given two strings, s1 and s2, write code to check if s2 is a rotation of s1 using only one call to isSubstring.",
     }));
@@ -195,5 +196,24 @@ Business rules
     assert.match(session.customContent ?? "", /## Common Interview Follow-Ups \(interviewer only\)/);
     assert.match(session.customContent ?? "", /\*\*implementation\*\*/);
     assert.match(session.questions.at(-1) ?? "", /Now implement Delete Middle Node/);
+  });
+
+  test("treats a problem title as an algorithm signal for older callers", async () => {
+    const { deps, sessions } = makeDeps();
+    const handlers = captureTool(registerStartScopedInterviewTool, deps);
+
+    const payload = parse(await handlers.get("start_scoped_interview")!({
+      topic: "Arrays",
+      problemTitle: "Two Sum",
+      content: `
+Given an array of integers nums and an integer target, return indices of the two numbers
+such that they add up to target. You may assume that each input has exactly one solution.
+      `.trim(),
+    }));
+
+    assert.equal(payload.parsed.contentType, "algorithm");
+    assert.equal(payload.interviewType, "code");
+    assert.equal(sessions[payload.sessionId]?.interviewType, "code");
+    assert.match(sessions[payload.sessionId]?.questions.at(-1) ?? "", /Now implement Two Sum/);
   });
 });

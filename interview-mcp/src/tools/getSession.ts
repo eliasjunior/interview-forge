@@ -32,6 +32,9 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
             "Do not expose tool chatter or internal workflow details to the candidate.";
 
       const lastEval = session.evaluations[session.evaluations.length - 1];
+      const codeChallenge = session.interviewType === "code" && deps.getCodeChallenge
+        ? deps.getCodeChallenge(sessionId)
+        : null;
       const activeFollowUp =
         session.state === "FOLLOW_UP" && lastEval?.needsFollowUp && lastEval.followUpQuestion
           ? {
@@ -51,6 +54,21 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
             ...session,
             instruction,
             activeFollowUp,
+            codeChallenge: codeChallenge
+              ? {
+                  configured: true,
+                  language: codeChallenge.language,
+                  functionSignature: codeChallenge.functionSignature,
+                  sampleTests: codeChallenge.sampleTests,
+                  hintsAvailable: codeChallenge.hints.length,
+                  hiddenTestCount: codeChallenge.hiddenTestCount,
+                }
+              : session.interviewType === "code"
+                ? {
+                    configured: false,
+                    nextTool: "configure_code_challenge",
+                  }
+                : null,
           }
         : session;
       return { content: [{ type: "text" as const, text: JSON.stringify(payload) }] };

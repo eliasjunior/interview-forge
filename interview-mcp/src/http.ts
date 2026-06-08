@@ -40,6 +40,7 @@ import {
   normalizeTopicPlanKey,
 } from "./http/topicDetails.js";
 import { inferLastLevelUpAt } from "./topicPlanProgress.js";
+import { runCodeChallenge } from "./codeExecution/runner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -321,6 +322,7 @@ app.post("/api/scoped-interviews", (req, res) => {
   const focus = typeof req.body?.focus === "string" && req.body.focus.trim().length > 0
     ? req.body.focus.trim()
     : DEFAULT_FOCUS;
+  const interviewType = req.body?.interviewType;
 
   if (!topic) {
     res.status(400).json({ error: "topic is required" });
@@ -332,11 +334,17 @@ app.post("/api/scoped-interviews", (req, res) => {
     return;
   }
 
+  if (interviewType !== undefined && interviewType !== "code" && interviewType !== "design") {
+    res.status(400).json({ error: "interviewType must be one of: code, design" });
+    return;
+  }
+
   const result = createScopedInterviewSession({
     topic,
     problemTitle,
     rawContent: content,
     focus,
+    interviewType,
     generateId: () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   });
 
@@ -389,6 +397,44 @@ app.get("/api/sessions/:id/launch-prompt", (req, res) => {
   }
 
   res.json(buildSessionLaunchPrompt(session));
+});
+
+app.get("/api/sessions/:id/code-challenge", (req, res) => {
+  const challenge = repositories.codeChallenges.getBySessionId(req.params.id);
+  if (!challenge) {
+    res.status(404).json({ error: "Code challenge not configured" });
+    return;
+  }
+
+  const {
+    testHarness: _testHarness,
+    referenceSolution: _referenceSolution,
+    teacherNotes: _teacherNotes,
+    ...publicChallenge
+  } = challenge;
+  res.json(publicChallenge);
+});
+
+app.post("/api/sessions/:id/code-runs", async (req, res) => {
+  const challenge = repositories.codeChallenges.getBySessionId(req.params.id);
+  if (!challenge) {
+    res.status(404).json({ error: "Code challenge not configured" });
+    return;
+  }
+
+  const code = typeof req.body?.code === "string" ? req.body.code : "";
+  if (!code.trim()) {
+    res.status(400).json({ error: "code is required" });
+    return;
+  }
+
+  try {
+    res.json(await runCodeChallenge(challenge, code));
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 app.get("/api/sessions/:id/delete-preview", (req, res) => {

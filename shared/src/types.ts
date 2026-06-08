@@ -180,6 +180,32 @@ export interface Session {
   knowledgeSource: 'file' | 'ai'
 }
 
+// ── Executable code challenges ───────────────────────────────────────────────
+
+export type CodeChallengeLanguage = 'javascript' | 'java'
+
+export interface CodeChallenge {
+  sessionId: string
+  language: CodeChallengeLanguage
+  functionSignature: string
+  starterCode: string
+  sampleTests: string[]
+  hints: string[]
+  hiddenTestCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CodeRunResult {
+  ok: boolean
+  phase: 'compile' | 'test'
+  exitCode: number | null
+  timedOut: boolean
+  durationMs: number
+  stdout: string
+  stderr: string
+}
+
 // ── Knowledge graph ───────────────────────────────────────────────────────────
 
 export interface GraphNode {

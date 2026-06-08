@@ -1,4 +1,4 @@
-import type { Session } from "@mock-interview/shared";
+import type { InterviewType, Session } from "@mock-interview/shared";
 import { detectContentType, detectGaps } from "../content/analyzer.js";
 import { extractSpec } from "../content/parser.js";
 import { buildAlgorithmFollowUpCandidates, buildAlgorithmQuestions, buildQuestions, polishContent } from "../content/questionBuilder.js";
@@ -21,6 +21,7 @@ export interface ScopedInterviewBuildInput {
   rawContent: string;
   generateId: () => string;
   focus?: string;
+  interviewType?: InterviewType;
   resolvedPath?: string;
 }
 
@@ -42,7 +43,14 @@ function looksLikeApiSpec(rawContent: string): boolean {
   return spec.endpoints.length > 0 || (spec.models.length > 0 && spec.rules.length > 0);
 }
 
-function inferScopedContentType(rawContent: string): "algorithm" | "api" {
+function inferScopedContentType(
+  rawContent: string,
+  problemTitle?: string,
+  interviewType?: InterviewType,
+): "algorithm" | "api" {
+  if (interviewType) return interviewType === "code" ? "algorithm" : "api";
+  if (problemTitle?.trim()) return "algorithm";
+
   const detected = detectContentType(rawContent);
   if (detected === "algorithm") return detected;
   // Default to "api" (design interview path) for any content that lacks strong algorithm signals.
@@ -116,9 +124,10 @@ export function createScopedInterviewSession({
   rawContent,
   generateId,
   focus = DEFAULT_FOCUS,
+  interviewType,
   resolvedPath,
 }: ScopedInterviewBuildInput): ScopedInterviewBuildResult {
-  const contentType = inferScopedContentType(rawContent);
+  const contentType = inferScopedContentType(rawContent, problemTitle, interviewType);
   const isAlgorithm = contentType === "algorithm";
   const trimmedProblemTitle = problemTitle?.trim() || undefined;
   const promptLabel = trimmedProblemTitle ?? topic;

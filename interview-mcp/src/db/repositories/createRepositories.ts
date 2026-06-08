@@ -7,6 +7,7 @@ import { SQLiteSessionRepository } from "./sqliteSessionRepository.js";
 import { SQLiteSkillRepository } from "./sqliteSkillRepository.js";
 import { SQLiteExerciseRepository } from "./sqliteExerciseRepository.js";
 import { SQLiteTopicPlanRepository } from "./sqliteTopicPlanRepository.js";
+import { SQLiteCodeChallengeRepository } from "./sqliteCodeChallengeRepository.js";
 import type { AppRepositories } from "../../repositories/index.js";
 
 export function createSqliteRepositories(db: AppDb): AppRepositories {
@@ -19,5 +20,6 @@ export function createSqliteRepositories(db: AppDb): AppRepositories {
     skills: new SQLiteSkillRepository(db),
     exercises: new SQLiteExerciseRepository(db),
     topicPlans: new SQLiteTopicPlanRepository(db),
+    codeChallenges: new SQLiteCodeChallengeRepository(db),
   };
 }

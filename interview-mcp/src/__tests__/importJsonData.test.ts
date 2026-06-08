@@ -128,6 +128,10 @@ function createSpyRepositories() {
       list: () => [],
       upsert: (plan) => plan,
     },
+    codeChallenges: {
+      getBySessionId: () => null,
+      upsert: () => undefined,
+    },
   };
 
   return { repositories, calls };

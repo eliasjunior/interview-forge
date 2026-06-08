@@ -250,6 +250,21 @@ export const topicPlans = sqliteTable("topic_plans", {
   lastUnlockedLevel: integer("last_unlocked_level"),
 });
 
+export const codeChallenges = sqliteTable("code_challenges", {
+  sessionId: text("session_id").primaryKey().references(() => sessions.id, { onDelete: "cascade" }),
+  language: text("language").notNull(),
+  functionSignature: text("function_signature").notNull(),
+  starterCode: text("starter_code").notNull(),
+  sampleTests: text("sample_tests").notNull().default("[]"),
+  hints: text("hints").notNull().default("[]"),
+  hiddenTestCount: integer("hidden_test_count").notNull().default(0),
+  testHarness: text("test_harness").notNull(),
+  referenceSolution: text("reference_solution").notNull(),
+  teacherNotes: text("teacher_notes").notNull().default(""),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const sessionsRelations = relations(sessions, ({ many }) => ({
   questions: many(sessionQuestions),
   messages: many(sessionMessages),

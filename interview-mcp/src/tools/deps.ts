@@ -2,6 +2,7 @@ import type { AIProvider } from "../ai/index.js";
 import type { KnowledgeStore } from "../knowledge/index.js";
 import type { Concept, Evaluation, Exercise, Flashcard, FlashcardAnswer, KnowledgeGraph, Mistake, Skill, Session, TopicPlan } from "@mock-interview/shared";
 import type { SessionDeletionPreview } from "../sessions/deleteFlow.js";
+import type { StoredCodeChallenge } from "../repositories/codeChallengeRepository.js";
 
 export type StateError = ReturnType<ToolDeps["stateError"]>;
 
@@ -43,6 +44,8 @@ export interface ToolDeps {
   loadExercises(topic?: string, maxDifficulty?: number, tags?: string[]): Exercise[];
   findExerciseByName(name: string): Exercise | null;
   saveExercise(exercise: Exercise): void;
+  getCodeChallenge?(sessionId: string): StoredCodeChallenge | null;
+  saveCodeChallenge?(challenge: StoredCodeChallenge): void;
   exercisesDir: string;
   scopesDir: string;
 
