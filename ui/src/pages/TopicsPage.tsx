@@ -642,8 +642,28 @@ export default function TopicsPage() {
   }, [])
 
   async function handleCopyPrompt(topicFile: string, action: TopicAction) {
+    let copied = false
     try {
       await navigator.clipboard.writeText(action.prompt)
+      copied = true
+    } catch {
+      // fallback for browsers that block clipboard API without focus/HTTPS
+      try {
+        const textarea = document.createElement('textarea')
+        textarea.value = action.prompt
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        copied = document.execCommand('copy')
+        document.body.removeChild(textarea)
+      } catch {
+        // both methods failed
+      }
+    }
+
+    if (copied) {
       setToastQueue(prev => [
         ...prev,
         {
@@ -653,7 +673,7 @@ export default function TopicsPage() {
         },
       ])
       setActiveMenu(null)
-    } catch {
+    } else {
       setToastQueue(prev => [
         ...prev,
         {
@@ -894,6 +914,7 @@ export default function TopicsPage() {
                       )}
                       <TopicActionLauncher
                         topicFile={topic.file}
+                        displayName={topic.displayName}
                         levelData={levelData}
                         activeMenu={activeMenu}
                         setActiveMenu={setActiveMenu}
@@ -1000,6 +1021,7 @@ export default function TopicsPage() {
                     {levelData && (
                       <TopicActionLauncher
                         topicFile={topic.file}
+                        displayName={topic.displayName}
                         levelData={levelData}
                         activeMenu={activeMenu}
                         setActiveMenu={setActiveMenu}
