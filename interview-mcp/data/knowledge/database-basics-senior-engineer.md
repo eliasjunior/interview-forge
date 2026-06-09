@@ -123,22 +123,6 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    - The reason for the performance improvement is explained.
    Exercise seed: Start from `WHERE LOWER(email) = LOWER(?)` on a table with an index on `email`.
 
-9. Compare a subquery, a CTE, and a temporary table. When would each be reasonable, and what trade-offs should a senior engineer consider?
-
-   Exercise fit: standard
-   Exercise goal: Refactor a multi-step reporting query into a clearer intermediate structure.
-   Exercise owner: query/report layer
-   Exercise scope: Use a CTE or temporary table for one report calculation.
-   Exercise constraints:
-   - Keep this to one report query.
-   - Do not use temporary tables just to hide unclear logic.
-   - Explain the cost of materializing intermediate data.
-   Exercise acceptance:
-   - The intermediate result has a clear purpose.
-   - The final query is easier to reason about.
-   - The trade-off between readability and execution cost is stated.
-   Exercise seed: Start from a nested report query that calculates active customers with recent high-value orders.
-
 10. A query filters by `customer_id`, filters by `status`, and sorts by `created_at DESC`. How would you design an index for this query, and what could go wrong if you add indexes blindly?
 
    Exercise fit: micro
