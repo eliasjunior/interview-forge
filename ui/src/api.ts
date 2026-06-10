@@ -114,7 +114,7 @@ export interface ScopedInterviewStartRequest {
   topic: string
   problemTitle?: string
   interviewType: 'code' | 'design'
-  content: string
+  content?: string
   focus?: string
 }
 
@@ -133,7 +133,7 @@ export interface ScopedInterviewStartResponse {
   previewQuestions: string[]
   normalizedContent: string
   detectedContentType: 'algorithm' | 'api'
-  nextTool: 'ask_question'
+  nextTool: 'ask_question' | 'configure_code_challenge'
 }
 
 export const createScopedInterview = (body: ScopedInterviewStartRequest): Promise<ScopedInterviewStartResponse> =>

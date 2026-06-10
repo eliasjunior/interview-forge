@@ -14,7 +14,7 @@ This server drives the interview session from start to finish.
 | `help_tools` | Lists all tools with short descriptions and example payloads. |
 | `list_topics` | Lists all knowledge topics available for interviews. |
 | `start_interview` | Creates a new session, loads questions from a knowledge file (or generates via AI). Returns `sessionId`. |
-| `start_scoped_interview` | Starts an interview from user-provided content (spec, README, architecture doc). Questions are generated locally by parsing the content — no AI call needed. |
+| `start_scoped_interview` | Starts an interview from user-provided content, or a title-only code interview such as `Valid Anagram`. Code sessions return `configure_code_challenge` as the required next step. |
 | `build_scope` | Builds a focused content block for `start_scoped_interview` from structured inputs. Optionally saves the result to `data/knowledge/scopes/<slug>.md` for reuse. |
 | `start_drill` | Starts a targeted drill on weak spots from a past interview. Requires at least one completed session for the topic. |
 | `ask_question` | Returns the current question for a session in `ASK_QUESTION` state. |
@@ -58,6 +58,8 @@ This server drives the interview session from start to finish.
 |---|---|
 | `create_exercise` | Creates a structured exercise grounded in a real-world scenario and returns a complexity assessment plus prerequisite roadmap. |
 | `list_exercises` | Lists exercises, optionally filtered by topic, max difficulty, or tags. |
+| `configure_code_challenge` | Uses the orchestrator-authored problem package to persist a candidate-facing statement, input/output examples, constraints, starter code, hints, and private reference/test artifacts. |
+| `run_code` | Runs candidate Java or JavaScript code against the configured private test harness. |
 
 **Session state machine:** `ASK_QUESTION → WAIT_FOR_ANSWER → EVALUATE_ANSWER → FOLLOW_UP` (loops per question) → `ENDED`
 

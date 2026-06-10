@@ -99,6 +99,12 @@ export function registerHelpTools(server: McpServer, deps: ToolDeps) {
           example: {
             sessionId: "...",
             language: "java",
+            problemStatement: "Given two strings s and t, determine whether t is an anagram of s.",
+            examples: [
+              { input: "s = \"anagram\", t = \"nagaram\"", output: "true" },
+              { input: "s = \"rat\", t = \"car\"", output: "false" },
+            ],
+            constraints: ["1 <= s.length, t.length <= 5 * 10^4", "s and t contain lowercase English letters"],
             functionSignature: "public static int[] twoSum(int[] nums, int target)",
             starterCode: "public class Solution { ... }",
             sampleTests: ["[2,7,11,15], 9 -> [0,1]"],

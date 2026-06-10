@@ -18,7 +18,7 @@ type ParsedPayload =
 export interface ScopedInterviewBuildInput {
   topic: string;
   problemTitle?: string;
-  rawContent: string;
+  rawContent?: string;
   generateId: () => string;
   focus?: string;
   interviewType?: InterviewType;
@@ -59,12 +59,14 @@ function inferScopedContentType(
 }
 
 function buildAlgorithmScope(topic: string, problemTitle: string | undefined, rawContent: string, focus: string): string {
-  const trimmed = rawContent.trim();
+  const problemLabel = problemTitle?.trim() || topic;
+  const trimmed = rawContent.trim() ||
+    `Problem definition pending. Before interviewing the candidate, configure "${problemLabel}" ` +
+    "with a complete problem statement, examples, constraints, starter code, and private tests.";
   if (/^#\s+Study Scope:/i.test(trimmed) || /##\s+Problem Statement/i.test(trimmed)) {
     return trimmed;
   }
 
-  const problemLabel = problemTitle?.trim() || topic;
   const followUpCandidates = buildAlgorithmFollowUpCandidates(problemLabel, trimmed);
 
   return [
@@ -127,13 +129,14 @@ export function createScopedInterviewSession({
   interviewType,
   resolvedPath,
 }: ScopedInterviewBuildInput): ScopedInterviewBuildResult {
-  const contentType = inferScopedContentType(rawContent, problemTitle, interviewType);
+  const sourceContent = rawContent?.trim() ?? "";
+  const contentType = inferScopedContentType(sourceContent, problemTitle, interviewType);
   const isAlgorithm = contentType === "algorithm";
   const trimmedProblemTitle = problemTitle?.trim() || undefined;
   const promptLabel = trimmedProblemTitle ?? topic;
   const normalizedContent = isAlgorithm
-    ? buildAlgorithmScope(topic, trimmedProblemTitle, rawContent, focus)
-    : rawContent;
+    ? buildAlgorithmScope(topic, trimmedProblemTitle, sourceContent, focus)
+    : sourceContent;
   const spec = isAlgorithm ? { endpoints: [], models: [], rules: [], notes: [] } : extractSpec(normalizedContent);
   const gaps = isAlgorithm ? [] : detectGaps(normalizedContent);
   const polished = isAlgorithm ? normalizedContent : polishContent(topic, normalizedContent, focus);

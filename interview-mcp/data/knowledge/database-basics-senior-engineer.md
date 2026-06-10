@@ -123,6 +123,22 @@ A strong candidate should not treat the database as a black box behind an ORM. T
    - The reason for the performance improvement is explained.
    Exercise seed: Start from `WHERE LOWER(email) = LOWER(?)` on a table with an index on `email`.
 
+9. Consider a `students` table containing Ana, Bob, and Carla, and a `StudentCourses` table where Ana has two courses, Bob has one, and Carla has none. You need one result row per student with the number of courses, including `Carla, 0`.
+
+   This query preserves Carla but reports a count of `1`:
+
+   ```sql
+   SELECT s.studentName, COUNT(*)
+   FROM students s
+   LEFT JOIN StudentCourses sc
+     ON s.studentID = sc.studentID
+   GROUP BY s.studentID, s.studentName;
+   ```
+
+   Explain why an `INNER JOIN` would omit Carla, why `LEFT JOIN` with `COUNT(*)` reports `1` for her, and write the corrected query.
+
+   Exercise fit: none
+
 10. A query filters by `customer_id`, filters by `status`, and sorts by `created_at DESC`. How would you design an index for this query, and what could go wrong if you add indexes blindly?
 
    Exercise fit: micro
@@ -241,7 +257,7 @@ A strong candidate should not treat the database as a black box behind an ORM. T
 - Question 6: Must explain that `WHERE` filters rows before grouping, while `HAVING` filters aggregate groups after grouping. Strong answer uses a sales summary example correctly.
 - Question 7: Must identify N+1 as one initial query plus one query per row or association. Strong answer discusses detection through logs/metrics and fixes such as projections, join fetch, batch loading, or explicit query design.
 - Question 8: Must explain that wrapping an indexed column in a function can make a normal index unusable or less useful. Strong answer preserves semantics through normalized stored values, an expression index, a database-native case-insensitive type or collation, or a justified query rewrite rather than blindly removing the function.
-- Question 9: Must compare subqueries, CTEs, and temporary tables by readability, reuse, optimizer behavior, materialization, and lifetime. Strong answer avoids treating any one option as universally best.
+- Question 9: Must explain that `INNER JOIN` keeps only matching students, while `LEFT JOIN` preserves Carla as a joined row whose right-side columns are `NULL`. Must distinguish `COUNT(*)`, which counts that preserved row, from `COUNT(sc.courseID)`, which ignores `NULL` and therefore returns zero for Carla. Strong answer writes `SELECT s.studentName, COUNT(sc.courseID) AS courseCount FROM students s LEFT JOIN StudentCourses sc ON s.studentID = sc.studentID GROUP BY s.studentID, s.studentName;` and states the mental model: count rows with `COUNT(*)`, count actual course matches with `COUNT(sc.courseID)`.
 - Question 10: Must explain composite index design around equality filters followed by sort or range needs. Strong answer explains index maintenance cost, write overhead, storage, and why access patterns drive indexes.
 - Question 11: Must not assume a sequential scan is automatically wrong. Strong answer compares estimated and actual rows, checks selectivity, statistics, predicate sargability, data volume, loops, timing, and buffer or I/O evidence where available, then validates any change with another measured plan.
 - Question 12: Must explain that deep offset requires the database to walk or discard preceding rows. Strong answer proposes cursor or seek pagination over stable ordering and explains trade-offs.

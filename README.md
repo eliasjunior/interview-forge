@@ -60,8 +60,8 @@ You can also start a scoped interview directly from the UI when you have your ow
 
 1. Open `http://localhost:5173/topics`.
 2. Click `Start With Content`.
-3. Enter a topic, optional focus, and paste the content.
-4. Create the session. The backend normalizes the content into scoped interview context before saving it.
+3. For a code interview, enter a broad topic and an exact problem name such as `Valid Anagram`. Pasting a custom statement is optional.
+4. Create the session. For title-only code interviews, Claude first calls `configure_code_challenge` to author and persist a LeetCode-style statement, input/output examples, constraints, starter code, progressive hints, and private tests before presenting the problem.
 5. Open the created session and use `Start In Claude` or `Copy prompt`.
 6. Paste that prompt into Claude Desktop. Claude should call `get_session` first and continue from the current state.
 

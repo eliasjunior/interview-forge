@@ -49,6 +49,17 @@ export function registerAskQuestionTool(server: McpServer, deps: ToolDeps) {
       const guard = deps.assertState(session, "ask_question");
       if (!guard.ok) return deps.stateError(guard.error);
 
+      if (
+        session.interviewType === "code" &&
+        deps.getCodeChallenge &&
+        !deps.getCodeChallenge(sessionId)
+      ) {
+        return deps.stateError(
+          `Code interview '${sessionId}' is not configured. ` +
+          "Call configure_code_challenge first with a complete problem statement, examples, constraints, starter code, and private tests."
+        );
+      }
+
       const question = session.questions[session.currentQuestionIndex];
       const choices = session.questChoices?.[session.currentQuestionIndex];
       // Prefer pre-selected criteria stored on the session (populated when questions are

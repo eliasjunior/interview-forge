@@ -51,7 +51,10 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
         return deps.stateError("Provide contentPath OR content, not both.");
       }
 
-      if (!contentPath && !content) {
+      const canStartTitleOnlyCodeInterview =
+        interviewType === "code" && Boolean(problemTitle?.trim());
+
+      if (!contentPath && !content && !canStartTitleOnlyCodeInterview) {
         const candidates = discoverScopeFiles(topic, SCOPE_DIR);
 
         if (candidates.length === 0) {
@@ -100,7 +103,7 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
         rawContent = fs.readFileSync(resolvedPath, "utf-8");
         console.error(`[start_scoped_interview] loaded content from ${resolvedPath} (${rawContent.length} chars)`);
       } else {
-        rawContent = content!;
+        rawContent = content ?? "";
       }
 
       const result = createScopedInterviewSession({
@@ -139,16 +142,21 @@ export function registerStartScopedInterviewTool(server: McpServer, deps: ToolDe
             previewQuestions: result.previewQuestions,
             normalizedContent: result.normalizedContent,
             interviewType: result.session.interviewType,
-            nextTool: "ask_question",
+            nextTool: result.detectedContentType === "algorithm"
+              ? "configure_code_challenge"
+              : "ask_question",
             instruction:
               result.detectedContentType === "algorithm"
                 ? "This is a CODE interview session (algorithm problem). " +
-                  "Ask the candidate to explain their approach, handle edge cases, and then implement. " +
+                  "Before presenting anything to the candidate, call configure_code_challenge. " +
+                  "Create a clear LeetCode-style problem statement with at least two basic input/output examples, " +
+                  "explicit constraints, starter code, progressive hints, a private reference solution, and a private hidden-test harness. " +
+                  "Then ask the candidate to explain their approach, handle edge cases, and implement. " +
                   "Hints are allowed when they are stuck, but do not reveal the solution. " +
                   "If the candidate submits code without time/space complexity, ask for that explicitly after the solution is sent. " +
                   "After a complete solution plus complexity, allow at most one problem-aware follow-up if it is genuinely useful; otherwise finish instead of forcing extra scripted questions. " +
                   "Probe pattern recognition, correctness reasoning, and boundary conditions — not API or system design. " +
-                  "Call ask_question to start. " +
+                  "After configuration, call ask_question to start. " +
                   (deps.ai
                     ? "AI is enabled — evaluate_answer will score against the Study Scope criteria automatically."
                     : "AI is disabled — provide score, feedback, and needsFollowUp manually when calling evaluate_answer.")

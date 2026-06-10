@@ -208,6 +208,31 @@ The tool builds a content block with explicit **Focus Areas**, **Evaluation Crit
 
 If you prefer the browser flow, you can also paste the resulting `content` into `Start With Content` in the Topics page instead of calling the tool directly yourself.
 
+### Title-only algorithm problems
+
+For a known algorithm problem, the code-interview flow does not require a pasted statement:
+
+```text
+start_scoped_interview {
+  topic: "Strings",
+  problemTitle: "Valid Anagram",
+  interviewType: "code"
+}
+  → configure_code_challenge {
+      problemStatement,
+      examples: [{ input, output, explanation? }, ...],
+      constraints,
+      starterCode,
+      sampleTests,
+      hints,
+      referenceSolution,
+      testHarness
+    }
+  → ask_question
+```
+
+The orchestrator must configure the challenge before presenting it. The tool persists a LeetCode-style problem statement with at least two basic input/output examples and explicit constraints. Reference solutions, teacher notes, and hidden-test harnesses remain private.
+
 ### Content template (for writing your own)
 
 When writing `content` manually for `start_scoped_interview`, this structure gives the LLM the most to work with:

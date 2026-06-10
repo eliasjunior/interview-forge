@@ -329,8 +329,13 @@ app.post("/api/scoped-interviews", (req, res) => {
     return;
   }
 
-  if (content.length < 20) {
-    res.status(400).json({ error: "content must be at least 20 characters" });
+  const canStartTitleOnlyCodeInterview =
+    interviewType === "code" && Boolean(problemTitle);
+
+  if (content.length < 20 && !canStartTitleOnlyCodeInterview) {
+    res.status(400).json({
+      error: "content must be at least 20 characters unless a code interview has a problem title",
+    });
     return;
   }
 
@@ -363,7 +368,9 @@ app.post("/api/scoped-interviews", (req, res) => {
     previewQuestions: result.previewQuestions,
     normalizedContent: result.normalizedContent,
     detectedContentType: result.detectedContentType,
-    nextTool: "ask_question",
+    nextTool: result.detectedContentType === "algorithm"
+      ? "configure_code_challenge"
+      : "ask_question",
   });
 });
 

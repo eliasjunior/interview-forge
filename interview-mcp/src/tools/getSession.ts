@@ -11,11 +11,19 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
       const session = sessions[sessionId];
       if (!session) return deps.stateError(`Session '${sessionId}' not found.`);
 
+      const codeChallenge = session.interviewType === "code" && deps.getCodeChallenge
+        ? deps.getCodeChallenge(sessionId)
+        : null;
       const instruction =
         session.interviewType === "code"
           ? "This is a CODE interview session (algorithm problem). " +
             `Topic/category: "${session.topic}". ` +
             (session.problemTitle ? `Concrete problem: "${session.problemTitle}". ` : "") +
+            (!codeChallenge
+              ? "Before presenting anything to the candidate, call configure_code_challenge. " +
+                "Author a clear LeetCode-style problem statement, at least two input/output examples, constraints, " +
+                "starter code, progressive hints, a private reference solution, and a private hidden-test harness. "
+              : "") +
             "The problem is in customContent under '## Problem Statement'. " +
             "Flow: (1) present the problem to the candidate, (2) ask them to explain their approach before coding, " +
             "(3) hints are allowed when they unblock progress, but never reveal the full solution, " +
@@ -32,9 +40,6 @@ export function registerGetSessionTool(server: McpServer, deps: ToolDeps) {
             "Do not expose tool chatter or internal workflow details to the candidate.";
 
       const lastEval = session.evaluations[session.evaluations.length - 1];
-      const codeChallenge = session.interviewType === "code" && deps.getCodeChallenge
-        ? deps.getCodeChallenge(sessionId)
-        : null;
       const activeFollowUp =
         session.state === "FOLLOW_UP" && lastEval?.needsFollowUp && lastEval.followUpQuestion
           ? {

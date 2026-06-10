@@ -216,4 +216,28 @@ such that they add up to target. You may assume that each input has exactly one 
     assert.equal(sessions[payload.sessionId]?.interviewType, "code");
     assert.match(sessions[payload.sessionId]?.questions.at(-1) ?? "", /Now implement Two Sum/);
   });
+
+  test("creates a title-only code session that must be configured before interviewing", async () => {
+    const { deps, sessions } = makeDeps();
+    const handlers = captureTool(registerStartScopedInterviewTool, deps);
+
+    const payload = parse(await handlers.get("start_scoped_interview")!({
+      topic: "Strings",
+      problemTitle: "Valid Anagram",
+      interviewType: "code",
+      focus: "correctness, edge cases, and complexity",
+    }));
+
+    assert.equal(payload.parsed.contentType, "algorithm");
+    assert.equal(payload.problemTitle, "Valid Anagram");
+    assert.equal(payload.interviewType, "code");
+    assert.match(payload.normalizedContent, /Problem definition pending/);
+    assert.equal(payload.nextTool, "configure_code_challenge");
+    assert.match(payload.instruction, /call configure_code_challenge/i);
+
+    const session = sessions[payload.sessionId];
+    assert.ok(session);
+    assert.match(session.customContent ?? "", /## Problem Statement/);
+    assert.match(session.customContent ?? "", /configure "Valid Anagram"/);
+  });
 });

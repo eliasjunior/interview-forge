@@ -362,7 +362,7 @@ function CustomInterviewModal({
         <div className="graph-modal-header">
           <div>
             <h2 className="topics-plan-title">Start Interview With Content</h2>
-            <p className="topics-plan-subtitle">Paste an algorithm prompt, project spec, or architecture note. For algorithms, use Topic for the broader subject and Problem for the exact challenge.</p>
+            <p className="topics-plan-subtitle">For code interviews, enter a problem name such as Valid Anagram and optionally paste a custom statement. Claude will prepare the full problem, examples, constraints, and tests before the interview.</p>
           </div>
           <button className="btn-back" onClick={onClose}>✕ Close</button>
         </div>
@@ -429,7 +429,9 @@ function CustomInterviewModal({
               className="custom-interview-textarea"
               value={draft.content}
               onChange={(event) => onChange({ ...draft, content: event.target.value })}
-              placeholder="Paste the problem statement or spec here."
+              placeholder={draft.interviewType === 'code'
+                ? 'Optional: paste a custom problem statement. Leave blank to let Claude build it from the problem name.'
+                : 'Paste the project spec or architecture note here.'}
               rows={12}
               disabled={busy}
             />
@@ -439,7 +441,19 @@ function CustomInterviewModal({
 
           <div className="custom-interview-actions">
             <button className="btn-back" onClick={onClose} disabled={busy}>Cancel</button>
-            <button className="btn-secondary" onClick={onSubmit} disabled={busy || draft.topic.trim().length === 0 || draft.content.trim().length < 20}>
+            <button
+              className="btn-secondary"
+              onClick={onSubmit}
+              disabled={
+                busy ||
+                draft.topic.trim().length === 0 ||
+                (
+                  draft.interviewType === 'code'
+                    ? draft.problemTitle.trim().length === 0 && draft.content.trim().length < 20
+                    : draft.content.trim().length < 20
+                )
+              }
+            >
               {busy ? 'Creating…' : 'Create session'}
             </button>
           </div>
@@ -761,7 +775,7 @@ export default function TopicsPage() {
         problemTitle: customInterviewDraft.problemTitle.trim() || undefined,
         interviewType: customInterviewDraft.interviewType,
         focus: customInterviewDraft.focus,
-        content: customInterviewDraft.content,
+        content: customInterviewDraft.content.trim() || undefined,
       })
       setToastQueue(prev => [
         ...prev,
