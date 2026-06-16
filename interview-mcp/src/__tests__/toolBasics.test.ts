@@ -222,7 +222,9 @@ describe("basic MCP tool handlers", () => {
     });
     const handlers = captureTool(registerReviewKnowledgeFileTool, deps);
 
-    const byFile = parse(await handlers.get("review_knowledge_file")!({ filePath: "java-concurrency.md" }));
+    const byFile = parse(await handlers.get("review_knowledge_file")!({
+      filePath: "design-interview/concurrency/java-concurrency.md",
+    }));
     assert.equal(byFile.topic, "Java Concurrency");
     assert.equal(byFile.summary.questionCount > 0, true);
     assert.equal(byFile.sectionChecks.criteriaAligned, true);

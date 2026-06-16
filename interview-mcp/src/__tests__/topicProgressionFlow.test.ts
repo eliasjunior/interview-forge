@@ -92,6 +92,8 @@ function makeDeps(
     loadFlashcardAnswersByState: () => [],
     saveFlashcardAnswer: () => {},
     updateFlashcardAnswer: () => {},
+    saveWarmupHistory: () => {},
+    loadWarmupStats: () => [],
     loadMistakes: () => [] as Mistake[],
     saveMistake: () => {},
     loadSkills: () => [] as Skill[],

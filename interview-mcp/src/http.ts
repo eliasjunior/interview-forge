@@ -35,9 +35,9 @@ import {
   paginateFlashcards,
 } from "./http/flashcards.js";
 import {
-  getKnowledgeTopicDetails,
-  listKnowledgeTopics,
-  normalizeTopicPlanKey,
+  getKnowledgeTopicDetailsFromDb,
+  listKnowledgeTopicsFromDb,
+  normalizeTopicPlanKeyFromDb,
 } from "./http/topicDetails.js";
 import { inferLastLevelUpAt } from "./topicPlanProgress.js";
 import { runCodeChallenge } from "./codeExecution/runner.js";
@@ -68,8 +68,8 @@ function loadSessions(): Record<string, Session> {
 }
 
 function hasWarmupContentForTopic(topic: string): boolean {
-  const normalizedTopic = normalizeTopicPlanKey(KNOWLEDGE_DIR, topic);
-  const topicEntry = listKnowledgeTopics(KNOWLEDGE_DIR).find((entry) => entry.file === normalizedTopic);
+  const normalizedTopic = normalizeTopicPlanKeyFromDb(db, topic);
+  const topicEntry = listKnowledgeTopicsFromDb(db).find((entry) => entry.file === normalizedTopic);
   if (!topicEntry) return false;
 
   const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
@@ -80,8 +80,8 @@ function hasWarmupContentForTopic(topic: string): boolean {
 }
 
 function getTopicDisplayName(topic: string): string {
-  const normalizedTopic = normalizeTopicPlanKey(KNOWLEDGE_DIR, topic);
-  const topicEntry = listKnowledgeTopics(KNOWLEDGE_DIR).find((entry) => entry.file === normalizedTopic);
+  const normalizedTopic = normalizeTopicPlanKeyFromDb(db, topic);
+  const topicEntry = listKnowledgeTopicsFromDb(db).find((entry) => entry.file === normalizedTopic);
   return topicEntry?.displayName ?? topic;
 }
 
@@ -210,12 +210,12 @@ function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult 
 
 // API: List available interview topics from knowledge files
 app.get("/api/topics", (_req, res) => {
-  res.json(listKnowledgeTopics(KNOWLEDGE_DIR));
+  res.json(listKnowledgeTopicsFromDb(db));
 });
 
 app.get("/api/topics/:topic/details", (req, res) => {
   const topic = decodeURIComponent(req.params.topic);
-  const details = getKnowledgeTopicDetails(KNOWLEDGE_DIR, topic);
+  const details = getKnowledgeTopicDetailsFromDb(db, topic);
   if (!details) {
     res.status(404).json({ error: "Topic not found" });
     return;
@@ -237,7 +237,7 @@ app.get("/api/topics/:topic/level", (req, res) => {
   const sessions = loadSessions();
   const persistedLevel = repositories.topicPlans
     .list()
-    .find((plan) => normalizeTopicPlanKey(KNOWLEDGE_DIR, plan.topic) === normalizeTopicPlanKey(KNOWLEDGE_DIR, topic))
+    .find((plan) => normalizeTopicPlanKeyFromDb(db, plan.topic) === normalizeTopicPlanKeyFromDb(db, topic))
     ?.lastUnlockedLevel;
   const { level, status, reason, nextLevelRequirement, progress } = stabilizeTopicLevelSnapshot(
     detectTopicLevel(topic, sessions, hasWarmupContent),
@@ -252,17 +252,17 @@ app.get("/api/topic-plans", (_req, res) => {
       const repairedPlan = repairTopicPlanLevelUpTimestamp(plan);
       return {
         ...repairedPlan,
-        topic: normalizeTopicPlanKey(KNOWLEDGE_DIR, repairedPlan.topic),
+        topic: normalizeTopicPlanKeyFromDb(db, repairedPlan.topic),
       };
     })
   );
 });
 
 app.put("/api/topic-plans/:topic", (req, res) => {
-  const topic = normalizeTopicPlanKey(KNOWLEDGE_DIR, decodeURIComponent(req.params.topic));
+  const topic = normalizeTopicPlanKeyFromDb(db, decodeURIComponent(req.params.topic));
   const focused = typeof req.body?.focused === "boolean" ? req.body.focused : false;
   const priority = req.body?.priority;
-  const existingPlan = repositories.topicPlans.list().find((plan) => normalizeTopicPlanKey(KNOWLEDGE_DIR, plan.topic) === topic);
+  const existingPlan = repositories.topicPlans.list().find((plan) => normalizeTopicPlanKeyFromDb(db, plan.topic) === topic);
 
   if (priority !== "core" && priority !== "secondary" && priority !== "optional") {
     res.status(400).json({ error: "priority must be one of: core, secondary, optional" });
