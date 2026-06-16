@@ -984,109 +984,127 @@ export default function TopicsPage() {
         ))}
       </div>
 
-      <div className="topics-list">
-        {visibleTopics.map(topic => {
-          const levelData = levels[topic.file]
-          const level = levelData?.level
-          const appearance = level !== undefined ? getLevelAppearance(level) : null
-          const recentLevelUp = topicPlans[topic.file]?.lastLevelUpAt
-            ? now - new Date(topicPlans[topic.file].lastLevelUpAt!).getTime() < LEVEL_HIGHLIGHT_WINDOW_MS
-            : false
+      {(() => {
+        const grouped = visibleTopics.reduce<Record<string, typeof visibleTopics>>((acc, topic) => {
+          const cat = topic.category || 'other'
+          if (!acc[cat]) acc[cat] = []
+          acc[cat].push(topic)
+          return acc
+        }, {})
+        const categoryOrder = Object.keys(grouped).sort()
 
-          return (
-            <div
-              key={topic.file}
-              className={`topic-card ${celebrating[topic.file] ? 'topic-card-leveled-up' : ''} ${recentLevelUp ? 'topic-card-recent-level-up' : ''}`}
-              style={appearance ? appearance.cardBorderStyle : { borderLeft: '3px solid var(--line)' }}
-            >
-              <div className="topic-card-main">
-                <div className="topic-name">{topic.displayName}</div>
-                <div className="topic-file-row">
-                  <div className="topic-planning-row">
-                    <button
-                      className={`topic-focus-btn ${focusMap[topic.file] ? 'active' : ''}`}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        void handlePlanUpdate(topic.file, {
-                          focused: !focusMap[topic.file],
-                          priority: getPriority(priorityMap, topic.file),
-                        })
-                      }}
-                    >
-                      {focusMap[topic.file] ? 'Unfocus' : 'Focus now'}
-                    </button>
-                    <div className="topic-priority-group">
-                      {(['core', 'secondary', 'optional'] as const).map((priority) => (
-                        <button
-                          key={priority}
-                          className={`topic-priority-btn ${getPriority(priorityMap, topic.file) === priority ? 'active' : ''}`}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            void handlePlanUpdate(topic.file, {
-                              focused: Boolean(focusMap[topic.file]),
-                              priority,
-                            })
-                          }}
-                        >
-                          {PRIORITY_LABELS[priority]}
-                        </button>
-                      ))}
-                    </div>
-                    {levelData && (
-                      <TopicActionLauncher
-                        topicFile={topic.file}
-                        displayName={topic.displayName}
-                        levelData={levelData}
-                        activeMenu={activeMenu}
-                        setActiveMenu={setActiveMenu}
-                        handleCopyPrompt={handleCopyPrompt}
-                      />
-                    )}
-                    <button
-                      className="topic-secondary-btn"
-                      onClick={() => void openTopicQuestionPicker(topic)}
-                    >
-                      Weak Slice
-                    </button>
-                    <button
-                      className="topic-secondary-btn"
-                      onClick={() => navigate(`/arena?topic=${encodeURIComponent(topic.file)}`)}
-                    >
-                      Crisis Mode
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="topic-card-right">
-                {level !== undefined && levelData ? <LevelBadge level={level} /> : <LevelSkeleton />}
-                {recentLevelUp && topicPlans[topic.file]?.lastUnlockedLevel !== undefined && (
-                  <div className="topic-level-up-pill">
-                    Recently reached L{topicPlans[topic.file].lastUnlockedLevel}
-                  </div>
-                )}
-                {levelData && level !== undefined && (
-                  <div className="topic-progress">
-                    <div className="topic-progress-header">
-                      <span className="topic-progress-title">{getProgressTitle(levelData)}</span>
-                      <span className="topic-progress-meta">{levelData.progress.label}</span>
-                    </div>
-                    <ProgressPips
-                      current={Math.min(levelData.progress.current, levelData.progress.required)}
-                      required={levelData.progress.required}
-                    />
-                    {getCompactCardNote(levelData) && (
-                      <div className="topic-compact-note">
-                        {getCompactCardNote(levelData)}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+        return categoryOrder.map((category) => (
+          <div key={category} className="topics-category-group">
+            <div className="topics-category-header">
+              <span className="topics-category-label">{category.replace(/-/g, ' ')}</span>
+              <span className="topics-category-count">{grouped[category].length}</span>
             </div>
-          )
-        })}
-      </div>
+            <div className="topics-list">
+              {grouped[category].map(topic => {
+                const levelData = levels[topic.file]
+                const level = levelData?.level
+                const appearance = level !== undefined ? getLevelAppearance(level) : null
+                const recentLevelUp = topicPlans[topic.file]?.lastLevelUpAt
+                  ? now - new Date(topicPlans[topic.file].lastLevelUpAt!).getTime() < LEVEL_HIGHLIGHT_WINDOW_MS
+                  : false
+
+                return (
+                  <div
+                    key={topic.file}
+                    className={`topic-card ${celebrating[topic.file] ? 'topic-card-leveled-up' : ''} ${recentLevelUp ? 'topic-card-recent-level-up' : ''}`}
+                    style={appearance ? appearance.cardBorderStyle : { borderLeft: '3px solid var(--line)' }}
+                  >
+                    <div className="topic-card-main">
+                      <div className="topic-name">{topic.displayName}</div>
+                      <div className="topic-file-row">
+                        <div className="topic-planning-row">
+                          <button
+                            className={`topic-focus-btn ${focusMap[topic.file] ? 'active' : ''}`}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void handlePlanUpdate(topic.file, {
+                                focused: !focusMap[topic.file],
+                                priority: getPriority(priorityMap, topic.file),
+                              })
+                            }}
+                          >
+                            {focusMap[topic.file] ? 'Unfocus' : 'Focus now'}
+                          </button>
+                          <div className="topic-priority-group">
+                            {(['core', 'secondary', 'optional'] as const).map((priority) => (
+                              <button
+                                key={priority}
+                                className={`topic-priority-btn ${getPriority(priorityMap, topic.file) === priority ? 'active' : ''}`}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  void handlePlanUpdate(topic.file, {
+                                    focused: Boolean(focusMap[topic.file]),
+                                    priority,
+                                  })
+                                }}
+                              >
+                                {PRIORITY_LABELS[priority]}
+                              </button>
+                            ))}
+                          </div>
+                          {levelData && (
+                            <TopicActionLauncher
+                              topicFile={topic.file}
+                              displayName={topic.displayName}
+                              levelData={levelData}
+                              activeMenu={activeMenu}
+                              setActiveMenu={setActiveMenu}
+                              handleCopyPrompt={handleCopyPrompt}
+                            />
+                          )}
+                          <button
+                            className="topic-secondary-btn"
+                            onClick={() => void openTopicQuestionPicker(topic)}
+                          >
+                            Weak Slice
+                          </button>
+                          <button
+                            className="topic-secondary-btn"
+                            onClick={() => navigate(`/arena?topic=${encodeURIComponent(topic.file)}`)}
+                          >
+                            Crisis Mode
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="topic-card-right">
+                      {level !== undefined && levelData ? <LevelBadge level={level} /> : <LevelSkeleton />}
+                      {recentLevelUp && topicPlans[topic.file]?.lastUnlockedLevel !== undefined && (
+                        <div className="topic-level-up-pill">
+                          Recently reached L{topicPlans[topic.file].lastUnlockedLevel}
+                        </div>
+                      )}
+                      {levelData && level !== undefined && (
+                        <div className="topic-progress">
+                          <div className="topic-progress-header">
+                            <span className="topic-progress-title">{getProgressTitle(levelData)}</span>
+                            <span className="topic-progress-meta">{levelData.progress.label}</span>
+                          </div>
+                          <ProgressPips
+                            current={Math.min(levelData.progress.current, levelData.progress.required)}
+                            required={levelData.progress.required}
+                          />
+                          {getCompactCardNote(levelData) && (
+                            <div className="topic-compact-note">
+                              {getCompactCardNote(levelData)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))
+      })()}
 
       {topics.length === 0 && (
         <div className="topics-empty">No knowledge files found.</div>

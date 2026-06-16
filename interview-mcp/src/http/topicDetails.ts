@@ -6,6 +6,7 @@ import type { QuestionExerciseGuidance } from "../knowledge/port.js";
 export interface KnowledgeTopicListItem {
   file: string;
   displayName: string;
+  category: string;
 }
 
 export interface KnowledgeTopicQuestionDetail {
@@ -28,7 +29,7 @@ function normalizeTopicLookupKey(value: unknown) {
 
 export function listKnowledgeTopicsFromDb(db: AppDb): KnowledgeTopicListItem[] {
   return db
-    .select({ file: topics.id, displayName: topics.title })
+    .select({ file: topics.id, displayName: topics.title, category: topics.category })
     .from(topics)
     .orderBy(topics.title)
     .all();

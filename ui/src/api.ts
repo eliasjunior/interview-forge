@@ -48,6 +48,7 @@ async function del<T>(url: string): Promise<T> {
 export interface Topic {
   file: string
   displayName: string
+  category: string
 }
 
 export interface TopicQuestionDetail {
