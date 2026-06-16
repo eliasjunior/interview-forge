@@ -1,0 +1,16 @@
+[mcp_servers.interview-mcp]
+command = "/usr/bin/env"
+args = [
+    "node",
+    "dist/server.js",
+]
+
+[mcp_servers.report-mcp]
+command = "/usr/bin/env"
+args = [
+    "node",
+    "dist/server.js",
+]
+
+[mcp_servers.report-mcp.env]
+AI_ENABLED = "false"

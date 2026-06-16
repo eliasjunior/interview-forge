@@ -1,0 +1,38 @@
+# Interview Preparation Map
+
+## What Happens When Running `java -jar app.jar`
+
+### Goals
+- Explain what the JVM does from process start to application bootstrap.
+- Connect OS-level concepts (process, memory, file descriptors) to JVM/runtime behavior.
+- Demonstrate observability: how to inspect what is happening (flags, logs, tools).
+
+### Interview Checklist
+- **Clarify assumptions**: OS, JDK version, container vs bare metal.
+- **High-level flow**: OS loads process → JVM starts → class loading → verification → initialization → `main` → frameworks bootstrap.
+- **Runtime topics**: heap vs stack, metaspace, JIT, GC, threads.
+- **Operational hooks**: GC logs, JFR, jcmd/jstack/jmap, `-XshowSettings`, `-Xlog`.
+- **Failure modes**: missing main class, bad manifest, OOM, permissions, classpath issues.
+
+### Suggested Practice Prompts
+- Walk me through everything that happens when you run `java -jar app.jar`.
+- What changes when running inside Docker / Kubernetes?
+- How do you debug startup slowness? What do you measure?
+
+---
+
+## Algorithms & Data Structures (Mock Interview Track)
+
+### Problem: Palindrome Permutation
+**Prompt:** Given a string, check if it is a permutation of a palindrome. Ignore spaces and case (unless specified otherwise).
+
+**Example:**
+- Input: `Tact Coa`
+- Output: `True` (e.g., `taco cat`)
+
+### Interview Expectations
+- Ask clarifying questions (case, spaces, character set).
+- State the core invariant for palindrome feasibility.
+- Provide time/space complexity and tradeoffs.
+- Write clean code with edge-case handling.
+

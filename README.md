@@ -51,7 +51,7 @@ The easiest way to understand the project is:
 ```text
 I want to study JWT authentication
 ```
-
+find ./design-interview -type f -iname '*.pdf' -exec cp {} /destination/folder/ \;
 Claude can then route you into the warm-up ladder, a full interview, or a drill based on your topic history.
 
 ## Custom Content Flow

@@ -6,7 +6,7 @@ In every new Desktop app thread in this project, the first response must be an M
 
 Before answering the user's request, first state whether `interview-mcp` is connected in the current Desktop session.
 
-- If it is not connected, say: `Before I continue, I should check whether interview-mcp is connected in this Desktop session. It is not connected, so I have to stop here.`
+- If it is not connected, say: `Before I continue, I should check whether interview-mcp is connected in this Desktop session. It is not connected, should I stop here or continue ?`
 - Do not answer the user's actual request until this check has been reported.
 
 ## MCP Connection Troubleshooting
@@ -32,8 +32,7 @@ tail -n 50 ~/Library/Logs/Claude/mcp-server-interview-mcp.log
 3. Confirm reconnection by calling `server_status`
 
 ## Overview
-
-A study project for learning **Model Context Protocol (MCP)** server development. It runs mock technical interviews through Claude, evaluates answers with AI, builds a growing knowledge graph across sessions, and uses a simple reward system with level-ups and progress tracking in the UI — all visualised in a React dashboard.
+It runs mock technical interviews through Claude, evaluates answers with AI, builds a growing knowledge graph across sessions, and uses a simple reward system with level-ups and progress tracking in the UI — all visualised in a React dashboard.
 
 **npm workspaces monorepo** with four packages:
 
@@ -61,7 +60,6 @@ Claude Desktop / Claude Code (orchestrator LLM)
 
 **Two LLMs are in play:**
 - **Orchestrator** — Claude inside Claude Desktop/Code (drives the conversation, calls tools)
-- **Worker** — Claude via Anthropic API (`src/ai/`) — generates questions, scores answers, extracts concepts. Optional: `AI_ENABLED=false` disables all API calls.
 
 ## Core Product Features
 

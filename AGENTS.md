@@ -245,3 +245,5 @@ create_exercise { name, topic, difficulty, ... }
 - Prioritize new tests for interview state-machine transitions and session flow branches.
 - Prioritize new tests for repository-backed logic: flashcards, mistakes, exercises, reports, and graph access.
 - Add optional root workspace shortcuts such as `test:coverage:interview` and `test:coverage:report` after package scripts are stable.
+
+## Imported Claude Cowork project instructions
