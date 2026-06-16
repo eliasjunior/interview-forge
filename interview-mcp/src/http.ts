@@ -7,8 +7,9 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import { registerWeakReportRoutes } from "./http/weakReports.js";
 import { applySM2 } from "./srsUtils.js";
-import { FileKnowledgeStore } from "./knowledge/file.js";
 import { buildSessionRewardSummary, detectTopicLevel, stabilizeTopicLevelSnapshot } from "./tools/getTopicLevel.js";
+import { eq, count } from "drizzle-orm";
+import { warmupQuestions } from "./db/schema.js";
 import type {
   ReviewRating,
   Flashcard,
@@ -47,7 +48,6 @@ const DATA_DIR = path.resolve(__dirname, "../data");
 const PUBLIC_DIR = path.resolve(__dirname, "../public");
 const REPORTS_DIR = path.join(DATA_DIR, "reports");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
-const KNOWLEDGE_DIR = path.join(DATA_DIR, "knowledge");
 
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -68,15 +68,9 @@ function loadSessions(): Record<string, Session> {
 }
 
 function hasWarmupContentForTopic(topic: string): boolean {
-  const normalizedTopic = normalizeTopicPlanKeyFromDb(db, topic);
-  const topicEntry = listKnowledgeTopicsFromDb(db).find((entry) => entry.file === normalizedTopic);
-  if (!topicEntry) return false;
-
-  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
-  const knowledgeTopic = store.findByTopic(topicEntry.displayName);
-  return knowledgeTopic != null &&
-    knowledgeTopic.warmupLevels != null &&
-    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+  const topicId = normalizeTopicPlanKeyFromDb(db, topic);
+  const result = db.select({ n: count() }).from(warmupQuestions).where(eq(warmupQuestions.topicId, topicId)).get();
+  return (result?.n ?? 0) > 0;
 }
 
 function getTopicDisplayName(topic: string): string {
@@ -227,12 +221,7 @@ app.get("/api/topics/:topic/details", (req, res) => {
 // API: Get the recommended warm-up level for a topic
 app.get("/api/topics/:topic/level", (req, res) => {
   const topic = decodeURIComponent(req.params.topic);
-  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
-  const knowledgeTopic = store.findByTopic(topic);
-  const hasWarmupContent =
-    knowledgeTopic != null &&
-    knowledgeTopic.warmupLevels != null &&
-    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+  const hasWarmupContent = hasWarmupContentForTopic(topic);
 
   const sessions = loadSessions();
   const persistedLevel = repositories.topicPlans
@@ -386,13 +375,7 @@ app.get("/api/sessions/:id/reward-summary", (req, res) => {
     return;
   }
 
-  const store = new FileKnowledgeStore(KNOWLEDGE_DIR);
-  const knowledgeTopic = store.findByTopic(session.topic);
-  const hasWarmupContent =
-    knowledgeTopic != null &&
-    knowledgeTopic.warmupLevels != null &&
-    Object.keys(knowledgeTopic.warmupLevels).length > 0;
-
+  const hasWarmupContent = hasWarmupContentForTopic(session.topic);
   res.json(buildSessionRewardSummary(session, loadSessions(), hasWarmupContent));
 });
 

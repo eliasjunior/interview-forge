@@ -29,9 +29,8 @@ export function registerCreateExerciseTool(server: McpServer, deps: ToolDeps) {
   server.registerTool(
     "create_exercise",
     {
-      description: "Create a structured practice exercise in the knowledge center. " +
-      "The tool writes a rich .md file under data/knowledge/exercises/<topic>/, persists metadata, " +
-      "and returns complexity signals + a progression roadmap so you can reason about whether to " +
+      description: "Create a structured practice exercise. " +
+      "Persists metadata to SQLite and returns complexity signals + a progression roadmap so you can reason about whether to " +
       "start this exercise directly or propose simpler prerequisite exercises first. " +
       "If the exercise is too hard (difficulty ≥ 4 or unmet prerequisites), show the roadmap to the candidate.",
       inputSchema: {
@@ -48,7 +47,7 @@ export function registerCreateExerciseTool(server: McpServer, deps: ToolDeps) {
         steps: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("Incremental implementation steps from simplest to complete"),
         evaluationCriteria: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).min(1)).describe("What a good solution must demonstrate"),
         hints: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Optional hints — shown only when stuck"),
-        relatedConcepts: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Concept links back to the knowledge file, e.g. 'java-concurrency.md: race condition, atomicity'"),
+        relatedConcepts: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.string()).default([])).describe("Concept links to the topic, e.g. 'java-concurrency: race condition, atomicity'"),
         prerequisites: z.preprocess((v) => typeof v === "string" ? JSON.parse(v) : v, z.array(z.object({
           name: z.string().describe("Exercise name that must be done first"),
           reason: z.string().describe("Why this is a prerequisite"),

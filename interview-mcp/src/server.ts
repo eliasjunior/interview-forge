@@ -23,6 +23,7 @@ import { topics, warmupHistory, warmupQuestions } from "./db/schema.js";
 import { normalizeConcepts } from "./graph/concepts.js";
 import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sessions/admin.js";
 import { shouldRecordTopicLevelUp } from "./topicPlanProgress.js";
+import { normalizeTopicPlanKeyFromDb } from "./http/topicDetails.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,25 +51,6 @@ function ensureDataDir() {
   if (!fs.existsSync(EXERCISES_DIR)) fs.mkdirSync(EXERCISES_DIR, { recursive: true });
 }
 
-function resolveTopicPlanKey(topic: string): string {
-  const knowledgeDir = path.join(DATA_DIR, "knowledge");
-  if (!fs.existsSync(knowledgeDir)) return topic;
-
-  const files = fs.readdirSync(knowledgeDir).filter((file) => file.endsWith(".md"));
-  const normalizedTopic = topic.trim().toLowerCase();
-
-  for (const file of files) {
-    const fullPath = path.join(knowledgeDir, file);
-    const content = fs.readFileSync(fullPath, "utf8");
-    const match = content.match(/^#\s+(.+)/m);
-    const displayName = match ? match[1].trim() : file.replace(".md", "");
-    if (displayName.toLowerCase() === normalizedTopic || file.replace(".md", "").toLowerCase() === normalizedTopic) {
-      return file.replace(".md", "");
-    }
-  }
-
-  return topic;
-}
 
 function loadSessions(): Record<string, Session> {
   return Object.fromEntries(
@@ -149,7 +131,7 @@ function saveExercise(exercise: Exercise): void {
 }
 
 function findTopicPlan(topic: string) {
-  const topicPlanKey = resolveTopicPlanKey(topic);
+  const topicPlanKey = normalizeTopicPlanKeyFromDb(db, topic);
   return repositories.topicPlans
     .list()
     .find((plan) => plan.topic === topicPlanKey || plan.topic === topic) ?? null;
@@ -194,11 +176,9 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   const previousSessions = Object.fromEntries(
     Object.entries(sessions).filter(([id]) => id !== session.id)
   );
-  const knowledgeTopic = knowledge.findByTopic(session.topic);
-  const hasWarmupContent =
-    knowledgeTopic != null &&
-    knowledgeTopic.warmupLevels != null &&
-    Object.keys(knowledgeTopic.warmupLevels).length > 0;
+  const topicId = normalizeTopicPlanKeyFromDb(db, session.topic);
+  const warmupCount = db.select({ n: sql<number>`count(*)` }).from(warmupQuestions).where(eq(warmupQuestions.topicId, topicId)).get();
+  const hasWarmupContent = (warmupCount?.n ?? 0) > 0;
   const previousLevelSnapshot = detectTopicLevel(session.topic, previousSessions, hasWarmupContent);
 
   const concepts = normalizeConcepts(await extractConcepts(session)).map(({ word, cluster }) => ({
@@ -220,7 +200,7 @@ async function finalizeSession(session: Session, sessions: Record<string, Sessio
   const reportFile = saveReport(session);
 
   const currentLevelSnapshot = detectTopicLevel(session.topic, sessions, hasWarmupContent);
-  const topicPlanKey = resolveTopicPlanKey(session.topic);
+  const topicPlanKey = normalizeTopicPlanKeyFromDb(db, session.topic);
   const existingTopicPlan = findTopicPlan(session.topic);
   const previousStoredLevel = existingTopicPlan?.lastUnlockedLevel;
   const currentStoredLevel = Math.max(previousStoredLevel ?? 0, currentLevelSnapshot.level) as WarmUpLevel;

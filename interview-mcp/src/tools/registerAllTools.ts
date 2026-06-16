@@ -33,7 +33,6 @@ import { registerGetTopicLevelTool } from "./getTopicLevel.js";
 import { registerStartWarmUpTool } from "./startWarmUp.js";
 import { registerEvaluateFlashcardTool } from "./evaluateFlashcard.js";
 import { registerSaveFlashcardEvaluationTool } from "./saveFlashcardEvaluation.js";
-import { registerReviewKnowledgeFileTool } from "./reviewKnowledgeFile.js";
 import { registerConfigureCodeChallengeTool } from "./configureCodeChallenge.js";
 import { registerRunCodeTool } from "./runCode.js";
 
@@ -71,7 +70,6 @@ export function registerAllTools(server: McpServer, deps: ToolDeps) {
   registerStartWarmUpTool(server, deps);
   registerEvaluateFlashcardTool(server, deps);
   registerSaveFlashcardEvaluationTool(server, deps);
-  registerReviewKnowledgeFileTool(server, deps);
   registerConfigureCodeChallengeTool(server, deps);
   registerRunCodeTool(server, deps);
 }

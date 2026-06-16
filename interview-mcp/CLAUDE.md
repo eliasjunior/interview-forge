@@ -12,7 +12,7 @@
 
 **STRICT RULE — no exceptions.**
 
-For warm-up sessions (Spark / Padawan levels), questions are authored MCQs. Present every warm-up MCQ **exactly as written in the knowledge file** — question stem and all answer choices verbatim.
+For warm-up sessions (Spark / Padawan levels), questions are authored MCQs served from the `warmup_questions` table. Present every warm-up MCQ **exactly as returned by the tool** — question stem and all answer choices verbatim.
 
 - **Do NOT add any scene-setting sentences, scenarios, or framing before the question.** Not one sentence, not a phrase. Nothing.
 - **Do NOT reframe, paraphrase, or expand the question stem in any way.**
@@ -30,15 +30,26 @@ interview-mcp/
 │   ├── http.ts                 # Express REST API port 3001
 │   ├── tools/                  # One file per MCP tool
 │   ├── ai/                     # AIProvider port + Anthropic adapter (haiku model)
-│   ├── knowledge/              # FileKnowledgeStore — reads data/knowledge/*.md
+│   ├── knowledge/              # DbKnowledgeStore — reads topics/questions/concepts from SQLite
 │   ├── interviewUtils.ts       # Pure utils: state guards, report builder, graph merge, flashcard generator
 │   └── srsUtils.ts             # SM-2 spaced repetition algorithm (pure, side-effect-free)
 ├── data/
-│   ├── app.db                  # Shared runtime database (sessions, graph, flashcards)
-│   ├── reports/                # One .md report per completed session
-│   └── knowledge/              # Curated topic .md files (committed to git)
+│   ├── app.db                  # Shared runtime database (sessions, graph, flashcards, knowledge tables)
+│   └── reports/                # One .md report per completed session
 └── .env                        # ANTHROPIC_API_KEY, AI_ENABLED
 ```
+
+### Knowledge tables (in `app.db`)
+
+| Table | Contents |
+|---|---|
+| `topics` | One row per topic (slug, title, summary) |
+| `topic_questions` | Interview questions per topic with difficulty and evaluation criteria |
+| `topic_concepts` | Concept clusters per topic (core concepts, tradeoffs, etc.) |
+| `warmup_questions` | MCQ warm-up questions per topic/level |
+| `warmup_history` | Per-question correct/incorrect history for weighted selection |
+
+To add or edit topic content: update the Markdown source under `data/knowledge/` then re-run the seed script to sync the DB.
 
 ## State Machine & Tools
 
@@ -120,15 +131,15 @@ A scheduled task (`flashcard-daily-review`) fires every day at **9:00 AM local t
 - Prints a summary table of due cards grouped by topic
 - Links to `http://localhost:5173/flashcards` to open the UI review
 
-## Knowledge File Improvement Process
+## Knowledge Content Improvement Process
 
-When the user asks to improve or update a topic knowledge file under `interview-mcp/data/knowledge/`, follow this exact process.
+When the user asks to improve or update topic questions, changes go directly into the DB (`topics`, `topic_questions`, `topic_concepts`, `warmup_questions` tables in `app.db`).
 
 ### Goal
-The purpose of every knowledge file is to prepare the user for real senior-level interviews — not just to catalogue information. Questions must build mental models, not test memorisation.
+Every question should prepare the user for real senior-level interviews — build mental models, not test memorisation.
 
 ### Step 1 — Load and group by difficulty
-Read the target file. Group all questions into their difficulty tiers: `foundation`, `intermediate`, `advanced`. Present them tier by tier. Do not review all 25 questions at once.
+Read the target Markdown file. Group questions into their difficulty tiers: `foundation`, `intermediate`, `advanced`. Present tier by tier.
 
 ### Step 2 — Analyse each tier with two lenses
 1. **Interview frequency** — how often does this actually come up at senior level?
@@ -149,10 +160,7 @@ Flag structural problems:
 Show a table of flagged questions with issue and proposed fix. Do not make changes yet.
 
 ### Step 4 — Apply approved changes
-For each approved change, update **three sections** in sync:
-- `## Questions` — rewrite the question text
-- `## Difficulty` — update label if the tier changed
-- `## Evaluation Criteria` — update framing to match the new question
+Update the relevant DB tables directly (`topic_questions`, `topic_concepts`), keeping question text, difficulty, and evaluation criteria in sync.
 
 ### Rewriting principles
 - **Problem before solution**: scenario beats definition
@@ -177,32 +185,11 @@ Currently only `'design'` is active. `'code'` is reserved for future algorithm/L
 
 ### Available design topics
 
-| Knowledge file | Topic |
-|---|---|
-| `jwt.md` | JWT — JSON Web Token |
-| `rest-spring-jpa.md` | REST API Design, Spring Boot & JPA |
-| `payment-api-design.md` | Payment API Design |
-| `url-shortener.md` | URL Shortener System Design |
+Topics are stored in the `topics` table in `app.db`. Use `list_topics` to get the current list at runtime. Markdown sources live under `data/knowledge/design-interview/` and are the canonical authoring source.
 
-### Knowledge file format
+### Concept cluster names
 
-```markdown
-# <Topic Title>
-
-## Summary
-## Questions
-## Difficulty
-## Evaluation Criteria
-## Concepts
-- core concepts: ...
-- practical usage: ...
-- tradeoffs: ...
-- best practices: ...
-## Warm-up Quests
-### Level 0
-```
-
-Cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
+When seeding concepts, cluster names must be one of: `core concepts`, `practical usage`, `tradeoffs`, `best practices`.
 
 ## Frozen / Parked Code
 
