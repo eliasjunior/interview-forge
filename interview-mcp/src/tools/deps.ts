@@ -49,6 +49,15 @@ export interface ToolDeps {
   exercisesDir: string;
   scopesDir: string;
 
+  saveWarmupHistory(questionStem: string, topicTitle: string, sessionId: string, correct: boolean): void;
+
+  loadWarmupStats(topicTitle: string, level: number): Array<{
+    stem: string;
+    weight: number;
+    correctCount: number;
+    incorrectCount: number;
+  }>;
+
   generateId(): string;
   assertState(session: Session, toolName: string): { ok: true } | { ok: false; error: string };
   findLast<T>(arr: T[], pred: (item: T) => boolean): T | undefined;

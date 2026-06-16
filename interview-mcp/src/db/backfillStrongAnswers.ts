@@ -8,7 +8,7 @@ import { buildStrongAnswer } from "../evaluation/strongAnswer.js";
 const db = createDb();
 const sqlite = createSqliteClient();
 const repositories = createSqliteRepositories(db);
-const knowledge = createKnowledgeStore();
+const knowledge = createKnowledgeStore(db);
 
 const liveSessions = repositories.sessions.list();
 let updatedEvaluations = 0;

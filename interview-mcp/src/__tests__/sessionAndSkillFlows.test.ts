@@ -126,6 +126,8 @@ function makeDeps(overrides: Partial<ToolDeps> = {}) {
     calcAvgScore: () => "3.0",
     buildSummary: () => "summary",
     finalizeSession: async () => ({ summary: "done", avgScore: "3.0", concepts: [], reportFile: "report.md" }),
+    saveWarmupHistory: () => {},
+    loadWarmupStats: () => [],
     ...overrides,
   };
 

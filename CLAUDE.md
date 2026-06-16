@@ -83,6 +83,10 @@ Both `dev:http` and `dev:ui` bind to `0.0.0.0` — reachable from any device on 
 - Keep it simple and iterative — learning project, not production-grade
 - MCP concepts explored: typed tool schemas (Zod), session state machine, microservice-style MCP split, npm workspaces, spaced repetition scheduling, scheduled tasks
 
+## Knowledge Files
+
+When the user mentions knowledge files, topics, or working in `design-interview/`, always start by reading `interview-mcp/data/knowledge/design-interview/CLAUDE.md` before doing anything else.
+
 ## Package-specific context
 
 Each package has its own `CLAUDE.md` with deeper context — Claude loads it automatically when you work in that directory:

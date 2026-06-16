@@ -265,6 +265,80 @@ export const codeChallenges = sqliteTable("code_challenges", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Knowledge tables — derived from markdown files, seeded by seed script
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const topics = sqliteTable("topics", {
+  id: text("id").primaryKey(),           // slug, e.g. "jwt"
+  category: text("category").notNull(),  // folder name, e.g. "security"
+  title: text("title").notNull(),
+  summary: text("summary").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const topicQuestions = sqliteTable("topic_questions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  topicId: text("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  order: integer("order").notNull(),
+  text: text("text").notNull(),
+  difficulty: text("difficulty").notNull(), // foundation | intermediate | advanced
+  evaluationCriteria: text("evaluation_criteria").notNull(),
+});
+
+export const topicConcepts = sqliteTable("topic_concepts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  topicId: text("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  cluster: text("cluster").notNull(), // core concepts | practical usage | tradeoffs | best practices
+  term: text("term").notNull(),
+});
+
+export const warmupQuestions = sqliteTable("warmup_questions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  topicId: text("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  level: integer("level").notNull().default(0),
+  stem: text("stem").notNull(),
+  choiceA: text("choice_a").notNull(),
+  choiceB: text("choice_b").notNull(),
+  choiceC: text("choice_c").notNull(),
+  choiceD: text("choice_d").notNull(),
+  correctAnswer: text("correct_answer").notNull(), // A | B | C | D
+  weight: integer("weight").notNull().default(3),  // 1–5, higher = picked more often
+  linkedQuestionOrder: integer("linked_question_order"), // nullable — open question this gates
+});
+
+export const warmupHistory = sqliteTable("warmup_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  warmupQuestionId: integer("warmup_question_id").notNull().references(() => warmupQuestions.id, { onDelete: "cascade" }),
+  sessionId: text("session_id").notNull().references(() => sessions.id, { onDelete: "cascade" }),
+  correct: integer("correct", { mode: "boolean" }).notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const topicsRelations = relations(topics, ({ many }) => ({
+  questions: many(topicQuestions),
+  concepts: many(topicConcepts),
+  warmupQuestions: many(warmupQuestions),
+}));
+
+export const topicQuestionsRelations = relations(topicQuestions, ({ one }) => ({
+  topic: one(topics, { fields: [topicQuestions.topicId], references: [topics.id] }),
+}));
+
+export const topicConceptsRelations = relations(topicConcepts, ({ one }) => ({
+  topic: one(topics, { fields: [topicConcepts.topicId], references: [topics.id] }),
+}));
+
+export const warmupQuestionsRelations = relations(warmupQuestions, ({ one, many }) => ({
+  topic: one(topics, { fields: [warmupQuestions.topicId], references: [topics.id] }),
+  history: many(warmupHistory),
+}));
+
+export const warmupHistoryRelations = relations(warmupHistory, ({ one }) => ({
+  question: one(warmupQuestions, { fields: [warmupHistory.warmupQuestionId], references: [warmupQuestions.id] }),
+  session: one(sessions, { fields: [warmupHistory.sessionId], references: [sessions.id] }),
+}));
+
 export const sessionsRelations = relations(sessions, ({ many }) => ({
   questions: many(sessionQuestions),
   messages: many(sessionMessages),

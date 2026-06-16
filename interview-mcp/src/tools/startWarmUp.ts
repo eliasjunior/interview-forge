@@ -90,6 +90,13 @@ function answerCardinality(answerPattern: string): number {
   return answerPattern.split(",").filter(Boolean).length;
 }
 
+type WarmupStats = {
+  stem: string;
+  weight: number;
+  correctCount: number;
+  incorrectCount: number;
+};
+
 type WarmupCandidate = {
   item: import("../knowledge/port.js").WarmUpQuestion,
   index: number,
@@ -97,6 +104,7 @@ type WarmupCandidate = {
   recentlyAsked: boolean,
   answerPattern: string,
   correctCount: number,
+  effectiveWeight: number,
 };
 
 function orderWarmupQuestions(candidates: WarmupCandidate[]): WarmupCandidate[] {
@@ -141,10 +149,17 @@ function selectWarmupQuestions(
   items: import("../knowledge/port.js").WarmUpQuestion[],
   pastAskCounts: Map<string, number>,
   recentSet: Set<string>,
+  statsMap: Map<string, WarmupStats>,
   maxQuestions = MAX_WARMUP_QUESTIONS,
 ): import("../knowledge/port.js").WarmUpQuestion[] {
   const candidates: WarmupCandidate[] = items.map((item, index) => {
     const answerPattern = normaliseAnswerPattern(item.answer);
+    const stats = statsMap.get(item.question);
+    const staticWeight = stats?.weight ?? 3;
+    const histCorrect = stats?.correctCount ?? 0;
+    const histIncorrect = stats?.incorrectCount ?? 0;
+    // Higher weight + more wrong → higher priority (lower sort value)
+    const effectiveWeight = Math.max(1, staticWeight + histIncorrect - Math.floor(histCorrect * 0.5));
     return {
       item,
       index,
@@ -152,12 +167,14 @@ function selectWarmupQuestions(
       recentlyAsked: recentSet.has(item.question),
       answerPattern,
       correctCount: answerCardinality(answerPattern),
+      effectiveWeight,
     };
   });
 
-  // Recently-asked last; then least-asked first; shuffle ties so the subset varies
+  // Recently-asked last; then highest effectiveWeight first; shuffle ties
   candidates.sort((a, b) => {
     if (a.recentlyAsked !== b.recentlyAsked) return a.recentlyAsked ? 1 : -1;
+    if (a.effectiveWeight !== b.effectiveWeight) return b.effectiveWeight - a.effectiveWeight;
     if (a.timesAsked !== b.timesAsked) return a.timesAsked - b.timesAsked;
     return Math.random() - 0.5;
   });
@@ -321,7 +338,11 @@ export function registerStartWarmUpTool(server: McpServer, deps: ToolDeps) {
       const id = deps.generateId();
       const format = FORMAT_BY_LEVEL[narrowedLevel];
       const recentSet = new Set(previouslyAskedQuestions);
-      const qs = selectWarmupQuestions(levelContent.questions, pastAskCounts, recentSet);
+
+      const statsRows = deps.loadWarmupStats(knowledgeTopic!.topic, narrowedLevel);
+      const statsMap = new Map<string, WarmupStats>(statsRows.map((s) => [s.stem, s]));
+
+      const qs = selectWarmupQuestions(levelContent.questions, pastAskCounts, recentSet, statsMap);
 
       const session: Session = {
         id,

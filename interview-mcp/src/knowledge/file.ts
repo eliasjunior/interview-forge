@@ -17,6 +17,16 @@ function normalise(s: string): string {
   return s.toLowerCase().replace(/[\s\-_]+/g, "");
 }
 
+function collectMdFiles(dir: string): string[] {
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) results.push(...collectMdFiles(full));
+    else if (entry.isFile() && entry.name.endsWith(".md")) results.push(full);
+  }
+  return results;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Markdown parser
 // Extracts sections delimited by ## headings
@@ -328,8 +338,8 @@ export class FileKnowledgeStore implements KnowledgeStore {
 
     if (!fs.existsSync(dir)) return;
 
-    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith(".md"))) {
-      const parsed = parseKnowledgeFile(path.join(dir, file));
+    for (const file of collectMdFiles(dir)) {
+      const parsed = parseKnowledgeFile(file);
       if (!parsed) continue;
 
       // Index by normalised filename stem AND normalised topic title

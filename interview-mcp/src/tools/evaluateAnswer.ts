@@ -364,6 +364,12 @@ export function registerEvaluateAnswerTool(server: McpServer, deps: ToolDeps) {
         }
 
         result = { score: isCorrect ? 5 : 1, feedback, needsFollowUp: false };
+
+        // Record warm-up history for weighted selection in future rounds
+        const questionStem = session.questions[session.currentQuestionIndex];
+        if (questionStem) {
+          deps.saveWarmupHistory(questionStem, session.topic, session.id, isCorrect);
+        }
       } else if (deps.ai) {
         const entry = deps.knowledge.findByTopic(session.topic);
         // Prefer pre-selected criteria stored on the session (safe after question shuffling).

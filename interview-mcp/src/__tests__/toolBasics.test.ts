@@ -137,6 +137,8 @@ function makeDeps(overrides: Partial<ToolDeps> = {}) {
       (evaluations.reduce((sum, evaluation) => sum + evaluation.score, 0) / evaluations.length).toFixed(1),
     buildSummary: (session) => `Summary for ${session.topic}`,
     finalizeSession: async () => ({ summary: "done", avgScore: "4.0", concepts: [], reportFile: "report.md" }),
+    saveWarmupHistory: () => {},
+    loadWarmupStats: () => [],
     ...overrides,
   };
 

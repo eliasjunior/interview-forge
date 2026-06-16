@@ -126,6 +126,8 @@ function makeDeps(overrides: Partial<ToolDeps> = {}) {
         reportFile: "reports/session-1.md",
       };
     },
+    saveWarmupHistory: () => {},
+    loadWarmupStats: () => [],
     ...overrides,
   };
 

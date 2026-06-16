@@ -18,6 +18,8 @@ import type { ToolDeps } from "./tools/deps.js";
 import { detectTopicLevel } from "./tools/getTopicLevel.js";
 import { createDb } from "./db/client.js";
 import { createSqliteRepositories } from "./db/repositories/createRepositories.js";
+import { and, eq, sql } from "drizzle-orm";
+import { topics, warmupHistory, warmupQuestions } from "./db/schema.js";
 import { normalizeConcepts } from "./graph/concepts.js";
 import { deleteSessionWithArtifacts, inspectSessionDeletionImpact } from "./sessions/admin.js";
 import { shouldRecordTopicLevelUp } from "./topicPlanProgress.js";
@@ -25,7 +27,6 @@ import { shouldRecordTopicLevelUp } from "./topicPlanProgress.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const ai: AIProvider | null = null;
-const knowledge: KnowledgeStore = createKnowledgeStore();
 
 function stateError(msg: string) {
   return {
@@ -41,6 +42,7 @@ const PUBLIC_DIR       = path.resolve(__dirname, "../public");
 const GENERATED_UI_DIR = path.join(PUBLIC_DIR, "generated");
 const UI_PORT = process.env.PORT ?? "3001";
 const db = createDb();
+const knowledge: KnowledgeStore = createKnowledgeStore(db);
 const repositories = createSqliteRepositories(db);
 
 function ensureDataDir() {
@@ -275,6 +277,43 @@ const deps: ToolDeps = {
   saveExercise,
   getCodeChallenge: (sessionId) => repositories.codeChallenges.getBySessionId(sessionId),
   saveCodeChallenge: (challenge) => repositories.codeChallenges.upsert(challenge),
+  loadWarmupStats(topicTitle, level) {
+    const topicRow = db.select({ id: topics.id }).from(topics).where(eq(topics.title, topicTitle)).get();
+    if (!topicRow) return [];
+
+    return db
+      .select({
+        stem: warmupQuestions.stem,
+        weight: warmupQuestions.weight,
+        correctCount: sql<number>`coalesce(sum(case when ${warmupHistory.correct} = 1 then 1 else 0 end), 0)`,
+        incorrectCount: sql<number>`coalesce(sum(case when ${warmupHistory.correct} = 0 then 1 else 0 end), 0)`,
+      })
+      .from(warmupQuestions)
+      .leftJoin(warmupHistory, eq(warmupHistory.warmupQuestionId, warmupQuestions.id))
+      .where(and(eq(warmupQuestions.topicId, topicRow.id), eq(warmupQuestions.level, level)))
+      .groupBy(warmupQuestions.id)
+      .all();
+  },
+  saveWarmupHistory(questionStem, topicTitle, sessionId, correct) {
+    const topicRow = db
+      .select({ id: topics.id })
+      .from(topics)
+      .where(eq(topics.title, topicTitle))
+      .get();
+    if (!topicRow) return;
+    const mcqRow = db
+      .select({ id: warmupQuestions.id })
+      .from(warmupQuestions)
+      .where(and(eq(warmupQuestions.topicId, topicRow.id), eq(warmupQuestions.stem, questionStem)))
+      .get();
+    if (!mcqRow) return;
+    db.insert(warmupHistory).values({
+      warmupQuestionId: mcqRow.id,
+      sessionId,
+      correct,
+      createdAt: new Date().toISOString(),
+    }).run();
+  },
   exercisesDir: EXERCISES_DIR,
   scopesDir: SCOPES_DIR,
   generateId,

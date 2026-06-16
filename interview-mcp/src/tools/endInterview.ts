@@ -15,6 +15,53 @@ export function registerEndInterviewTool(server: McpServer, deps: ToolDeps) {
       if (!session) return deps.stateError(`Session '${sessionId}' not found.`);
       if (session.state === "ENDED") return deps.stateError("Session is already ended.");
 
+      // ── Warm-up round summary ────────────────────────────────────────────────
+      if (session.sessionKind === "warmup") {
+        await deps.finalizeSession(session, sessions);
+
+        const level = session.questLevel ?? 0;
+        const topic = session.topic;
+
+        const correctEvals = session.evaluations.filter((e) => e.score >= 4);
+        const wrongEvals   = session.evaluations.filter((e) => e.score < 4);
+        const total        = session.evaluations.length;
+        const correctCount = correctEvals.length;
+
+        const weakSpots = wrongEvals.map((e) => e.question);
+
+        // Count how many warmup rounds for this topic+level have now ended
+        const allSessions = deps.loadSessions();
+        const roundNumber = Object.values(allSessions).filter(
+          (s) => s.topic === topic &&
+                  s.sessionKind === "warmup" &&
+                  (s.questLevel ?? 0) === level &&
+                  s.state === "ENDED",
+        ).length;
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              sessionId,
+              sessionKind: "warmup",
+              topic,
+              level,
+              roundNumber,
+              score: { correct: correctCount, total, pct: total > 0 ? Math.round((correctCount / total) * 100) : 0 },
+              weakSpots,
+              canRepeat: true,
+              instruction:
+                `Present the round summary: ${correctCount}/${total} correct (${weakSpots.length > 0 ? `weak spots: ${weakSpots.join("; ")}` : "all correct!"}).` +
+                " Then ask: 'Would you like another round of warm-up, or are you ready to start the interview?'" +
+                ` Another round → start_warm_up { topic: "${topic}", level: ${level} }.` +
+                ` Ready → start_interview { topic: "${topic}" }.` +
+                " Wait for the candidate's answer before calling either tool.",
+            }),
+          }],
+        };
+      }
+
+      // ── Full interview summary ───────────────────────────────────────────────
       const { summary, concepts, reportFile } = await deps.finalizeSession(session, sessions);
       const recommendations = buildEndInterviewRecommendations(session, deps.loadMistakes(session.topic));
       const flashcardDrafts = buildFlashcardDrafts(session);
