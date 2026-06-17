@@ -9,7 +9,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema.js";
 import { createSqliteClient } from "../db/client.js";
 import { createSqliteRepositories } from "../db/repositories/createRepositories.js";
-import type { Exercise, Flashcard, KnowledgeGraph, Mistake, Session, Skill } from "@mock-interview/shared";
+import type { AlgorithmProblemTrackerItem, Exercise, Flashcard, KnowledgeGraph, Mistake, Session, Skill } from "@mock-interview/shared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.resolve(__dirname, "../../drizzle");
@@ -168,6 +168,26 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     ],
     filePath: "java-concurrency/thread-pool-capacity-lab.md",
     createdAt: "2026-03-01T10:14:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeAlgorithmProblem(overrides: Partial<AlgorithmProblemTrackerItem> = {}): AlgorithmProblemTrackerItem {
+  return {
+    id: "algorithm-problem-1",
+    problem: "Merge Sorted Array",
+    problemDescription: "Given two sorted integer arrays where the first has enough trailing space, merge the second into the first in nondecreasing order in place.",
+    pattern: "two pointers",
+    difficulty: "Easy",
+    trickyPart: "Writing from the end avoids overwriting values in nums1.",
+    mentalModel: "Treat the extra tail space as the merge buffer.",
+    commonMistake: "Merging from the front and losing unread values.",
+    complexity: "O(n + m) time, O(1) extra space",
+    reSolvedWithoutHelp: true,
+    dateLastReviewed: "2026-03-01",
+    nextReviewDays: 3,
+    createdAt: "2026-03-01T10:15:00.000Z",
+    updatedAt: "2026-03-01T10:15:00.000Z",
     ...overrides,
   };
 }
@@ -617,6 +637,47 @@ describe("sqlite repositories", () => {
         repositories.exercises.list("java-concurrency", undefined, ["concurrency", "capacity"]),
         [mediumExercise]
       );
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test("algorithm problem repository tracks and updates practice rows", () => {
+    const { sqlite, repositories } = setupRepositories();
+
+    try {
+      const first = makeAlgorithmProblem();
+      const second = makeAlgorithmProblem({
+        id: "algorithm-problem-2",
+        problem: "LRU Cache",
+        pattern: "hash map + doubly linked list",
+        difficulty: "Medium",
+        reSolvedWithoutHelp: false,
+        dateLastReviewed: undefined,
+        nextReviewDays: 1,
+        createdAt: "2026-03-02T10:15:00.000Z",
+        updatedAt: "2026-03-02T10:15:00.000Z",
+      });
+
+      repositories.algorithmProblems.insert(first);
+      repositories.algorithmProblems.insert(second);
+
+      assert.deepEqual(repositories.algorithmProblems.list(), [second, first]);
+      assert.deepEqual(repositories.algorithmProblems.getById(first.id), first);
+
+      const updated = {
+        ...first,
+        difficulty: "Medium" as const,
+        reSolvedWithoutHelp: false,
+        nextReviewDays: 7,
+        updatedAt: "2026-03-03T10:15:00.000Z",
+      };
+
+      repositories.algorithmProblems.update(updated);
+      assert.deepEqual(repositories.algorithmProblems.getById(first.id), updated);
+      assert.equal(repositories.algorithmProblems.deleteById("missing"), false);
+      assert.equal(repositories.algorithmProblems.deleteById(second.id), true);
+      assert.deepEqual(repositories.algorithmProblems.list(), [updated]);
     } finally {
       sqlite.close();
     }

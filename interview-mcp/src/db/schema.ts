@@ -265,6 +265,23 @@ export const codeChallenges = sqliteTable("code_challenges", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const algorithmProblems = sqliteTable("algorithm_problems", {
+  id: text("id").primaryKey(),
+  problem: text("problem").notNull(),
+  problemDescription: text("problem_description").notNull().default(""),
+  pattern: text("pattern").notNull().default(""),
+  difficulty: text("difficulty").notNull().default("Medium"),
+  trickyPart: text("tricky_part").notNull().default(""),
+  mentalModel: text("mental_model").notNull().default(""),
+  commonMistake: text("common_mistake").notNull().default(""),
+  complexity: text("complexity").notNull().default(""),
+  reSolvedWithoutHelp: integer("re_solved_without_help", { mode: "boolean" }).notNull().default(false),
+  dateLastReviewed: text("date_last_reviewed"),
+  nextReviewDays: integer("next_review_days").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Knowledge tables — derived from markdown files, seeded by seed script
 // ─────────────────────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import MistakesPage from './pages/MistakesPage'
 import TopicsPage from './pages/TopicsPage'
 import ProgressPage from './pages/ProgressPage'
 import ForgeArenaPage from './pages/ForgeArenaPage'
+import AlgorithmTrackerPage from './pages/AlgorithmTrackerPage'
 
 export default function App() {
   const location = useLocation()
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/sessions/:id" element={<ReportPage />} />
           <Route path="/graph" element={<GraphPage />} />
           <Route path="/progress" element={<ProgressPage />} />
+          <Route path="/algorithms" element={<AlgorithmTrackerPage />} />
           <Route path="/flashcards" element={<FlashcardsPage />} />
           <Route path="/flashcards/pending" element={<PendingFlashcardAnswersPage />} />
           <Route path="/mistakes" element={<MistakesPage />} />

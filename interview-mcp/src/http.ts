@@ -20,6 +20,8 @@ import type {
   ProgressSessionKind,
   TopicPlan,
   TopicPlanPriority,
+  AlgorithmProblemDifficulty,
+  AlgorithmProblemTrackerItem,
 } from "@mock-interview/shared";
 import { randomUUID } from "crypto";
 import { createDb } from "./db/client.js";
@@ -116,6 +118,43 @@ function parseProgressSessionKind(value: unknown): ProgressSessionKind {
     return value;
   }
   return "interview";
+}
+
+function parseAlgorithmProblemDifficulty(value: unknown, fallback: AlgorithmProblemDifficulty = "Medium"): AlgorithmProblemDifficulty {
+  if (value === "Easy" || value === "Medium" || value === "Hard") return value;
+  return fallback;
+}
+
+function parseAlgorithmProblemPatch(body: unknown, existing?: AlgorithmProblemTrackerItem) {
+  const source = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
+  const problem = typeof source.problem === "string" ? source.problem.trim() : existing?.problem ?? "";
+  const nextReviewDaysRaw = source.nextReviewDays ?? existing?.nextReviewDays ?? 1;
+  const nextReviewDays = Number.isFinite(Number(nextReviewDaysRaw))
+    ? Math.max(0, Math.min(365, Math.trunc(Number(nextReviewDaysRaw))))
+    : existing?.nextReviewDays ?? 1;
+  const dateLastReviewed = Object.prototype.hasOwnProperty.call(source, "dateLastReviewed")
+    ? typeof source.dateLastReviewed === "string" && source.dateLastReviewed.trim().length > 0
+      ? source.dateLastReviewed.trim()
+      : undefined
+    : existing?.dateLastReviewed;
+
+  return {
+    problem,
+    problemDescription: typeof source.problemDescription === "string"
+      ? source.problemDescription.trim()
+      : existing?.problemDescription ?? "",
+    pattern: typeof source.pattern === "string" ? source.pattern.trim() : existing?.pattern ?? "",
+    difficulty: parseAlgorithmProblemDifficulty(source.difficulty, existing?.difficulty ?? "Medium"),
+    trickyPart: typeof source.trickyPart === "string" ? source.trickyPart.trim() : existing?.trickyPart ?? "",
+    mentalModel: typeof source.mentalModel === "string" ? source.mentalModel.trim() : existing?.mentalModel ?? "",
+    commonMistake: typeof source.commonMistake === "string" ? source.commonMistake.trim() : existing?.commonMistake ?? "",
+    complexity: typeof source.complexity === "string" ? source.complexity.trim() : existing?.complexity ?? "",
+    reSolvedWithoutHelp: typeof source.reSolvedWithoutHelp === "boolean"
+      ? source.reSolvedWithoutHelp
+      : existing?.reSolvedWithoutHelp ?? false,
+    dateLastReviewed,
+    nextReviewDays,
+  };
 }
 
 function buildGraphInspection(selectedNodeIds: string[]): GraphInspectionResult {
@@ -295,6 +334,61 @@ app.get("/api/progress", (req, res) => {
   });
 
   res.json(progress);
+});
+
+app.get("/api/algorithm-problems", (_req, res) => {
+  res.json(repositories.algorithmProblems.list());
+});
+
+app.post("/api/algorithm-problems", (req, res) => {
+  const patch = parseAlgorithmProblemPatch(req.body);
+  if (!patch.problem) {
+    res.status(400).json({ error: "problem is required" });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const item: AlgorithmProblemTrackerItem = {
+    id: randomUUID(),
+    ...patch,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  repositories.algorithmProblems.insert(item);
+  res.status(201).json(item);
+});
+
+app.put("/api/algorithm-problems/:id", (req, res) => {
+  const existing = repositories.algorithmProblems.getById(req.params.id);
+  if (!existing) {
+    res.status(404).json({ error: "Algorithm problem not found" });
+    return;
+  }
+
+  const patch = parseAlgorithmProblemPatch(req.body, existing);
+  if (!patch.problem) {
+    res.status(400).json({ error: "problem is required" });
+    return;
+  }
+
+  const item: AlgorithmProblemTrackerItem = {
+    ...existing,
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+
+  repositories.algorithmProblems.update(item);
+  res.json(item);
+});
+
+app.delete("/api/algorithm-problems/:id", (req, res) => {
+  if (!repositories.algorithmProblems.deleteById(req.params.id)) {
+    res.status(404).json({ error: "Algorithm problem not found" });
+    return;
+  }
+
+  res.json({ deleted: true, id: req.params.id });
 });
 
 // API: List all sessions

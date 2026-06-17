@@ -1,6 +1,19 @@
-import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
+
+const studyToolLinks = [
+  { to: '/progress', label: 'Progress' },
+  { to: '/graph', label: 'Knowledge Graph' },
+  { to: '/mistakes', label: 'Mistake Log' },
+  { to: '/flashcards/pending', label: 'Pending Eval' },
+  { to: '/arena', label: 'Crisis Mode' },
+]
 
 export default function NavBar() {
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const location = useLocation()
+  const toolsActive = studyToolLinks.some(link => location.pathname === link.to)
+
   return (
     <nav className="navbar">
       <div className="navbar-brand">
@@ -15,28 +28,16 @@ export default function NavBar() {
           Topics
         </NavLink>
         <NavLink
-          to="/arena"
-          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-        >
-          Crisis Mode
-        </NavLink>
-        <NavLink
           to="/sessions"
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >
           Sessions
         </NavLink>
         <NavLink
-          to="/graph"
+          to="/algorithms"
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >
-          Knowledge Graph
-        </NavLink>
-        <NavLink
-          to="/progress"
-          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-        >
-          Progress
+          Algorithms
         </NavLink>
         <NavLink
           to="/flashcards"
@@ -44,18 +45,38 @@ export default function NavBar() {
         >
           Flashcards 🃏
         </NavLink>
-        <NavLink
-          to="/flashcards/pending"
-          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        <div
+          className="nav-dropdown"
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setToolsOpen(false)
+          }}
         >
-          Pending Eval
-        </NavLink>
-        <NavLink
-          to="/mistakes"
-          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-        >
-          Mistake Log
-        </NavLink>
+          <button
+            type="button"
+            className={`nav-link nav-dropdown-trigger${toolsActive ? ' active' : ''}`}
+            aria-haspopup="menu"
+            aria-expanded={toolsOpen}
+            onClick={() => setToolsOpen(open => !open)}
+          >
+            Study Tools
+            <span className="nav-dropdown-caret" aria-hidden="true">▾</span>
+          </button>
+          {toolsOpen && (
+            <div className="nav-dropdown-menu" role="menu">
+              {studyToolLinks.map(link => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  role="menuitem"
+                  className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                  onClick={() => setToolsOpen(false)}
+                >
+                  {link.label}
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   )

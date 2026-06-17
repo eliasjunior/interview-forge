@@ -259,6 +259,28 @@ export interface GraphInspectionResult {
   sessionsMatchingAny: GraphInspectionSession[]
 }
 
+// ── Algorithm problem tracker ────────────────────────────────────────────────
+
+export type AlgorithmProblemDifficulty = 'Easy' | 'Medium' | 'Hard'
+
+export interface AlgorithmProblemTrackerItem {
+  id: string
+  problem: string
+  /** Original exercise prompt context, written in our own concise words. */
+  problemDescription: string
+  pattern: string
+  difficulty: AlgorithmProblemDifficulty
+  trickyPart: string
+  mentalModel: string
+  commonMistake: string
+  complexity: string
+  reSolvedWithoutHelp: boolean
+  dateLastReviewed?: string
+  nextReviewDays: number
+  createdAt: string
+  updatedAt: string
+}
+
 // ── AI provider ───────────────────────────────────────────────────────────────
 
 export interface EvaluationResult {

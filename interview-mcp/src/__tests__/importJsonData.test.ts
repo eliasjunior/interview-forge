@@ -132,6 +132,13 @@ function createSpyRepositories() {
       getBySessionId: () => null,
       upsert: () => undefined,
     },
+    algorithmProblems: {
+      list: () => [],
+      getById: () => null,
+      insert: () => undefined,
+      update: () => undefined,
+      deleteById: () => false,
+    },
   };
 
   return { repositories, calls };

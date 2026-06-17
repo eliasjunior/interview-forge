@@ -19,6 +19,7 @@ import type {
   TopicPlanPriority,
   CodeChallenge,
   CodeRunResult,
+  AlgorithmProblemTrackerItem,
 } from '@mock-interview/shared'
 
 const BASE = '/api'
@@ -157,6 +158,30 @@ export const getProgressOverview = (query: ProgressQuery = {}): Promise<Progress
   const suffix = params.toString() ? `?${params.toString()}` : ''
   return req(`${BASE}/progress${suffix}`)
 }
+
+export type AlgorithmProblemInput = Omit<AlgorithmProblemTrackerItem, 'id' | 'createdAt' | 'updatedAt'>
+
+export const getAlgorithmProblems = (): Promise<AlgorithmProblemTrackerItem[]> =>
+  req(`${BASE}/algorithm-problems`)
+
+export const createAlgorithmProblem = (body: AlgorithmProblemInput): Promise<AlgorithmProblemTrackerItem> =>
+  post(`${BASE}/algorithm-problems`, body)
+
+export const updateAlgorithmProblem = (
+  id: string,
+  body: Partial<AlgorithmProblemInput>
+): Promise<AlgorithmProblemTrackerItem> =>
+  fetch(`${BASE}/algorithm-problems/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (!res.ok) throw new Error(`Request failed: ${res.status} ${BASE}/algorithm-problems/${encodeURIComponent(id)}`)
+    return res.json() as Promise<AlgorithmProblemTrackerItem>
+  })
+
+export const deleteAlgorithmProblem = (id: string): Promise<{ deleted: true; id: string }> =>
+  del(`${BASE}/algorithm-problems/${encodeURIComponent(id)}`)
 export const getSession = async (id: string): Promise<Session | null> => {
   const sessions = await getSessions()
   return sessions.find(s => s.id === id) ?? null
